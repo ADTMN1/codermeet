@@ -69,7 +69,7 @@ const LoginForm: React.FC = () => {
       {/* Login form */}
       <form
         onSubmit={handleSubmit}
-        className="relative z-10 mx-auto mt-20 w-full max-w-sm p-8 bg-black bg-opacity-80 backdrop-blur-lg rounded-3xl shadow-2xl border-2 border-neon-purple hover:shadow-[0_0_40px_#C27AFF] transition-shadow duration-500 flex flex-col gap-6"
+        className="relative z-10 mx-auto mt-20 w-full max-w-sm p-8 bg-black bg-opacity-80 backdrop-blur-lg rounded-3xl shadow-2xl border-2 border-neon-purple hover:shadow-[0_0_40px_#C27AFF] transition-shadow duration-500 flex flex-col gap-3"
       >
         <h2
           className="text-5xl font-extrabold text-neon-purple text-center tracking-wider animate-pulse"
