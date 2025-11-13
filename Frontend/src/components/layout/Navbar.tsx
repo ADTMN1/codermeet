@@ -17,13 +17,13 @@ const Navbar: React.FC = () => {
 
           <div className="hidden md:flex items-center space-x-6">
             <a
-              href="/Explore"
+              href="/explore"
               className="text-gray-300 hover:text-blue-400 px-3 py-2 rounded-md text-md font-mono font-semibold transition duration-200 hover:underline underline-offset-4"
             >
               Explore
             </a>
             <a
-              href="/Mentorship"
+              href="/mentorship"
               className="text-gray-300 hover:text-blue-400 px-3 py-2 rounded-md text-md font-mono font-semibold transition duration-200 hover:underline underline-offset-4"
             >
               Mentorship
@@ -46,7 +46,7 @@ const Navbar: React.FC = () => {
 
           <div className="flex items-center space-x-4">
             <button className="border-2  text-white px-4 py-2 rounded-md text-sm font-mono font-semibold shadow-lg hover:shadow-blue-500/50 transform hover:-translate-y-0.5 hover:scale-105 transition duration-200">
-              <Link to="/Login">Login In</Link>
+              <Link to="/login">Login In</Link>
             </button>
             <button className="bg-purple-500 hover:bg-purple-500  text-white px-4 py-2 rounded-md text-sm font-mono font-semibold shadow-lg hover:shadow-blue-500/50 transform hover:-translate-y-0.5 hover:scale-105 transition duration-200">
               Sign Up
