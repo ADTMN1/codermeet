@@ -49,7 +49,7 @@ const Navbar: React.FC = () => {
               <Link to="/login">Login In</Link>
             </button>
             <button className="bg-purple-500 hover:bg-purple-500  text-white px-4 py-2 rounded-md text-sm font-mono font-semibold shadow-lg hover:shadow-blue-500/50 transform hover:-translate-y-0.5 hover:scale-105 transition duration-200">
-              Sign Up
+              <Link to="/signup"> Sign Up</Link>
             </button>
           </div>
         </div>

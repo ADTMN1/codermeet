@@ -8,9 +8,88 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* src/index.css or globals.css */
+/* 🔮 Gradient text helper */
 .custom-gradient-text {
   background: linear-gradient(to right, #60a5fa, #c084fc, #f472b6);
   -webkit-background-clip: text;
   color: transparent;
+}
+
+/* 🔒 Autofill fix (so Chrome/Safari don't force white/yellow backgrounds) */
+@layer base {
+  input:-webkit-autofill,
+  textarea:-webkit-autofill,
+  select:-webkit-autofill {
+    /* Paint the input’s own background color instead of Chrome’s autofill color */
+    -webkit-box-shadow: 0 0 0px 1000px rgb(31 41 55 / 1) inset !important;
+    box-shadow: 0 0 0px 1000px rgb(31 41 55 / 1) inset !important;
+
+    /* Make sure text stays white (for dark inputs) */
+    -webkit-text-fill-color: white !important;
+
+    /* Prevent Chrome from reapplying white/yellow background after delay */
+    transition: background-color 9999s ease-in-out 0s !important;
+  }
+
+  /* Optional: handle focus/hover autofill states too */
+  input:-webkit-autofill:focus,
+  textarea:-webkit-autofill:focus,
+  select:-webkit-autofill:focus {
+    -webkit-box-shadow: 0 0 0px 1000px rgb(31 41 55 / 1) inset !important;
+    box-shadow: 0 0 0px 1000px rgb(31 41 55 / 1) inset !important;
+    -webkit-text-fill-color: white !important;
+  }
+}
+
+@layer base {
+  /* Fix autofill color flash (Chrome, Edge, Safari) */
+  input:-webkit-autofill,
+  textarea:-webkit-autofill,
+  select:-webkit-autofill {
+    /* repaint with your bg color instead of white/yellow */
+    -webkit-box-shadow: 0 0 0px 1000px rgb(55 65 81 / 1) inset !important; /* bg-gray-700 */
+    box-shadow: 0 0 0px 1000px rgb(55 65 81 / 1) inset !important;
+
+    /* keep text readable */
+    -webkit-text-fill-color: rgb(229 231 235) !important; /* text-gray-200 */
+    color: rgb(229 231 235) !important;
+
+    /* prevent the browser from re-applying the default highlight */
+    transition: background-color 9999s ease-in-out 0s !important;
+  }
+
+  /* also handle autofill when focused */
+  input:-webkit-autofill:focus,
+  textarea:-webkit-autofill:focus,
+  select:-webkit-autofill:focus {
+    -webkit-box-shadow: 0 0 0px 1000px rgb(55 65 81 / 1) inset !important;
+    -webkit-text-fill-color: rgb(229 231 235) !important;
+  }
+}
+
+@layer base {
+  input:-webkit-autofill,
+  textarea:-webkit-autofill,
+  select:-webkit-autofill {
+    /* Repaint with your color (Tailwind bg-gray-700 = rgb(55 65 81)) */
+    -webkit-box-shadow: 0 0 0px 1000px rgb(55 65 81) inset !important;
+    box-shadow: 0 0 0px 1000px rgb(55 65 81) inset !important;
+
+    /* Keep your text & caret colors */
+    -webkit-text-fill-color: rgb(229 231 235) !important; /* text-gray-200 */
+    caret-color: rgb(229 231 235) !important;
+
+    /* 👇 This line stops Chrome’s delayed “repaint to black” animation */
+    transition:
+      background-color 9999s ease-in-out 0s,
+      color 9999s ease-in-out 0s !important;
+  }
+
+  input:-webkit-autofill:focus,
+  textarea:-webkit-autofill:focus,
+  select:-webkit-autofill:focus {
+    -webkit-box-shadow: 0 0 0px 1000px rgb(55 65 81) inset !important;
+    -webkit-text-fill-color: rgb(229 231 235) !important;
+    caret-color: rgb(229 231 235) !important;
+  }
 }

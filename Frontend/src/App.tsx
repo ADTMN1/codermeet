@@ -4,7 +4,7 @@ import Navbar from './components/layout/Navbar';
 import Home from './pages/Home';
 import MentorshipPreview from './components/sections/MentorshipPreview';
 import Login from './pages/Login';
-// import Discover from './pages/Discover';
+import SignUp from './pages/SignUp';
 // import Projects from './pages/Projects';
 // import Community from './pages/Community';
 
@@ -18,7 +18,7 @@ function App() {
           <Route path="/login" element={<Login />} />
           {/* {/* <Route path="/discover" element={<Discover />} /> */}
           <Route path="/mentorship" element={<MentorshipPreview />} />
-          {/* <Route path="/community" element={<Community />} /> */}
+          <Route path="/signup" element={<SignUp />} />
         </Routes>
       </div>
     </Router>
