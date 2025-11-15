@@ -134,7 +134,9 @@ const LoginForm: React.FC = () => {
           className="bg-neon-purple hover:bg-neon-purple/80 text-white font-bold py-3 rounded-md 
             transition-transform transform hover:scale-105 hover:shadow-[0_0_25px_#C27AFF] shadow-md cursor-pointer"
         >
-          Sign In
+          <a href="/dashboard" className="w-full text-center">
+            Sign In
+          </a>
         </button>
 
         {/* Sign Up */}

@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { FaGithub, FaPython, FaJsSquare, FaReact } from 'react-icons/fa';
 import { IoMdCheckboxOutline } from 'react-icons/io';
 
+import { useNavigate } from 'react-router-dom';
+
 type FormData = {
   fullName: string;
   username: string;
@@ -19,6 +21,8 @@ type FormData = {
 
 const Signup: React.FC = () => {
   const [step, setStep] = useState<number>(1);
+
+  const navigate = useNavigate();
   const [formData, setFormData] = useState<FormData>({
     fullName: '',
     username: '',
@@ -82,7 +86,7 @@ const Signup: React.FC = () => {
 
     // Automatically hide after 3 seconds
     setTimeout(() => setToast(null), 3000);
-
+    navigate('/dashboard');
     // Here you can call your API to save the user
   };
 
@@ -470,7 +474,8 @@ const Signup: React.FC = () => {
             </button>
           ) : (
             <button
-              type="submit"
+              type="button"
+              onClick={handleSubmit}
               className="px-6 py-3 rounded-lg bg-green-500 hover:bg-green-400 text-white transition duration-200 ml-auto cursor-pointer"
             >
               Finish & Join
