@@ -1,5 +1,4 @@
 import React from 'react';
-import Sidebar from './Sidebar';
 import {
   FaTrophy,
   FaUsers,
@@ -8,8 +7,10 @@ import {
   FaBell,
   FaMoneyBillWave,
 } from 'react-icons/fa';
+import { useNavigate } from 'react-router-dom';
 
 const Dashboard: React.FC = () => {
+  const navigate = useNavigate();
   // Sample data
   const leaderboard = [
     { name: '@Amanuel', points: 120, rank: 1, total_point: 300 },
@@ -22,15 +23,15 @@ const Dashboard: React.FC = () => {
     { name: 'Team Beta', project: 'Portfolio Builder', progress: 45 },
   ];
 
-  // Define UI values used in the JSX to avoid "Cannot find name" errors.
   const unreadCount = 3;
   const onprogress = 45;
 
+  const handleJoin = () => {
+    navigate('/weeklyChallenge');
+  };
+
   return (
     <div className="flex min-h-screen bg-gray-900 text-gray-200">
-      {/* Sidebar */}
-      <Sidebar />
-
       {/* Main Content */}
       <main className="flex-1 p-8 space-y-8">
         {/* Welcome Panel */}
@@ -75,6 +76,7 @@ const Dashboard: React.FC = () => {
             </p>
             <button
               type="button"
+              onClick={handleJoin}
               className="text-heading bg-neutral-primary box-border border border-transparent hover:bg-neutral-secondary-medium focus:ring-4 focus:ring-neutral-tertiary-soft font-medium leading-5 rounded-full text-sm px-4 py-2.5 focus:outline-none cursor-pointer hover:shadow-[0_0_15px_#C27AFF] shadow-md transition "
             >
               Join

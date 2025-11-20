@@ -3,7 +3,7 @@ import Hero from '../components/sections/Hero';
 import Features from '../components/sections/Features';
 import Footer from '../components/layout/Public/Footer';
 import LeaderboardPreview from '../components/sections/LeaderboardPreview';
-import WeeklyChallenge from '../components/sections/WeeklyChallenge';
+import WeeklyChallengePreview from '../components/sections/WeeklyChallengePreview';
 import Testimonials from '../components/sections/Testimonials';
 
 const Home: React.FC = () => {
@@ -12,7 +12,7 @@ const Home: React.FC = () => {
       <Hero />
       <Features />
       <LeaderboardPreview />
-      <WeeklyChallenge />
+      <WeeklyChallengePreview />
       <Testimonials />
       <Footer />
     </main>

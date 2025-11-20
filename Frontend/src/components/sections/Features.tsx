@@ -1,6 +1,6 @@
 import React from 'react';
 import { FaReact, FaJsSquare, FaPython, FaGitAlt } from 'react-icons/fa';
-import Card from '../ui/Card';
+import { Card } from '../ui/card';
 
 const features = [
   {

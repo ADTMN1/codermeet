@@ -11,7 +11,7 @@ const challengeCode = [
   '// Remember: Leaderboard points for bug fixes, reviews & contributions',
 ];
 
-export default function WeeklyChallenge() {
+export default function WeeklyChallengePreview() {
   const [displayedCode, setDisplayedCode] = useState<string[]>([]);
   const [lineIndex, setLineIndex] = useState(0);
 
