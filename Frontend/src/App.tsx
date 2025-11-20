@@ -9,7 +9,7 @@ import SignUp from './pages/SignUp';
 import DashboardLayout from './components/layout/Private/DashboardLayout';
 import Dashboard from './pages/Dashboard/Dashboard';
 import WeeklyChallenge from './pages/Dashboard/WeeklyChallenge';
-import Community from './pages/Dashboard/community';
+import Community from './pages/Dashboard/Community';
 import Profile from './pages/profile/profile';
 
 function App() {

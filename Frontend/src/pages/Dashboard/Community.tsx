@@ -1,6 +1,7 @@
 import React from 'react';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+
 const Community: React.FC = () => {
   const [members, setMembers] = useState<
     Array<{ id: number; name: string; role: string }>
