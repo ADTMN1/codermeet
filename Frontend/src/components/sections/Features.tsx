@@ -58,6 +58,7 @@ const Features: React.FC = () => {
 
         <Card />
       </div>
+      {/* {final section} */}
     </section>
   );
 };
