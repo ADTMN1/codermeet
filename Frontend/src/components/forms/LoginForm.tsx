@@ -1,10 +1,14 @@
 import React, { useEffect, useRef, useState } from 'react';
+import axios from 'axios';
+import { useNavigate } from 'react-router-dom';
 
 const LoginForm: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [typedPlaceholder, setTypedPlaceholder] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
+  const navigate = useNavigate();
 
   // Matrix background animation
   useEffect(() => {
@@ -56,9 +60,35 @@ const LoginForm: React.FC = () => {
     return () => clearInterval(interval);
   }, []);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Handle login securely
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Logging in with:', { email, password });
+    setErrorMessage('');
+
+    if (!email || !password) {
+      setErrorMessage('Please enter email and password.');
+      return;
+    }
+
+    try {
+      const response = await axios.post(
+        `${import.meta.env.VITE_API_URL}/api/auth/login`,
+        { email, password },
+        {
+          withCredentials: true, // important: sends/receives httpOnly cookie
+        }
+      );
+
+      console.log('Login successful:', response.data);
+
+      // Redirect to dashboard
+      navigate('/dashboard');
+    } catch (err: any) {
+      console.error(err);
+      setErrorMessage(
+        err.response?.data?.message || 'Login failed. Try again.'
+      );
+    }
   };
 
   return (
@@ -77,6 +107,10 @@ const LoginForm: React.FC = () => {
         >
           LOGIN
         </h2>
+
+        {errorMessage && (
+          <div className="text-red-500 text-md text-center">{errorMessage}</div>
+        )}
 
         {/* Email Field */}
         <div className="flex flex-col gap-2 relative">
@@ -97,9 +131,8 @@ const LoginForm: React.FC = () => {
             autoComplete="email"
             placeholder={email ? '' : typedPlaceholder}
             className="w-full p-3 rounded-md bg-[#1e1e2e] border border-neon-purple 
-    text-neon-purple font-mono placeholder:text-neon-purple/50 focus:outline-none 
-    focus:border-neon-purple  focus:ring-neon-purple transition-all 
-    duration-300 caret-neon-purple shadow-sm"
+            text-neon-purple font-mono placeholder:text-neon-purple/50 focus:outline-none 
+            focus:border-neon-purple focus:ring-neon-purple transition-all duration-300 caret-neon-purple shadow-sm"
           />
         </div>
 
@@ -122,9 +155,8 @@ const LoginForm: React.FC = () => {
             autoComplete="current-password"
             placeholder="********"
             className="w-full p-3 rounded-md bg-[#1e1e2e] border border-neon-purple 
-    text-neon-purple font-mono placeholder:text-neon-purple/50 focus:outline-none 
-    focus:border-neon-purple  focus:ring-neon-purple transition-all 
-    duration-300 caret-neon-purple shadow-sm"
+            text-neon-purple font-mono placeholder:text-neon-purple/50 focus:outline-none 
+            focus:border-neon-purple focus:ring-neon-purple transition-all duration-300 caret-neon-purple shadow-sm"
           />
         </div>
 
@@ -132,14 +164,12 @@ const LoginForm: React.FC = () => {
         <button
           type="submit"
           className="bg-neon-purple hover:bg-neon-purple/80 text-white font-bold py-3 rounded-md 
-            transition-transform transform hover:scale-105 hover:shadow-[0_0_25px_#C27AFF] shadow-md cursor-pointer"
+          transition-transform transform hover:scale-105 hover:shadow-[0_0_25px_#C27AFF] shadow-md cursor-pointer"
         >
-          <a href="/dashboard" className="w-full text-center">
-            Sign In
-          </a>
+          Sign In
         </button>
 
-        {/* Sign Up */}
+        {/* Sign Up Link */}
         <p className="text-center text-sm text-neon-purple/80">
           Don't have an account?{' '}
           <a
@@ -150,28 +180,6 @@ const LoginForm: React.FC = () => {
           </a>
         </p>
       </form>
-
-      {/* Autofill and caret fix */}
-      <style>{`
-  input:-webkit-autofill,
-  input:-webkit-autofill:hover,
-  input:-webkit-autofill:focus,
-  input:-webkit-autofill:active {
-    -webkit-box-shadow: 0 0 0px 1000px #1e1e2e inset; /* background */
-    -webkit-text-fill-color: #C27AFF;               /* text color */
-    border: 2px solid #C27AFF;                      /* keep border neon */
-    transition: background-color 5000s ease-in-out 0s;
-  }
-
-  .caret-neon-purple {
-    caret-color: #C27AFF;
-  }
-
-  @keyframes blink {
-    0%, 50%, 100% { opacity: 1; }
-    25%, 75% { opacity: 0; }
-  }
-`}</style>
     </div>
   );
 };
