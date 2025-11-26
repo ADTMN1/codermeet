@@ -28,7 +28,7 @@ app.use(express.json());
 
 // CORS - restrict in production by setting FRONTEND_URL in .env
 const allowedOrigins = (
-  process.env.FRONTEND_URL || "http://localhost:3000"
+  process.env.FRONTEND_URL || "http://localhost:5173"
 ).split(",");
 app.use(
   cors({
