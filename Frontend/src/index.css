@@ -6,6 +6,9 @@ body {
     -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  background-color: #1a202c; /* Dark background color */
+  color: #e2e8f0; /* Light text color */
+  min-height: 100vh;
 }
 
 /* 🔮 Gradient text helper */

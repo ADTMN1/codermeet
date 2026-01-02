@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
+import { useUser } from '../../context/UserContext';
+import { authService } from '../../services/auth';
 
 const LoginForm: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -8,9 +10,13 @@ const LoginForm: React.FC = () => {
   const [password, setPassword] = useState('');
   const [typedPlaceholder, setTypedPlaceholder] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
 
-  // Matrix background animation
+  // ✅ Get setUser from UserContext
+  const { setUser } = useUser();
+
+  // Matrix background animation (keep your existing code)
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -48,7 +54,7 @@ const LoginForm: React.FC = () => {
     return () => clearInterval(interval);
   }, []);
 
-  // Typing animation for placeholder
+  // Typing animation for placeholder (keep your existing code)
   useEffect(() => {
     const placeholderText = "const user = 'you@example.com';";
     let index = 0;
@@ -60,13 +66,15 @@ const LoginForm: React.FC = () => {
     return () => clearInterval(interval);
   }, []);
 
-  // Handle login securely
+  // Handle login and update UserContext
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage('');
+    setIsLoading(true);
 
     if (!email || !password) {
       setErrorMessage('Please enter email and password.');
+      setIsLoading(false);
       return;
     }
 
@@ -74,20 +82,51 @@ const LoginForm: React.FC = () => {
       const response = await axios.post(
         `${import.meta.env.VITE_API_URL}/api/auth/login`,
         { email, password },
-        {
-          withCredentials: true, // important: sends/receives httpOnly cookie
-        }
+        { withCredentials: true }
       );
 
-      console.log('Login successful:', response.data);
+      // Save the token using authService
+      const token = response.data.token || (response.data.data && response.data.data.token);
+      if (token) {
+        authService.setToken(token);
+      }
 
-      // Redirect to dashboard
-      navigate('/dashboard');
+      // Get user data from either response.data.user or response.data.data
+      const userData = response.data.user || response.data.data;
+      
+      if (userData) {
+        // Update user context
+        setUser({
+          name: userData.name || userData.fullName || email.split('@')[0],
+          email: userData.email || email,
+          avatar: userData.avatar,
+          profileImage: userData.profileImage,
+          points: userData.points || 0,
+          bio: userData.bio || '',
+          location: userData.location || '',
+          website: userData.website || '',
+          github: userData.github || '',
+          linkedin: userData.linkedin || '',
+          skills: userData.skills || [],
+          phone: userData.phone || '',
+        });
+
+        // Save user data to localStorage
+        localStorage.setItem('user', JSON.stringify(userData));
+
+        // Redirect to dashboard
+        navigate('/dashboard');
+      } else {
+        throw new Error('No user data received from server');
+      }
     } catch (err: any) {
-      console.error(err);
       setErrorMessage(
-        err.response?.data?.message || 'Login failed. Try again.'
+        err.response?.data?.message || 
+        err.message || 
+        'Login failed. Please try again.'
       );
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -133,6 +172,7 @@ const LoginForm: React.FC = () => {
             className="w-full p-3 rounded-md bg-[#1e1e2e] border border-neon-purple 
             text-neon-purple font-mono placeholder:text-neon-purple/50 focus:outline-none 
             focus:border-neon-purple focus:ring-neon-purple transition-all duration-300 caret-neon-purple shadow-sm"
+            disabled={isLoading}
           />
         </div>
 
@@ -157,16 +197,19 @@ const LoginForm: React.FC = () => {
             className="w-full p-3 rounded-md bg-[#1e1e2e] border border-neon-purple 
             text-neon-purple font-mono placeholder:text-neon-purple/50 focus:outline-none 
             focus:border-neon-purple focus:ring-neon-purple transition-all duration-300 caret-neon-purple shadow-sm"
+            disabled={isLoading}
           />
         </div>
 
         {/* Submit Button */}
         <button
           type="submit"
-          className="bg-neon-purple hover:bg-neon-purple/80 text-white font-bold py-3 rounded-md 
-          transition-transform transform hover:scale-105 hover:shadow-[0_0_25px_#C27AFF] shadow-md cursor-pointer"
+          disabled={isLoading}
+          className={`bg-neon-purple hover:bg-neon-purple/80 text-white font-bold py-3 rounded-md 
+          transition-all duration-300 transform hover:scale-105 hover:shadow-[0_0_25px_#C27AFF] shadow-md cursor-pointer
+          ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
         >
-          Sign In
+          {isLoading ? 'Signing In...' : 'Sign In'}
         </button>
 
         {/* Sign Up Link */}

@@ -21,8 +21,14 @@ const userSchema = new mongoose.Schema(
     password: { type: String, required: true },
     primaryLanguage: { type: String, trim: true },
     skills: { type: [String], default: [] },
-    githubUrl: { type: String, trim: true },
+    github: { type: String, trim: true },
+    linkedin: { type: String, trim: true },
+    website: { type: String, trim: true },
+    location: { type: String, trim: true },
     bio: { type: String, trim: true },
+avatar: { type: String },           // Cloudinary secure_url
+avatarPublicId: { type: String },   // Cloudinary public_id (for delete)
+
     plan: {
       type: String,
       enum: ["Trial", "Basic", "Premium"],
@@ -30,7 +36,17 @@ const userSchema = new mongoose.Schema(
     },
     isProfessional: { type: Boolean, default: false },
   },
-  { timestamps: true }
+  { 
+    timestamps: true,
+    toJSON: {
+      transform: function(doc, ret) {
+        // Remove sensitive information when converting to JSON
+        delete ret.password;
+        delete ret.__v;
+        return ret;
+      }
+    }
+  }
 );
 
 module.exports = mongoose.model("User", userSchema);

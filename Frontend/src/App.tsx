@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 
 import Navbar from './components/layout/Public/Navbar';
@@ -28,7 +28,6 @@ function App() {
             }
           />
 
-          <Route path="/profile" element={<Profile />} />
           <Route
             path="/login"
             element={
@@ -57,11 +56,12 @@ function App() {
             }
           />
 
-          {/* Dashboard Layout Routes - including root level paths */}
+          {/* Dashboard Layout Routes - including profile */}
           <Route path="/*" element={<DashboardLayout />}>
             <Route path="dashboard" element={<Dashboard />} />
             <Route path="weeklyChallenge" element={<WeeklyChallenge />} />
             <Route path="community" element={<Community />} />
+            <Route path="profile" element={<Profile />} />
 
             {/* Optional: Redirect root to dashboard */}
             <Route path="" element={<Dashboard />} />

@@ -20,15 +20,25 @@ export const validateEmail = (email: string): boolean => {
 
 export const validateGithubUrl = (url: string): boolean => {
   if (!url) return true;
-  const githubRegex = /^(https?:\/\/)?(www\.)?github\.com\/[a-zA-Z0-9-]+$/;
-  const urlRegex =
-    /^(https?:\/\/)?(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)$/;
-  return githubRegex.test(url) || urlRegex.test(url);
+  
+  // Trim whitespace
+  const trimmedUrl = url.trim();
+  if (!trimmedUrl) return true;
+  
+  // More flexible GitHub regex - allows usernames with underscores, dots, and dashes
+  const githubRegex = /^(https?:\/\/)?(www\.)?github\.com\/[a-zA-Z0-9._-]+$/;
+  
+  // More general URL regex for other portfolio sites
+  const urlRegex = /^(https?:\/\/)?(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)$/;
+  
+  return githubRegex.test(trimmedUrl) || urlRegex.test(trimmedUrl);
 };
 
-export const sanitizeInput = (input: string): string => {
+export const sanitizeInput = (input: string | any): string => {
+  if (typeof input !== 'string') {
+    return String(input);
+  }
   return input
-    .trim()
     .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
 };
 
@@ -45,7 +55,7 @@ export const validateStep = (
 
   if (step === 1) {
     if (!formData.fullName.trim()) errors.fullName = 'Full Name is required';
-    else if (formData.fullName.length > 100)
+    else if (formData.fullName.trim().length > 100)
       errors.fullName = 'Full Name must be less than 100 characters';
 
     if (!formData.username.trim()) errors.username = 'Username is required';
@@ -76,11 +86,15 @@ export const validateStep = (
   if (step === 2) {
     if (!formData.primaryLanguage)
       errors.primaryLanguage = 'Select your primary language';
+    if (formData.skills.length === 0)
+      errors.skills = 'Please select at least one skill';
     if (formData.skills.length > 10)
       errors.skills = 'You can select up to 10 skills';
-    if (formData.github && !validateGithubUrl(formData.github))
-      errors.github = 'Please enter a valid GitHub or portfolio URL';
-    if (formData.bio.length > 500)
+    if (!formData.github || !formData.github.trim())
+      errors.github = 'GitHub URL is required';
+    else if (!validateGithubUrl(formData.github))
+      errors.github = 'GitHub URL must be a valid URL (e.g., github.com/username)';
+    if (formData.bio && formData.bio.length > 500)
       errors.bio = 'Bio must be less than 500 characters';
   }
 

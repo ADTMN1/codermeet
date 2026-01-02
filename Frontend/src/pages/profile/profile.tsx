@@ -1,223 +1,732 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Input } from '../../components/ui/input';
-import { Textarea } from '../../components/ui/textarea';
-import { Button } from '../../components/ui/button';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useForm, SubmitHandler } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import {
-  Avatar,
-  AvatarImage,
-  AvatarFallback,
-} from '../../components/ui/avatar';
-import { FaGithub, FaLinkedin, FaGlobe, FaPlus } from 'react-icons/fa';
-import UserStats from './UserStats';
+  XCircle,
+  CheckCircle,
+  Star,
+  Loader2,
+  Camera,
+  Github,
+  Linkedin,
+  Globe,
+  X,
+  MapPin,
+  Link as LinkIcon,
+  User as UserIcon,
+  Save,
+} from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { apiService } from '../../services/api';
+import { User } from '../../context/UserContext';
 
-export default function Profile() {
-  // Profile State
-  const [profileImage, setProfileImage] = useState<string | null>('/bdu.jpg');
-  const [name, setName] = useState('John Doe');
-  const [bio, setBio] = useState(
-    'Full-stack developer passionate about building modern apps.'
-  );
-  const [location, setLocation] = useState('London, UK');
-  const [website, setWebsite] = useState('https://myportfolio.com');
-  const [github, setGithub] = useState('https://github.com/johndoe');
-  const [linkedin, setLinkedin] = useState('https://linkedin.com/in/johndoe');
+/* ----------------------------- Schema ----------------------------- */
 
-  // Skills
-  const allSkills = [
-    'React',
-    'Node.js',
-    'MongoDB',
-    'Next.js',
-    'Tailwind',
-    'TypeScript',
-  ];
-  const [skills, setSkills] = useState<string[]>(['React', 'TypeScript']);
+const profileSchema = z.object({
+  name: z
+    .string()
+    .min(2, 'Name must be at least 2 characters')
+    .max(50, 'Name cannot exceed 50 characters')
+    .trim(),
+  bio: z
+    .string()
+    .max(160, 'Bio cannot exceed 160 characters')
+    .optional()
+    .or(z.literal('')),
+  location: z
+    .string()
+    .max(100, 'Location cannot exceed 100 characters')
+    .optional()
+    .or(z.literal('')),
+  website: z
+    .string()
+    .url('Please enter a valid URL')
+    .or(z.literal(''))
+    .optional()
+    .transform(val => val || undefined),
+  github: z
+    .string()
+    .url('Please enter a valid GitHub URL')
+    .or(z.literal(''))
+    .optional()
+    .transform(val => val || undefined)
+    .refine(val => !val || val.includes('github.com'), {
+      message: 'Must be a valid GitHub URL',
+    }),
+  linkedin: z
+    .string()
+    .url('Please enter a valid LinkedIn URL')
+    .or(z.literal(''))
+    .optional()
+    .transform(val => val || undefined)
+    .refine(val => !val || val.includes('linkedin.com'), {
+      message: 'Must be a valid LinkedIn URL',
+    }),
+});
 
-  const toggleSkill = (skill: string) => {
-    setSkills((prev) =>
-      prev.includes(skill) ? prev.filter((s) => s !== skill) : [...prev, skill]
-    );
-  };
-  // Image Upload Handler
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+type ProfileFormData = {
+  name: string;
+  bio?: string;
+  location?: string;
+  website?: string;
+  github?: string;
+  linkedin?: string;
+};
 
-    const reader = new FileReader();
-    reader.onload = (event) => setProfileImage(event.target?.result as string);
-    reader.readAsDataURL(file);
-  };
+interface ExtendedUser extends User {
+  _id?: string;
+  name: string;
+  email?: string;
+  username?: string;
+  bio?: string;
+  location?: string;
+  website?: string;
+  github?: string;
+  linkedin?: string;
+  profilePicture?: string;
+  points?: number;
+  skills?: string[];
+  fullName?: string;
+  avatar?: string;
+}
+
+/* ----------------------------- Helpers ----------------------------- */
+
+function handleError(error: any): Error {
+  if (error?.response?.data?.message) {
+    return new Error(error.response.data.message);
+  }
+  if (error?.message) {
+    return new Error(error.message);
+  }
+  return new Error('An unexpected error occurred');
+}
+
+/* ----------------------------- Component ----------------------------- */
+
+const ProfilePage: React.FC = () => {
+  const [user, setUser] = useState<ExtendedUser>({
+    _id: '',
+    name: '',
+    email: '',
+    username: '',
+    bio: '',
+    location: '',
+    website: '',
+    github: '',
+    linkedin: '',
+    profilePicture: '',
+    points: 0,
+    skills: []
+  });
+  const [loading, setLoading] = useState<boolean>(true);
+  const [updating, setUpdating] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+  const [showEditForm, setShowEditForm] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const navigate = useNavigate();
+  const [uploadingImage, setUploadingImage] = useState(false);
+const fileInputRef = useRef<HTMLInputElement>(null);
+const [previewImage, setPreviewImage] = useState<string | null>(null);
 
-  const handleSave = () => {
-    const updatedProfile = {
-      profileImage,
-      name,
-      bio,
-      location,
-      website,
-      github,
-      linkedin,
-      skills,
+  const {
+    register,
+    handleSubmit,
+    reset,
+    watch,
+    formState: { errors, isDirty },
+  } = useForm<ProfileFormData>({
+    resolver: zodResolver(profileSchema),
+    mode: 'onChange',
+    defaultValues: {
+      name: '',
+      bio: '',
+      location: '',
+      website: '',
+      github: '',
+      linkedin: '',
+    },
+  });
+
+  // Watch form values for character counting
+  const bioValue = watch('bio', '');
+
+  /* ----------------------------- Data ----------------------------- */
+
+  const fetchProfile = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      // First try to get from localStorage for immediate UI update
+      const savedUser = localStorage.getItem('user_data');
+      if (savedUser) {
+        try {
+          const parsedUser = JSON.parse(savedUser);
+          setUser(parsedUser);
+          reset({
+            name: parsedUser.fullName || parsedUser.name || '',
+            bio: parsedUser.bio || '',
+            location: parsedUser.location || '',
+            website: parsedUser.website || '',
+            github: parsedUser.github || '',
+            linkedin: parsedUser.linkedin || '',
+          });
+        } catch (e) {
+          // Error parsing saved user data
+        }
+      }
+      
+      // Then fetch fresh data from the server
+      const response = await apiService.getProfile();
+      
+      // Handle the response
+      const responseData = response;
+      
+      if (!responseData) {
+        throw new Error('No data received from server');
+      }
+      
+      // Map the API response to our user object
+      const userData = {
+        _id: responseData._id || responseData.id,
+        name: responseData.fullName || responseData.name || '',
+        email: responseData.email,
+        username: responseData.username,
+        bio: responseData.bio || '',
+        location: responseData.location || '',
+        website: responseData.website || '',
+        github: responseData.github || '',
+        linkedin: responseData.linkedin || '',
+        profilePicture: responseData.profilePicture || responseData.avatar || '',
+        points: responseData.points || 0,
+        skills: responseData.skills || []
+      };
+      
+      if (!userData._id) {
+        throw new Error('Invalid user data: missing ID');
+      }
+      
+      // Update user state
+      setUser(userData);
+      
+      // Update form with fresh data
+      reset({
+        name: userData.name,
+        bio: userData.bio,
+        location: userData.location,
+        website: userData.website,
+        github: userData.github,
+        linkedin: userData.linkedin,
+      });
+      
+      // Update localStorage
+      localStorage.setItem('user_data', JSON.stringify(userData));
+      
+    } catch (err) {
+      console.error('Error fetching profile:', err);
+      setError(handleError(err).message);
+    } finally {
+      setLoading(false);
+    }
+  }, [reset]);
+
+  useEffect(() => {
+    fetchProfile();
+  }, [fetchProfile]);
+
+  /* ----------------------------- Image ----------------------------- */
+
+const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
+
+  try {
+    setUploadingImage(true);
+    const imageUrl = await apiService.uploadImage(file);
+    await apiService.updateProfilePicture(imageUrl);
+    setPreviewImage(imageUrl);
+    setUser(prev => ({ ...prev, profilePicture: imageUrl }));
+    setSuccess('Profile picture updated!');
+    setTimeout(() => setSuccess(null), 3000);
+  } catch (error) {
+    setError('Failed to upload image');
+    setTimeout(() => setError(null), 3000);
+  } finally {
+    setUploadingImage(false);
+  }
+};
+
+const handleRemoveImage = async () => {
+  try {
+    setUploadingImage(true);
+    await apiService.updateProfilePicture('');
+    setPreviewImage(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+    setUser(prev => ({ ...prev, profilePicture: '' }));
+    setSuccess('Profile picture removed!');
+    setTimeout(() => setSuccess(null), 3000);
+  } catch (error) {
+    setError('Failed to remove image');
+    setTimeout(() => setError(null), 3000);
+  } finally {
+    setUploadingImage(false);
+  }
+};
+ 
+
+  /* ----------------------------- Submit ----------------------------- */
+
+const onSubmit: SubmitHandler<ProfileFormData> = async (formData) => {
+  setIsSubmitting(true);
+  setError(null);
+  setSuccess(null);
+  
+  try {
+    // Create form data for the request
+    const formDataToSend = new FormData();
+    
+    // Add all fields to form data with correct field names
+    formDataToSend.append('fullName', formData.name || '');
+    formDataToSend.append('name', formData.name || '');
+    if (formData.bio !== undefined) formDataToSend.append('bio', formData.bio || '');
+    if (formData.location !== undefined) formDataToSend.append('location', formData.location || '');
+    if (formData.website) formDataToSend.append('website', formData.website);
+    if (formData.github) formDataToSend.append('github', formData.github);
+    if (formData.linkedin) formDataToSend.append('linkedin', formData.linkedin);
+    
+    // Add profile picture if changed
+    if (fileInputRef.current?.files?.[0]) {
+      formDataToSend.append('avatar', fileInputRef.current.files[0]);
+    }
+    
+    const response = await apiService.updateProfile(formDataToSend);
+    
+    // Update user state and show success message
+    const updatedUserData = {
+      ...user,
+      ...response,
+      name: response.fullName || response.name || user?.name || '',
+      fullName: response.fullName || response.name || user?.name || '',
+      profilePicture: response.avatar || response.profilePicture || user?.profilePicture,
+      bio: response.bio !== undefined ? response.bio : (user?.bio || ''),
+      location: response.location !== undefined ? response.location : (user?.location || ''),
+      website: response.website !== undefined ? response.website : (user?.website || ''),
+      github: response.github !== undefined ? response.github : (user?.github || ''),
+      linkedin: response.linkedin !== undefined ? response.linkedin : (user?.linkedin || '')
     };
+    
+    setUser(updatedUserData);
+    localStorage.setItem('user_data', JSON.stringify(updatedUserData));
+    
+    // Show success message
+    setSuccess('Profile updated successfully!');
+    setTimeout(() => setSuccess(null), 3000);
+    
+    // Update form data with new values
+    reset({
+      name: response.fullName || response.name || formData.name || '',
+      bio: response.bio !== undefined ? response.bio : formData.bio || '',
+      location: response.location !== undefined ? response.location : formData.location || '',
+      website: response.website !== undefined ? response.website : formData.website || '',
+      github: response.github !== undefined ? response.github : formData.github || '',
+      linkedin: response.linkedin !== undefined ? response.linkedin : formData.linkedin || ''
+    });
+    
+  } catch (err) {
+    const error = handleError(err);
+    setError(error.message);
+    setTimeout(() => setError(null), 3000);
+  } finally {
+    setIsSubmitting(false);
+  }
+};
 
-    console.log('Updated Profile:', updatedProfile);
-    alert('Profile updated successfully!');
-    navigate('/dashboard');
-  };
-  const addSkill = () => {
-    const newSkill = prompt('Enter a new skill:');
-    if (!newSkill) return;
+  /* ----------------------------- Loading ----------------------------- */
 
-    // add to available options
-    if (!allSkills.includes(newSkill)) {
-      allSkills.push(newSkill);
-    }
-
-    // auto-select the skill
-    if (!skills.includes(newSkill)) {
-      setSkills([...skills, newSkill]);
-    }
-  };
-
-  return (
-    <div className="p-6 max-w-3xl mx-auto text-gray-200">
-      <h1 className="text-3xl font-bold mb-6">Edit Profile</h1>
-
-      {/* Avatar Upload */}
-      <div className="flex items-center gap-6 mb-8">
-        <Avatar className="w-24 h-24">
-          <AvatarImage src={profileImage || ''} />
-          <AvatarFallback>U</AvatarFallback>
-        </Avatar>
-
-        <div>
-          <label className="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded-lg cursor-pointer text-white">
-            Change Photo
-            <input
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={handleImageUpload}
-            />
-          </label>
-        </div>
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-900">
+        <Loader2 className="h-10 w-10 animate-spin text-white" />
       </div>
+    );
+  }
 
-      <UserStats />
+  /* ----------------------------- UI ----------------------------- */
 
-      {/* Form */}
-      <div className="space-y-6">
-        {/* Name */}
-        <div>
-          <label className="text-sm text-gray-400">Name</label>
-          <Input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            className="mt-1"
-          />
+  const initial = user?.name?.charAt(0)?.toUpperCase() || 'U';
+  
+  return (
+    <div className="min-h-screen bg-gray-900 py-8 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-3xl mx-auto">
+        {/* Header */}
+        <div className="flex justify-between items-center mb-8">
+          <h1 className="text-2xl font-bold text-white-900">Your Profile</h1>
+          <button
+            onClick={() => setShowEditForm(!showEditForm)}
+            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+          >
+            {showEditForm ? 'Cancel' : 'Edit Profile'}
+          </button>
         </div>
 
-        {/* Bio */}
-        <div>
-          <label className="text-sm text-gray-400">Bio</label>
-          <Textarea
-            value={bio}
-            onChange={(e) => setBio(e.target.value)}
-            className="mt-1"
-            rows={4}
-          />
-        </div>
-
-        {/* Location */}
-        <div>
-          <label className="text-sm text-gray-400">Location</label>
-          <Input
-            value={location}
-            onChange={(e) => setLocation(e.target.value)}
-            className="mt-1"
-          />
-        </div>
-
-        {/* Skills */}
-        <div>
-          <label className="text-sm text-gray-400">Skills</label>
-
-          {/* Skills List */}
-          <div className="flex flex-wrap gap-2 mt-2">
-            {allSkills.map((skill) => (
-              <button
-                key={skill}
-                onClick={() => toggleSkill(skill)}
-                className={`px-3 py-1 rounded-lg border ${
-                  skills.includes(skill)
-                    ? 'bg-purple-600 border-purple-600 text-white'
-                    : 'bg-gray-700 border-gray-600 text-gray-300'
-                }`}
-              >
-                {skill}
-              </button>
-            ))}
-          </div>
-
-          {/* Add New Skill Button */}
-          <div className="mt-3">
-            <Button
-              type="button"
-              onClick={addSkill}
-              variant="outline"
-              size="sm"
-              className="border-blue-500/30 text-blue-400 hover:bg-blue-500/10"
-            >
-              <FaPlus className="w-4 h-4 mr-1" />
-              Add Skill
-            </Button>
-          </div>
-        </div>
-
-        {/* Social Links */}
-        <div>
-          <label className="text-sm text-gray-400">Social Links</label>
-
-          <div className="grid grid-cols-1 gap-4 mt-3">
-            <div className="flex items-center gap-2">
-              <FaGlobe className="text-gray-400" />
-              <Input
-                value={website}
-                onChange={(e) => setWebsite(e.target.value)}
-                placeholder="Website"
-              />
-            </div>
-
-            <div className="flex items-center gap-2">
-              <FaGithub className="text-gray-400" />
-              <Input
-                value={github}
-                onChange={(e) => setGithub(e.target.value)}
-                placeholder="GitHub"
-              />
-            </div>
-
-            <div className="flex items-center gap-2">
-              <FaLinkedin className="text-gray-400" />
-              <Input
-                value={linkedin}
-                onChange={(e) => setLinkedin(e.target.value)}
-                placeholder="LinkedIn"
-              />
+        {/* Success/Error Messages */}
+        {error && (
+          <div className="mb-6 p-4 bg-red-50 border-l-4 border-red-400 rounded">
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <XCircle className="h-5 w-5 text-red-400" aria-hidden="true" />
+              </div>
+              <div className="ml-3">
+                <p className="text-sm text-red-700">{error}</p>
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
-        <Button
-          onClick={handleSave}
-          className="bg-green-600 hover:bg-green-700 w-full py-3 text-lg"
-        >
-          Save Changes
-        </Button>
+        {success && (
+          <div className="mb-6 p-4 bg-green-50 border-l-4 border-green-400 rounded">
+            <div className="flex">
+              <div className="flex-shrink-0">
+                {/* <CheckCircle className="h-5 w-5 text-green-400" aria-hidden="true" /> */}
+              </div>
+              <div className="ml-3">
+                <p className="text-sm text-green-700">{success}</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {showEditForm ? (
+          /* Edit Form */
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6  shadow overflow-hidden sm:rounded-lg p-6">
+            <div className="space-y-6 sm:space-y-5">
+              <div>
+                <h3 className="text-lg font-medium leading-6 text-gray-900">Profile</h3>
+                <p className="mt-1 text-sm text-white-500">Update your profile information.</p>
+              </div>
+
+              <div className="sm:grid sm:grid-cols-3 sm:gap-4 sm:items-start sm:border-t sm:border-gray-200 sm:pt-5">
+                <label htmlFor="name" className="block text-sm font-medium text-white-700 sm:mt-px sm:pt-2">
+                  Full name
+                </label>
+                <div className="mt-1 sm:mt-0 sm:col-span-2">
+                  <input
+                    type="text"
+                    id="name"
+                    {...register('name')}
+                    className="max-w-lg block w-full shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm border border-gray-300 rounded-md p-2"
+                  />
+                  {errors.name && <p className="mt-2 text-sm text-red-600">{errors.name.message}</p>}
+                </div>
+              </div>
+
+              <div className="sm:grid sm:grid-cols-3 sm:gap-4 sm:items-start sm:border-t sm:border-gray-200 sm:pt-5">
+                <label htmlFor="bio" className="block text-sm font-medium text-white-700 sm:mt-px sm:pt-2">
+                  Bio
+                </label>
+                <div className="mt-1 sm:mt-0 sm:col-span-2">
+                  <textarea
+                    id="bio"
+                    rows={3}
+                    {...register('bio')}
+                    className="max-w-lg shadow-sm block w-full focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm border border-gray-300 rounded-md p-2"
+                    defaultValue={''}
+                  />
+                  <p className="mt-2 text-sm text-gray-500">
+                    {bioValue?.length || 0}/160 characters
+                  </p>
+                  {errors.bio && <p className="mt-2 text-sm text-red-600">{errors.bio.message}</p>}
+                </div>
+              </div>
+
+              <div className="sm:grid sm:grid-cols-3 sm:gap-4 sm:items-start sm:border-t sm:border-gray-200 sm:pt-5">
+                <label htmlFor="location" className="block text-sm font-medium text-white-700 sm:mt-px sm:pt-2">
+                  Location
+                </label>
+                <div className="mt-1 sm:mt-0 sm:col-span-2">
+                  <input
+                    type="text"
+                    id="location"
+                    {...register('location')}
+                    className="max-w-lg block w-full shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm border border-gray-300 rounded-md p-2"
+                  />
+                  {errors.location && <p className="mt-2 text-sm text-red-600">{errors.location.message}</p>}
+                </div>
+              </div>
+
+              <div className="sm:grid sm:grid-cols-3 sm:gap-4 sm:items-start sm:border-t sm:border-gray-200 sm:pt-5">
+                <label htmlFor="website" className="block text-sm font-medium text-white-700 sm:mt-px sm:pt-2">
+                  Website
+                </label>
+                <div className="mt-1 sm:mt-0 sm:col-span-2">
+                  <input
+                    type="url"
+                    id="website"
+                    {...register('website')}
+                    className="max-w-lg block w-full shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm border border-gray-300 rounded-md p-2"
+                  />
+                  {errors.website && <p className="mt-2 text-sm text-red-600">{errors.website.message}</p>}
+                </div>
+              </div>
+
+              <div className="sm:grid sm:grid-cols-3 sm:gap-4 sm:items-start sm:border-t sm:border-gray-200 sm:pt-5">
+                <label htmlFor="github" className="block text-sm font-medium text-white-700 sm:mt-px sm:pt-2">
+                  GitHub
+                </label>
+                <div className="mt-1 sm:mt-0 sm:col-span-2">
+                  <div className="mt-1 flex rounded-md shadow-sm">
+                    <span className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-gray-300 bg-gray-50 text-white-500 text-sm">
+                      github.com/
+                    </span>
+                    <input
+                      type="text"
+                      id="github"
+                      {...register('github')}
+                      className="flex-1 min-w-0 block w-full px-3 py-2 rounded-none rounded-r-md focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm border-gray-300"
+                      placeholder="username"
+                    />
+                  </div>
+                  {errors.github && <p className="mt-2 text-sm text-red-600">{errors.github.message}</p>}
+                </div>
+              </div>
+
+              <div className="sm:grid sm:grid-cols-3 sm:gap-4 sm:items-start sm:border-t sm:border-gray-200 sm:pt-5">
+                <label htmlFor="linkedin" className="block text-sm font-medium text-white-700 sm:mt-px sm:pt-2">
+                  LinkedIn
+                </label>
+                <div className="mt-1 sm:mt-0 sm:col-span-2">
+                  <div className="mt-1 flex rounded-md shadow-sm">
+                    <span className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-gray-300 bg-gray-50 text-white-500 text-sm">
+                      linkedin.com/in/
+                    </span>
+                    <input
+                      type="text"
+                      id="linkedin"
+                      {...register('linkedin')}
+                      className="flex-1 min-w-0 block w-full px-3 py-2 rounded-none rounded-r-md focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm border-gray-300"
+                      placeholder="username"
+                    />
+                  </div>
+                  {errors.linkedin && <p className="mt-2 text-sm text-red-600">{errors.linkedin.message}</p>}
+                </div>
+              </div>
+
+              <div className="sm:grid sm:grid-cols-3 sm:gap-4 sm:items-start sm:border-t sm:border-gray-200 sm:pt-5">
+                <label className="block text-sm font-medium text-white-700">Photo</label>
+                <div className="mt-1 sm:mt-0 sm:col-span-2">
+             <div className="flex flex-col items-center">
+  <div className="relative h-32 w-32">
+    <div className="h-full w-full rounded-full overflow-hidden border-2 border-gray-200">
+      {previewImage || user?.profilePicture ? (
+        <img
+          src={previewImage || user.profilePicture}
+          alt="Profile"
+          className="h-full w-full object-cover"
+        />
+      ) : (
+        <div className="h-full w-full flex items-center justify-center bg-gray-100">
+          <UserIcon className="h-16 w-16 text-gray-400" />
+        </div>
+      )}
+    </div>
+  </div>
+  
+  <div className="mt-4 flex gap-2">
+    <div>
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleImageChange}
+        accept="image/*"
+        className="hidden"
+        id="profile-picture"
+        disabled={uploadingImage}
+      />
+      <label
+        htmlFor="profile-picture"
+        className={`inline-flex items-center px-3 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 cursor-pointer ${
+          uploadingImage ? 'opacity-50 cursor-not-allowed' : ''
+        }`}
+      >
+        {uploadingImage ? (
+          <>
+            <Loader2 className="animate-spin -ml-1 mr-2 h-4 w-4" />
+            Uploading...
+          </>
+        ) : (
+          'Change Photo'
+        )}
+      </label>
+    </div>
+    {(previewImage || user?.profilePicture) && (
+      <button
+        type="button"
+        onClick={handleRemoveImage}
+        className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-red-700 bg-red-100 hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+        disabled={uploadingImage}
+      >
+        Remove
+      </button>
+    )}
+  </div>
+</div>
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-5">
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setShowEditForm(false)}
+                  className="bg-white py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-white-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmitting || !isDirty}
+                  className={`ml-3 inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white ${isSubmitting || !isDirty ? 'bg-indigo-400' : 'bg-indigo-600 hover:bg-indigo-700'} focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500`}
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" />
+                      Saving...
+                    </>
+                  ) : (
+                    'Save'
+                  )}
+                </button>
+              </div>
+            </div>
+          </form>
+        ) : (
+          /* Profile View */
+          <div className="shadow overflow-hidden sm:rounded-lg">
+            <div className="px-4 py-5 sm:px-6">
+              <div className="flex items-center">
+                <div className="h-20 w-20 rounded-full overflow-hidden bg-gray-100 flex-shrink-0">
+                  {user?.profilePicture ? (
+                    <img src={user.profilePicture} alt={user.name} className="h-full w-full object-cover" />
+                  ) : (
+                    <div className="h-full w-full flex items-center justify-center bg-indigo-600 text-white text-2xl font-medium">
+                      {initial}
+                    </div>
+                  )}
+                </div>
+                <div className="ml-6">
+                <h2 className="text-2xl font-bold text-gray-900">
+  {user?.fullName || user?.name || 'User'}
+</h2>
+                  {user?.username && (
+                    <p className="text-sm text-gray-500">@{user.username}</p>
+                  )}
+                  {user?.points !== undefined && (
+                    <div className="mt-1 flex items-center text-sm text-gray-500">
+                      <Star className="flex-shrink-0 mr-1.5 h-5 w-5 text-yellow-400" />
+                      <span>{user.points} points</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="border-t border-gray-200 px-4 py-5 sm:px-6">
+              <dl className="grid grid-cols-1 gap-x-4 gap-y-8 sm:grid-cols-2">
+                {user?.bio && (
+                  <div className="sm:col-span-2">
+                    <dt className="text-sm font-medium text-gray-500">About</dt>
+                    <dd className="mt-1 text-sm text-gray-900 whitespace-pre-line">{user.bio}</dd>
+                  </div>
+                )}
+
+                {user?.location && (
+                  <div>
+                    <dt className="text-sm font-medium text-gray-500">Location</dt>
+                    <dd className="mt-1 text-sm text-gray-900">{user.location}</dd>
+                  </div>
+                )}
+
+                {user?.website && (
+                  <div>
+                    <dt className="text-sm font-medium text-gray-500">Website</dt>
+                    <dd className="mt-1 text-sm">
+                      <a
+                        href={user.website.startsWith('http') ? user.website : `https://${user.website}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-indigo-600 hover:text-indigo-500"
+                      >
+                        {user.website.replace(/^https?:\/\//, '')}
+                      </a>
+                    </dd>
+                  </div>
+                )}
+
+                {user?.github && (
+                  <div>
+                    <dt className="text-sm font-medium text-gray-500">GitHub</dt>
+                    <dd className="mt-1 text-sm">
+                      <a
+                        href={`https://github.com/${user.github}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-indigo-600 hover:text-indigo-500"
+                      >
+                        {user.github}
+                      </a>
+                    </dd>
+                  </div>
+                )}
+
+                {user?.linkedin && (
+                  <div>
+                    <dt className="text-sm font-medium text-gray-500">LinkedIn</dt>
+                    <dd className="mt-1 text-sm">
+                      <a
+                        href={`https://linkedin.com/in/${user.linkedin}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-indigo-600 hover:text-indigo-500"
+                      >
+                        {user.linkedin}
+                      </a>
+                    </dd>
+                  </div>
+                )}
+
+                {user?.email && (
+                  <div className="sm:col-span-2">
+                    <dt className="text-sm font-medium text-gray-500">Email</dt>
+                    <dd className="mt-1 text-sm text-gray-900">{user.email}</dd>
+                  </div>
+                )}
+              </dl>
+
+              {user?.skills && user.skills.length > 0 && (
+                <div className="mt-8">
+                  <h3 className="text-sm font-medium text-gray-500">Skills</h3>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {user.skills.map((skill, index) => (
+                      <span
+                        key={index}
+                        className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800"
+                      >
+                        {skill}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
-}
+};
+
+export default ProfilePage;

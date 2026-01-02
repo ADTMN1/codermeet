@@ -6,6 +6,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>CoderMeet</title>
 
+    <!-- Set theme color for mobile browsers -->
+    <meta name="theme-color" content="#1a202c">
+    
     <!-- Meta Description for SEO -->
     <meta
       name="description"
@@ -19,10 +22,31 @@
       href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;800&display=swap"
       rel="stylesheet"
     />
+    
+    <!-- Critical CSS to prevent white flash -->
+    <style>
+      /* This will be applied immediately */
+      body {
+        background-color: #1a202c;
+        color: #e2e8f0;
+        margin: 0;
+        min-height: 100vh;
+      }
+      #root {
+        min-height: 100vh;
+      }
+    </style>
   </head>
 
-  <body class="bg-black text-white font-mono">
+  <body class="bg-gray-900 text-white font-mono">
     <div id="root"></div>
+
+    <!-- Add a script to set the background color before React loads -->
+    <script>
+      // Immediately set the background color to prevent white flash
+      document.documentElement.style.backgroundColor = '#1a202c';
+      document.body.style.backgroundColor = '#1a202c';
+    </script>
 
     <!-- Vite handles JS and Tailwind compilation -->
     <script type="module" src="/src/main.tsx"></script>

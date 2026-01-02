@@ -1,8 +1,9 @@
 // components/Signup/SignupForm.tsx
-import React, { useState } from 'react';
-import { FaGithub, FaPython, FaJsSquare, FaReact } from 'react-icons/fa';
+import React, { useState, useEffect } from 'react';
+import { FaGithub, FaPython, FaJsSquare, FaReact, FaCheckCircle, FaExclamationTriangle, FaSpinner, FaArrowLeft, FaArrowRight, FaCheck } from 'react-icons/fa';
 import { IoMdCheckboxOutline } from 'react-icons/io';
 import axios from 'axios';
+import { useUser } from '../../../context/UserContext';
 import { useNavigate } from 'react-router-dom';
 
 import { FormData } from './types';
@@ -26,8 +27,12 @@ const SignupForm: React.FC = () => {
   const [apiError, setApiError] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [paymentProof, setPaymentProof] = useState<File | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [uploadProgress, setUploadProgress] = useState<number>(0);
+  const [showSuccessModal, setShowSuccessModal] = useState<boolean>(false);
 
   const navigate = useNavigate();
+  const { setUser } = useUser();
   const [formData, setFormData] = useState<FormData>({
     fullName: '',
     username: '',
@@ -44,10 +49,24 @@ const SignupForm: React.FC = () => {
   });
   const [toast, setToast] = useState<{
     message: string;
-    type: 'success' | 'error';
+    type: 'success' | 'error' | 'warning';
+    isVisible: boolean;
   } | null>(null);
 
-  // keep password visibility toggles here (same as original)
+  // Enhanced toast notification
+  const showToast = (message: string, type: 'success' | 'error' | 'warning') => {
+    setToast({ message, type, isVisible: true });
+    setTimeout(() => {
+      setToast(null);
+    }, 3000);
+  };
+
+  // Clear errors when step changes
+  useEffect(() => {
+    setErrors({});
+    setApiError('');
+  }, [step]);
+
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
@@ -60,42 +79,33 @@ const SignupForm: React.FC = () => {
     'Docker',
   ];
 
-  // handleChange preserved from original (sanitization included)
-  const handleChange = (
-    e: React.ChangeEvent<
-      HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
-    >
-  ) => {
-    const { name, value, type, checked } = e.target;
-    const sanitizedValue =
-      type === 'checkbox' ? value : sanitizeInput(value as string);
-
-    if (type === 'checkbox' && name === 'skills') {
-      const newSkills = checked
-        ? [...formData.skills, sanitizedValue]
-        : formData.skills.filter((s) => s !== sanitizedValue);
-      setFormData({ ...formData, skills: newSkills });
-    } else if (type === 'checkbox') {
-      // cast name to keyof FormData to satisfy TS - but we know it's notifications or challenges
-      setFormData({ ...formData, [name as keyof FormData]: checked as any });
+  // Enhanced handleChange with proper TypeScript typing
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    const target = e.target;
+    const { name, value } = target;
+    
+    let finalValue: string | boolean | string[];
+    
+    if ('checked' in target && target.type === 'checkbox') {
+      finalValue = target.checked;
+    } else if (name === 'skills' && Array.isArray(value)) {
+      finalValue = value; // Skills array, no sanitization needed
     } else {
-      setFormData({
-        ...formData,
-        [name as keyof FormData]: sanitizedValue as any,
-      });
+      finalValue = sanitizeInput(value);
     }
-
-    // Clear the error for the field if it exists
-    if ((errors as any)[name]) {
-      setErrors((prev) => {
-        const newErrors = { ...prev };
-        delete (newErrors as any)[name];
-        return newErrors;
-      });
+    
+    setFormData(prev => ({
+      ...prev,
+      [name]: finalValue
+    }));
+    
+    // Clear error for this field if it exists
+    if (errors[name]) {
+      setErrors(prev => ({ ...prev, [name]: '' }));
     }
   };
 
-  // file validation (does NOT upload here)
+  // Enhanced file change handler with validation
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -109,11 +119,11 @@ const SignupForm: React.FC = () => {
       return;
     }
 
-    const maxSize = 5 * 1024 * 1024;
+    const maxSize = 10 * 1024 * 1024; // 10MB
     if (file.size > maxSize) {
       setErrors((prev) => ({
         ...prev,
-        paymentProof: 'File size must be less than 5MB',
+        paymentProof: 'File size must be less than 10MB',
       }));
       return;
     }
@@ -126,14 +136,65 @@ const SignupForm: React.FC = () => {
     });
   };
 
-  const handleNext = () => {
+  const checkExistingUser = async (field: 'email' | 'username', value: string): Promise<boolean> => {
+    if (!value.trim()) return false;
+    
+    try {
+      const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      const response = await axios.get(`${API_BASE_URL}/api/auth/check-user`, {
+        params: { field, value }
+      });
+      return response.data.exists;
+    } catch (error) {
+      return false;
+    }
+  };
+
+  const handleNext = async () => {
+    // Clear previous errors first
+    setErrors({});
+    setApiError('');
+    
+    // Validate current step only
     const stepErrors = validateStep(formData, step, paymentProof);
+    
+    // If we're on step 1, check for existing email/username
+    if (step === 1) {
+      try {
+        const [emailExists, usernameExists] = await Promise.all([
+          checkExistingUser('email', formData.email),
+          checkExistingUser('username', formData.username)
+        ]);
+        
+        if (emailExists || usernameExists) {
+          const newErrors = {...stepErrors};
+          if (emailExists) newErrors.email = 'This email is already registered';
+          if (usernameExists) newErrors.username = 'This username is already taken';
+          
+          setErrors(newErrors);
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+          return;
+        }
+      } catch (error) {
+        setApiError('Error verifying account details. Please try again.');
+        return;
+      }
+    }
+    
     if (Object.keys(stepErrors).length > 0) {
+      // Show errors for current step
       setErrors(stepErrors);
+      
+      // Scroll to top of form to show errors
+      window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
+    
+    // Clear all errors and proceed to next step
     setErrors({});
-    if (step < 4) setStep(step + 1);
+    if (step < 4) {
+      setStep(step + 1);
+    }
   };
 
   const handleBack = () => {
@@ -143,12 +204,33 @@ const SignupForm: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+    setIsSubmitting(true);
     setApiError('');
 
-    const finalErrors = validateStep(formData, step, paymentProof);
-    if (Object.keys(finalErrors).length > 0) {
-      setErrors(finalErrors);
+    // Validate all steps before final submission
+    let allErrors: { [key: string]: string } = {};
+    
+    // Validate each step
+    for (let stepNum = 1; stepNum <= 4; stepNum++) {
+      const stepErrors = validateStep(formData, stepNum, paymentProof);
+      allErrors = { ...allErrors, ...stepErrors };
+    }
+    
+    if (Object.keys(allErrors).length > 0) {
+      setErrors(allErrors);
       setIsLoading(false);
+      setIsSubmitting(false);
+      
+      // Find which step has errors and go back to it
+      const errorSteps = [1, 2, 3, 4].filter(stepNum => {
+        const stepErrors = validateStep(formData, stepNum, paymentProof);
+        return Object.keys(stepErrors).length > 0;
+      });
+      
+      if (errorSteps.length > 0) {
+        setStep(errorSteps[0]);
+        showToast('Please fix validation errors before submitting', 'error');
+      }
       return;
     }
 
@@ -198,26 +280,55 @@ const SignupForm: React.FC = () => {
         }
       );
 
-      setToast({ message: res.data.message, type: 'success' });
+      // Set user data in context
+      if (res.data.user) {
+        setUser({
+          _id: res.data.user._id,
+          name: formData.fullName,
+          email: formData.email,
+          username: formData.username,
+          plan: formData.plan.toLowerCase(),
+          bio: formData.bio,
+          skills: formData.skills,
+          github: formData.github,
+          points: 0, // Initial points
+          // Add other fields as needed
+        });
+      }
 
-      setTimeout(() => {
-        navigate('/dashboard');
-      }, 1500);
+      showToast(res.data.message, 'success');
+
+      // Redirect to dashboard
+      navigate('/dashboard');
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
-        console.log('🔴 FULL ERROR RESPONSE:', error.response?.data);
-        console.log('🔴 ERROR STATUS:', error.response?.status);
         const backendError = error.response?.data;
-        setApiError(
-          backendError?.message
-            ? `Error: ${backendError.message}`
-            : `Registration failed: ${JSON.stringify(backendError)}`
-        );
+        const errorMessage = backendError?.message || 'Registration failed. Please try again.';
+        
+        if (error.response?.status === 400 && errorMessage.includes('already exists')) {
+          // Handle duplicate user error
+          setApiError('An account with this email or username already exists.');
+          // Highlight relevant fields
+          setErrors(prev => ({
+            ...prev,
+            email: 'This email is already registered',
+            username: 'This username is already taken'
+          }));
+          // Scroll to the first error
+          setTimeout(() => {
+            const errorElement = document.querySelector('[name="email"], [name="username"]');
+            errorElement?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }, 100);
+        } else {
+          // Handle other errors
+          setApiError(errorMessage);
+        }
       } else {
-        setApiError('An unexpected error occurred.');
+        setApiError('An unexpected error occurred. Please try again later.');
       }
     } finally {
       setIsLoading(false);
+      setIsSubmitting(false);
     }
   };
 
@@ -233,22 +344,41 @@ const SignupForm: React.FC = () => {
           </p>
         )}
 
-        <h1 className="text-4xl font-bold mb-6 text-purple-400 text-center">
-          Join CoderMeet
-        </h1>
-
-        {/* Progress Indicator */}
-        <div className="flex justify-between mb-8">
-          {[1, 2, 3, 4].map((s) => (
-            <div
-              key={s}
-              className={`flex-1 h-2 mx-1 rounded-es-sm transition-colors duration-300 ${
-                step >= s
-                  ? 'bg-gradient-to-r from-pink-200 via-purple-500'
-                  : 'bg-gray-700'
-              }`}
-            ></div>
-          ))}
+        
+        {/* Enhanced Progress Indicator */}
+        <div className="mb-8">
+          <div className="flex items-center justify-between mb-3">
+            {[1, 2, 3, 4].map((s) => (
+              <div key={s} className="flex flex-col items-center">
+                <div
+                  className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold transition-all duration-300 ${
+                    step >= s
+                      ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg shadow-purple-500/30'
+                      : 'bg-gray-700 text-gray-400'
+                  }`}
+                >
+                  {step > s ? <FaCheck /> : s}
+                </div>
+                <span className={`text-xs mt-2 transition-colors duration-300 ${
+                  step >= s ? 'text-purple-400' : 'text-gray-500'
+                }`}>
+                  {s === 1 ? 'Account' : s === 2 ? 'Profile' : s === 3 ? 'Plan' : 'Payment'}
+                </span>
+              </div>
+            ))}
+          </div>
+          <div className="relative">
+            <div className="flex justify-between">
+              {[1, 2, 3].map((s) => (
+                <div
+                  key={s}
+                  className={`flex-1 h-1 mx-1 transition-all duration-500 ${
+                    step > s ? 'bg-gradient-to-r from-purple-500 to-pink-500' : 'bg-gray-700'
+                  }`}
+                ></div>
+              ))}
+            </div>
+          </div>
         </div>
 
         {/* Steps */}
@@ -290,46 +420,92 @@ const SignupForm: React.FC = () => {
           />
         )}
 
-        {/* Navigation Buttons */}
-        <div className="flex justify-between mt-6">
+        {/* Enhanced Navigation Buttons */}
+        <div className="flex justify-between items-center mt-8">
           {step > 1 && (
             <button
               type="button"
               onClick={handleBack}
-              disabled={isLoading}
-              className="px-6 py-3 rounded-lg bg-gray-700 hover:bg-gray-600 transition duration-200 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={isLoading || isSubmitting}
+              className="flex items-center gap-2 px-6 py-3 rounded-xl bg-gray-700 hover:bg-gray-600 transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
             >
+              <FaArrowLeft />
               Back
             </button>
           )}
+          <div className="flex-1"></div>
           {step < 4 ? (
             <button
               type="button"
               onClick={handleNext}
-              disabled={isLoading}
-              className="px-6 py-3 rounded-lg bg-purple-500 hover:bg-purple-400 text-white transition duration-200 ml-auto cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={isLoading || isSubmitting}
+              className="flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white transition-all duration-300 transform hover:scale-105 shadow-lg shadow-purple-500/30 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
             >
-              {isLoading ? 'Loading...' : 'Next'}
+              {isLoading || isSubmitting ? (
+                <>
+                  <FaSpinner className="animate-spin mr-2" />
+                  Processing...
+                </>
+              ) : (
+                <>
+                  Next
+                  <FaArrowRight />
+                </>
+              )}
             </button>
           ) : (
             <button
               type="submit"
-              disabled={isLoading}
-              className="px-6 py-3 rounded-lg bg-green-500 hover:bg-green-400 text-white transition duration-200 ml-auto cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={isLoading || isSubmitting}
+              className="flex items-center gap-2 px-8 py-3 rounded-xl bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white transition-all duration-300 transform hover:scale-105 shadow-lg shadow-green-500/30 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 font-bold"
             >
-              {isLoading ? 'Creating Account...' : 'Finish & Join'}
+              {isLoading || isSubmitting ? (
+                <>
+                  <FaSpinner className="animate-spin" />
+                  Creating Account...
+                </>
+              ) : (
+                <>
+                  <FaCheckCircle />
+                  Finish & Join
+                </>
+              )}
             </button>
           )}
         </div>
       </form>
 
-      {toast && (
+      {/* Enhanced Toast Notifications */}
+      {toast && toast.isVisible && (
         <div
-          className={`fixed top-5 right-5 px-4 py-2 rounded shadow-lg text-white font-semibold transition-transform duration-300 ${
-            toast.type === 'success' ? 'bg-green-500' : 'bg-red-500'
+          className={`fixed top-32 right-5 px-6 py-4 rounded-xl shadow-2xl text-white font-semibold transition-all duration-500 transform animate-slideInRight flex items-center gap-3 z-50 max-w-md ${
+            toast.type === 'success' 
+              ? 'bg-gradient-to-r from-green-500 to-emerald-500' 
+              : toast.type === 'warning'
+              ? 'bg-gradient-to-r from-yellow-500 to-orange-500'
+              : 'bg-gradient-to-r from-red-500 to-pink-500'
           }`}
         >
-          {toast.message}
+          {toast.type === 'success' && <FaCheckCircle />}
+          {toast.type === 'warning' && <FaExclamationTriangle />}
+          {toast.type === 'error' && <FaExclamationTriangle />}
+          <span>{toast.message}</span>
+        </div>
+      )}
+
+      {/* Success Modal */}
+      {showSuccessModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 animate-fadeIn">
+          <div className="bg-gray-800 rounded-2xl p-8 max-w-md mx-4 text-center shadow-2xl border border-gray-700">
+            <div className="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-4">
+              <FaCheckCircle className="text-white text-3xl" />
+            </div>
+            <h3 className="text-2xl font-bold text-white mb-2">Welcome to CoderMeet!</h3>
+            <p className="text-gray-300 mb-6">Your account has been created successfully. Redirecting to dashboard...</p>
+            <div className="w-full bg-gray-700 rounded-full h-2">
+              <div className="bg-green-500 h-2 rounded-full animate-progressBar"></div>
+            </div>
+          </div>
         </div>
       )}
     </div>

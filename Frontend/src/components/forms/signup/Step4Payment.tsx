@@ -30,7 +30,7 @@ const Step4Payment: React.FC<Props> = ({
       <div className="space-y-6">
         {formData.plan !== 'trial' && (
           <>
-            <h2 className="text-2xl font-semibold text-center mb-4 text-green-400">
+            <h2 className="text-2xl font-semibold text-center mb-4 text-purple-400">
               Payment Instructions
             </h2>
 
@@ -72,7 +72,7 @@ const Step4Payment: React.FC<Props> = ({
                 accept="image/jpeg,image/png,image/gif,image/webp"
                 onChange={handleFileChange}
                 className="w-full p-3 rounded-lg bg-gray-800 text-gray-200 focus:outline-none focus:ring-purple-400"
-                required={formData.plan !== 'trial'}
+                required={formData.plan !== 'trial' as any}
               />
 
               {paymentProof && (

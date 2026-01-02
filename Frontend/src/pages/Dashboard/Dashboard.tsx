@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   FaTrophy,
   FaUsers,
@@ -6,17 +6,82 @@ import {
   FaLaptopCode,
   FaBell,
   FaMoneyBillWave,
+  FaUser,
+  FaStar,
+  FaChartLine,
+  FaMedal,
+  FaAward
 } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
+import { useUser } from '../../context/UserContext';
+import axios from 'axios';
+
+interface LeaderboardUser {
+  name: string;
+  points: number;
+  rank: number;
+  total_point: number;
+  isCurrentUser?: boolean;
+}
 
 const Dashboard: React.FC = () => {
   const navigate = useNavigate();
-  // Sample data
-  const leaderboard = [
-    { name: '@Amanuel', points: 120, rank: 1, total_point: 300 },
-    { name: '@Marta', points: 110, rank: 2, total_point: 250 },
-    { name: '@Selam', points: 100, rank: 3, total_point: 200 },
-  ];
+  const { user } = useUser();
+  const [leaderboard, setLeaderboard] = useState<LeaderboardUser[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [stats, setStats] = useState({
+    totalChallenges: 0,
+    completedChallenges: 0,
+    rank: 0,
+    totalUsers: 0,
+  });
+  
+  // Calculate current user's rank
+  const currentUserRank = React.useMemo(() => {
+    if (!user?._id) return 'N/A';
+    const userInLeaderboard = leaderboard.find(
+      item => item.name === (user?.username || user?.name) || item.isCurrentUser
+    );
+    return userInLeaderboard?.rank || 'N/A';
+  }, [leaderboard, user]);
+
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      if (!user?._id) {
+        setIsLoading(false);
+        return;
+      }
+
+      try {
+        const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+        
+        // Fetch leaderboard data
+        const [leaderboardRes, statsRes] = await Promise.all([
+          axios.get(`${API_BASE_URL}/api/leaderboard`),
+          axios.get(`${API_BASE_URL}/api/users/${user._id}/stats`, {
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+            }
+          })
+        ]);
+        
+        setLeaderboard(leaderboardRes.data);
+        setStats(statsRes.data);
+        
+      } catch (error) {
+        // Fallback to sample data if API fails
+        setLeaderboard([
+          { name: user?.username || user?.name || 'You', points: user?.points || 0, rank: 1, total_point: user?.points || 0, isCurrentUser: true },
+          { name: '@Amanuel', points: 120, rank: 2, total_point: 300 },
+          { name: '@Selam', points: 100, rank: 3, total_point: 200 },
+        ]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchDashboardData();
+  }, [user?._id, user?.points, user?.username, user?.name]);
 
   const activeTeams = [
     { name: 'Team Alpha', project: 'Chat App', progress: 70 },
@@ -30,37 +95,98 @@ const Dashboard: React.FC = () => {
     navigate('/weeklyChallenge');
   };
 
+  const getPlanBadge = (plan?: string) => {
+    if (!plan) {
+      return <span className="bg-gradient-to-r from-gray-500 to-gray-600 text-white text-xs font-semibold px-2.5 py-0.5 rounded-full ml-2">TRIAL</span>;
+    }
+    
+    const planLower = plan.toLowerCase();
+    switch (planLower) {
+      case 'premium':
+        return <span className="bg-gradient-to-r from-yellow-500 to-amber-600 text-white text-xs font-semibold px-2.5 py-0.5 rounded-full ml-2">PREMIUM</span>;
+      case 'basic':
+        return <span className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white text-xs font-semibold px-2.5 py-0.5 rounded-full ml-2">BASIC</span>;
+      case 'trial':
+        return <span className="bg-gradient-to-r from-gray-500 to-gray-600 text-white text-xs font-semibold px-2.5 py-0.5 rounded-full ml-2">TRIAL</span>;
+      default:
+        // Handle any custom plan names
+        return <span className="bg-gradient-to-r from-purple-500 to-pink-600 text-white text-xs font-semibold px-2.5 py-0.5 rounded-full ml-2">
+          {plan.toUpperCase()}
+        </span>;
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gray-900">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-purple-500"></div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex min-h-screen bg-gray-900 text-gray-200">
       {/* Main Content */}
-      <main className="flex-1 p-8 space-y-8">
+      <main className="flex-1 p-4 md:p-8 space-y-6 md:space-y-8">
         {/* Welcome Panel */}
-        <div className="bg-gray-800 rounded-xl p-6 shadow-lg border border-gray-700 flex flex-col md:flex-row items-center justify-between">
-          <div>
-            <h1 className="text-3xl md:text-4xl font-bold text-purple-400 mb-2">
-              Welcome, Nati!
-            </h1>
-            <p className="text-gray-400">
-              Your subscription: Premium Plan | Points: 230 | Rank: #2
-            </p>
+        <div className="bg-gray-800 rounded-xl p-6 shadow-lg border border-gray-700">
+          <div className="flex flex-col md:flex-row items-start md:items-center justify-between">
+            <div className="mb-4 md:mb-0">
+              <div className="flex items-center">
+                <h1 className="text-2xl md:text-4xl font-bold text-purple-400">
+                  Welcome, {user?.name || 'Coder'}!
+                </h1>
+                {getPlanBadge(user?.plan)}
+              </div>
+              <p className="text-gray-400 mt-2">
+                {user?.plan ? `Your plan: ${user.plan.charAt(0).toUpperCase() + user.plan.slice(1)} | ` : 'No active plan | '}
+                Points: {user?.points || 0} | 
+                Rank: #{currentUserRank}
+              </p>
+            </div>
+            <div className="flex items-center space-x-4 mt-4 md:mt-0">
+              <div className="relative">
+                {user?.profileImage ? (
+                  <img 
+                    src={user.profileImage} 
+                    alt={user.name} 
+                    className="w-12 h-12 rounded-full object-cover border-2 border-purple-500"
+                  />
+                ) : (
+                  <div className="w-12 h-12 rounded-full bg-purple-600 flex items-center justify-center text-white text-xl font-bold">
+                    {user?.name?.charAt(0) || 'U'}
+                  </div>
+                )}
+                <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-gray-800"></span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <button className="relative p-2 rounded-full hover:bg-gray-700 transition">
+                  <FaBell className="w-6 h-6 text-white" />
+                  {unreadCount > 0 && (
+                    <span className="absolute top-0 right-0 inline-flex items-center justify-center px-1.5 py-0.5 text-xs font-bold leading-none text-white bg-red-500 rounded-full transform translate-x-1/2 -translate-y-1/2">
+                      {unreadCount}
+                    </span>
+                  )}
+                </button>
+                <button 
+                  onClick={() => navigate('/profile')}
+                  className="p-2 rounded-full hover:bg-gray-700 transition"
+                  title="View Profile"
+                >
+                  <FaUser className="w-6 h-6 text-purple-400" />
+                </button>
+              </div>
+              <button 
+                className="border-2 border-gray-600 hover:border-purple-500 px-6 py-3 rounded-lg font-semibold transition"
+                onClick={() => navigate('/projects')}
+              >
+                View Projects
+              </button>
+            </div>
           </div>
-          <div className="mt-4 md:mt-0 flex items-center space-x-4">
-            <button className="relative p-2 rounded-full hover:bg-gray-700 transition">
-              <FaBell className="w-6 h-6 text-white" />
 
-              {/* Unread badge */}
-              {unreadCount > 0 && (
-                <span className="absolute top-0 right-0 inline-flex items-center justify-center px-1.5 py-0.5 text-xs font-bold leading-none text-white bg-red-500 rounded-full transform translate-x-1/2 -translate-y-1/2">
-                  {unreadCount}
-                </span>
-              )}
-            </button>
-            <button className="border-2 border-gray-600 hover:border-purple-500 px-6 py-3 rounded-lg font-semibold transition">
-              View Projects
-            </button>
-          </div>
-        </div>
-
+        </div> {/* Close the welcome panel div */}
+        
         {/* Panels Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
           {/* Weekly Challenge */}
