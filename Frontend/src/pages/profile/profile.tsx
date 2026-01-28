@@ -19,7 +19,8 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { apiService } from '../../services/api';
-import { User } from '../../context/UserContext';
+import { useUser, User } from '../../context/UserContext';
+import { toast } from 'sonner';
 
 /* ----------------------------- Schema ----------------------------- */
 
@@ -74,7 +75,7 @@ type ProfileFormData = {
   linkedin?: string;
 };
 
-interface ExtendedUser extends User {
+interface ExtendedUser extends Omit<User, 'email'> {
   _id?: string;
   name: string;
   email?: string;
@@ -89,6 +90,7 @@ interface ExtendedUser extends User {
   skills?: string[];
   fullName?: string;
   avatar?: string;
+  [key: string]: any; // For any additional properties
 }
 
 /* ----------------------------- Helpers ----------------------------- */
@@ -106,7 +108,8 @@ function handleError(error: any): Error {
 /* ----------------------------- Component ----------------------------- */
 
 const ProfilePage: React.FC = () => {
-  const [user, setUser] = useState<ExtendedUser>({
+  const { user: contextUser, setUser: setContextUser, updateUser } = useUser();
+  const [user, setUser] = useState<ExtendedUser>(contextUser || {
     _id: '',
     name: '',
     email: '',
@@ -226,8 +229,7 @@ const [previewImage, setPreviewImage] = useState<string | null>(null);
       localStorage.setItem('user_data', JSON.stringify(userData));
       
     } catch (err) {
-      console.error('Error fetching profile:', err);
-      setError(handleError(err).message);
+      toast.error('Failed to fetch profile');
     } finally {
       setLoading(false);
     }
@@ -245,15 +247,37 @@ const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
 
   try {
     setUploadingImage(true);
-    const imageUrl = await apiService.uploadImage(file);
-    await apiService.updateProfilePicture(imageUrl);
-    setPreviewImage(imageUrl);
-    setUser(prev => ({ ...prev, profilePicture: imageUrl }));
-    setSuccess('Profile picture updated!');
-    setTimeout(() => setSuccess(null), 3000);
+    setError(null);
+    setSuccess(null);
+
+    // Send the file directly to backend
+    const updatedUser = await apiService.updateProfilePicture(file);
+
+    // Update context using updateUser to keep both fields in sync
+    updateUser({
+      avatar: updatedUser.avatar,
+      profilePicture: updatedUser.avatar
+    });
+
+    // Update local state
+    const newUserState = {
+      ...user,
+      avatar: updatedUser.avatar,
+      profilePicture: updatedUser.avatar,
+      ...updatedUser
+    };
+
+    setUser(newUserState);
+    setPreviewImage(updatedUser.avatar || null);
+
+    setSuccess('Profile picture updated successfully!');
+    setTimeout(() => setSuccess(null), 5000);
   } catch (error) {
-    setError('Failed to upload image');
-    setTimeout(() => setError(null), 3000);
+    const errorMessage = error instanceof Error ? error.message : 'Failed to update profile picture';
+    setError(errorMessage);
+    setTimeout(() => setError(null), 5000);
+
+    if (fileInputRef.current) fileInputRef.current.value = '';
   } finally {
     setUploadingImage(false);
   }
@@ -262,15 +286,37 @@ const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
 const handleRemoveImage = async () => {
   try {
     setUploadingImage(true);
-    await apiService.updateProfilePicture('');
+    setError(null);
+    setSuccess(null);
+    
+    // 1. Update context using updateUser to keep both fields in sync
+    updateUser({
+      avatar: '',
+      profilePicture: ''
+    });
+    
+    // 2. Update local state
+    const newUserState = {
+      ...user,
+      profilePicture: '',
+      avatar: ''
+    };
+    
+    setUser(newUserState);
     setPreviewImage(null);
+    
+    // 3. Clear file input
     if (fileInputRef.current) fileInputRef.current.value = '';
-    setUser(prev => ({ ...prev, profilePicture: '' }));
-    setSuccess('Profile picture removed!');
-    setTimeout(() => setSuccess(null), 3000);
+    
+    // 4. Update profile on server with empty avatar
+    await apiService.updateProfile({ avatar: '', profilePicture: '' });
+    
+    setSuccess('Profile picture removed successfully!');
+    setTimeout(() => setSuccess(null), 5000);
   } catch (error) {
-    setError('Failed to remove image');
-    setTimeout(() => setError(null), 3000);
+    const errorMessage = error instanceof Error ? error.message : 'Failed to remove profile picture';
+    setError(errorMessage);
+    setTimeout(() => setError(null), 5000);
   } finally {
     setUploadingImage(false);
   }
@@ -285,32 +331,48 @@ const onSubmit: SubmitHandler<ProfileFormData> = async (formData) => {
   setSuccess(null);
   
   try {
-    // Create form data for the request
-    const formDataToSend = new FormData();
-    
-    // Add all fields to form data with correct field names
-    formDataToSend.append('fullName', formData.name || '');
-    formDataToSend.append('name', formData.name || '');
-    if (formData.bio !== undefined) formDataToSend.append('bio', formData.bio || '');
-    if (formData.location !== undefined) formDataToSend.append('location', formData.location || '');
-    if (formData.website) formDataToSend.append('website', formData.website);
-    if (formData.github) formDataToSend.append('github', formData.github);
-    if (formData.linkedin) formDataToSend.append('linkedin', formData.linkedin);
-    
-    // Add profile picture if changed
+    // 1. Handle image upload if a new file is selected
+    let imageUrl = user?.avatar || user?.profilePicture;
     if (fileInputRef.current?.files?.[0]) {
-      formDataToSend.append('avatar', fileInputRef.current.files[0]);
+      try {
+        imageUrl = await apiService.uploadImage(fileInputRef.current.files[0]);
+      } catch (uploadError) {
+        throw new Error('Failed to upload profile picture. ' + (uploadError instanceof Error ? uploadError.message : 'Please try again.'));
+      }
     }
+
+    // 2. Prepare the data to send
+    const updateData: Record<string, any> = {
+      fullName: formData.name?.trim(),
+      name: formData.name?.trim(),
+    };
+
+    // Only add fields that have values
+    const optionalFields = ['bio', 'location', 'website', 'github', 'linkedin'] as const;
+    optionalFields.forEach(field => {
+      const value = formData[field]?.trim();
+      if (value) {
+        updateData[field] = value;
+      }
+    });
+
+    // 3. Add the image URL if we have one
+    if (imageUrl) {
+      updateData.avatar = imageUrl;
+      updateData.profilePicture = imageUrl;
+    }
+
+    // 4. Send the update request
+    const response = await apiService.updateProfile(updateData);
     
-    const response = await apiService.updateProfile(formDataToSend);
-    
-    // Update user state and show success message
+    // 5. Update local state with the response
     const updatedUserData = {
       ...user,
       ...response,
       name: response.fullName || response.name || user?.name || '',
       fullName: response.fullName || response.name || user?.name || '',
       profilePicture: response.avatar || response.profilePicture || user?.profilePicture,
+      avatar: response.avatar || response.profilePicture || user?.profilePicture,
       bio: response.bio !== undefined ? response.bio : (user?.bio || ''),
       location: response.location !== undefined ? response.location : (user?.location || ''),
       website: response.website !== undefined ? response.website : (user?.website || ''),
@@ -318,14 +380,12 @@ const onSubmit: SubmitHandler<ProfileFormData> = async (formData) => {
       linkedin: response.linkedin !== undefined ? response.linkedin : (user?.linkedin || '')
     };
     
+    // 6. Update all relevant states
     setUser(updatedUserData);
+    setContextUser(updatedUserData);
     localStorage.setItem('user_data', JSON.stringify(updatedUserData));
     
-    // Show success message
-    setSuccess('Profile updated successfully!');
-    setTimeout(() => setSuccess(null), 3000);
-    
-    // Update form data with new values
+    // 7. Update form state to match the new data
     reset({
       name: response.fullName || response.name || formData.name || '',
       bio: response.bio !== undefined ? response.bio : formData.bio || '',
@@ -335,10 +395,19 @@ const onSubmit: SubmitHandler<ProfileFormData> = async (formData) => {
       linkedin: response.linkedin !== undefined ? response.linkedin : formData.linkedin || ''
     });
     
+    // 8. Update preview image if it was changed
+    if (imageUrl) {
+      setPreviewImage(imageUrl);
+    }
+    
+    // 9. Show success message
+    setSuccess('Profile updated successfully!');
+    setTimeout(() => setSuccess(null), 5000);
+    
   } catch (err) {
     const error = handleError(err);
-    setError(error.message);
-    setTimeout(() => setError(null), 3000);
+    setError(error.message || 'Failed to update profile. Please try again.');
+    setTimeout(() => setError(null), 5000);
   } finally {
     setIsSubmitting(false);
   }
@@ -366,7 +435,7 @@ const onSubmit: SubmitHandler<ProfileFormData> = async (formData) => {
           <h1 className="text-2xl font-bold text-white-900">Your Profile</h1>
           <button
             onClick={() => setShowEditForm(!showEditForm)}
-            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 cursor-pointer"
           >
             {showEditForm ? 'Cancel' : 'Edit Profile'}
           </button>
@@ -404,7 +473,7 @@ const onSubmit: SubmitHandler<ProfileFormData> = async (formData) => {
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-6  shadow overflow-hidden sm:rounded-lg p-6">
             <div className="space-y-6 sm:space-y-5">
               <div>
-                <h3 className="text-lg font-medium leading-6 text-gray-900">Profile</h3>
+                {/* <h3 className="text-lg font-medium leading-6 text-white-900">Profile</h3> */}
                 <p className="mt-1 text-sm text-white-500">Update your profile information.</p>
               </div>
 
@@ -589,7 +658,7 @@ const onSubmit: SubmitHandler<ProfileFormData> = async (formData) => {
                 <button
                   type="submit"
                   disabled={isSubmitting || !isDirty}
-                  className={`ml-3 inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white ${isSubmitting || !isDirty ? 'bg-indigo-400' : 'bg-indigo-600 hover:bg-indigo-700'} focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500`}
+                  className={`ml-3 inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white ${isSubmitting || !isDirty ? 'bg-indigo-400' : 'bg-indigo-600 hover:bg-indigo-700'} focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 cursor-pointer`}
                 >
                   {isSubmitting ? (
                     <>
@@ -639,7 +708,7 @@ const onSubmit: SubmitHandler<ProfileFormData> = async (formData) => {
                 {user?.bio && (
                   <div className="sm:col-span-2">
                     <dt className="text-sm font-medium text-gray-500">About</dt>
-                    <dd className="mt-1 text-sm text-gray-900 whitespace-pre-line">{user.bio}</dd>
+                    <dd className="mt-1 text-sm text-white-900 whitespace-pre-line">{user.bio}</dd>
                   </div>
                 )}
 
@@ -701,7 +770,7 @@ const onSubmit: SubmitHandler<ProfileFormData> = async (formData) => {
                 {user?.email && (
                   <div className="sm:col-span-2">
                     <dt className="text-sm font-medium text-gray-500">Email</dt>
-                    <dd className="mt-1 text-sm text-gray-900">{user.email}</dd>
+                    <dd className="mt-1 text-sm text-white-900">{user.email}</dd>
                   </div>
                 )}
               </dl>

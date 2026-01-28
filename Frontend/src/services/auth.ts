@@ -1,6 +1,6 @@
 // /Frontend/src/services/auth.ts
 import { User } from '../context/UserContext';
-import api from './api';
+import {api} from './api';
 
 const TOKEN_KEY = 'auth_token';
 const USER_KEY = 'user_data';
@@ -8,54 +8,86 @@ const USER_KEY = 'user_data';
 export const authService = {
   // Token management
   getToken: (): string | null => {
-    return localStorage.getItem(TOKEN_KEY);
+    try {
+      return localStorage.getItem(TOKEN_KEY);
+    } catch (err) {
+      // Cannot access localStorage (SSR or private mode)
+      return null;
+    }
   },
 
-  setToken: (token: string): void => {
-    if (token) {
-      try {
-        // Remove 'Bearer ' prefix if it exists to avoid duplication
-        const cleanToken = token.startsWith('Bearer ') ? token.substring(7) : token;
-        localStorage.setItem(TOKEN_KEY, cleanToken);
-        
-        // Set the Authorization header for all future requests
-        api.defaults.headers.common['Authorization'] = `Bearer ${cleanToken}`;
-      } catch (error) {
-        throw new Error('Failed to save authentication token');
+  setToken: (token: string | null): void => {
+    try {
+      if (token) {
+        // Save token safely
+        try {
+          localStorage.setItem(TOKEN_KEY, token);
+        } catch (err) {
+          // Handle localStorage access error
+        }
+
+        // Set axios Authorization header safely
+        if (api?.defaults?.headers) {
+          api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+        }
+      } else {
+        try {
+          localStorage.removeItem(TOKEN_KEY);
+        } catch (err) {}
+        if (api?.defaults?.headers) {
+          delete api.defaults.headers.common['Authorization'];
+        }
       }
-    } else {
-      localStorage.removeItem(TOKEN_KEY);
-      delete api.defaults.headers.common['Authorization'];
+    } catch (error) {
+      // Unable to save token
+      try {
+        localStorage.removeItem(TOKEN_KEY);
+      } catch (err) {}
+      if (api?.defaults?.headers) {
+        delete api.defaults.headers.common['Authorization'];
+      }
     }
   },
 
   removeToken: (): void => {
-    localStorage.removeItem(TOKEN_KEY);
-    delete api.defaults.headers.common['Authorization'];
+    try {
+      localStorage.removeItem(TOKEN_KEY);
+    } catch (err) {}
+    if (api?.defaults?.headers) {
+      delete api.defaults.headers.common['Authorization'];
+    }
   },
 
   // User management
   getCurrentUser: (): User | null => {
-    const userStr = localStorage.getItem(USER_KEY);
-    if (!userStr) {
-      return null;
-    }
-
     try {
+      const userStr = localStorage.getItem(USER_KEY);
+      if (!userStr) {
+        return null;
+      }
+
       return JSON.parse(userStr);
     } catch (error) {
       // Clear invalid user data
-      localStorage.removeItem(USER_KEY);
+      try {
+        localStorage.removeItem(USER_KEY);
+      } catch (err) {}
       return null;
     }
   },
 
   setUser: (user: User): void => {
-    localStorage.setItem(USER_KEY, JSON.stringify(user));
+    try {
+      localStorage.setItem(USER_KEY, JSON.stringify(user));
+    } catch (err) {
+      // Handle localStorage error
+    }
   },
 
   clearUser: (): void => {
-    localStorage.removeItem(USER_KEY);
+    try {
+      localStorage.removeItem(USER_KEY);
+    } catch (err) {}
   },
 
   // Authentication state
@@ -67,12 +99,18 @@ export const authService = {
   login: (token: string, user: User): void => {
     authService.setToken(token);
     // Store user data in localStorage
-    localStorage.setItem(USER_KEY, JSON.stringify(user));
+    try {
+      localStorage.setItem(USER_KEY, JSON.stringify(user));
+    } catch (err) {
+      // Handle localStorage error
+    }
   },
 
   logout: (): void => {
     authService.setToken('');
-    localStorage.removeItem(USER_KEY);
+    try {
+      localStorage.removeItem(USER_KEY);
+    } catch (err) {}
   }
 };
 

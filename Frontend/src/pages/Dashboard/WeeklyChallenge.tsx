@@ -26,6 +26,7 @@ export default function WeeklyChallenge() {
   const [registrationMode, setRegistrationMode] = useState<'solo' | 'team'>(
     'solo'
   );
+  const [challenge, setChallenge] = useState<any>(null); // Add challenge state
 
   // Challenge deadline passed (set to false initially, true to show winners)
   const [challengeEnded, setChallengeEnded] = useState(false);
@@ -55,6 +56,7 @@ export default function WeeklyChallenge() {
             <ChallengeOverviewCard
               isRegistered={isRegistered}
               onJoinClick={handleJoinClick}
+              onChallengeLoaded={setChallenge} // Set challenge when loaded
             />
 
             {isRegistered && (
@@ -82,6 +84,7 @@ export default function WeeklyChallenge() {
         open={registrationModalOpen}
         onOpenChange={setRegistrationModalOpen}
         onSuccess={handleRegistrationSuccess}
+        challengeId={challenge?._id} // Pass the challenge ID
       />
     </div>
   );

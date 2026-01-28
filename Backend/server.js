@@ -7,6 +7,9 @@ const morgan = require("morgan");
 const rateLimit = require("express-rate-limit");
 const connectDB = require("./config/db");
 const authRoutes = require("./routes/auth");
+const userRoutes = require("./routes/user");
+const adminRoutes = require("./routes/admin");
+const challengeRoutes = require("./routes/challenges");
 const leaderboardRoutes = require("./routes/leaderboard");
 const { errorHandler } = require("./middlewares/errorHandler");
 const fs = require('fs');
@@ -76,6 +79,10 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Routes
 app.use("/api/auth", authRoutes);
+app.use("/api/users", userRoutes);
+app.use("/api/admin", adminRoutes);
+app.use("/api/admin/challenges", challengeRoutes); // Admin challenge routes
+app.use("/api/challenges", challengeRoutes); // Public challenge routes
 app.use("/api/leaderboard", leaderboardRoutes);
 
 // Error handler

@@ -11,16 +11,17 @@ import { authService } from '../services/auth';
 
 export interface User {
   _id?: string;
+  id?: string; // Add id field for backward compatibility
   name: string;
   fullName?: string;
   email: string;
   username?: string;
   plan?: string;
-  avatar?: string;
+  role?: string;
+  avatar?: string; // Use only one field consistently
+  profilePicture?: string; // Add profilePicture for backward compatibility
   phone?: string;
   points?: number;
-  profileImage?: string;
-  profilePicture?: string;
   bio?: string;
   location?: string;
   website?: string;
@@ -32,22 +33,11 @@ export interface User {
 interface UserContextType {
   user: User | null;
   setUser: (user: User | null) => void;
+  updateUser: (updates: Partial<User>) => void; // Add this function
   logout: () => void;
 }
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
-
-const defaultUser: User = {
-  name: '',
-  email: '',
-  bio: '',
-  location: '',
-  website: '',
-  github: '',
-  linkedin: '',
-  skills: [],
-  points: 0,
-};
 
 export const UserProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUserState] = useState<User | null>(() => {
@@ -57,15 +47,25 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
         const parsedUser = JSON.parse(savedUser);
         if (parsedUser && (parsedUser._id || parsedUser.email)) {
           return {
-            ...defaultUser,
-            ...parsedUser,
             name: parsedUser.fullName || parsedUser.name || '',
-            profilePicture: parsedUser.avatar || parsedUser.profilePicture || parsedUser.profileImage
+            email: parsedUser.email || '',
+            avatar: parsedUser.avatar || parsedUser.profilePicture || parsedUser.profileImage || '',
+            profilePicture: parsedUser.profilePicture || parsedUser.avatar || parsedUser.profileImage || '',
+            bio: parsedUser.bio || '',
+            location: parsedUser.location || '',
+            website: parsedUser.website || '',
+            github: parsedUser.github || '',
+            linkedin: parsedUser.linkedin || '',
+            skills: parsedUser.skills || [],
+            points: parsedUser.points || 0,
+            username: parsedUser.username || '',
+            ...parsedUser // Spread last to ensure our mapping takes precedence
           };
         }
       }
     } catch (error) {
-      // Error parsing saved user data
+      // Error parsing saved user data, clear it
+      localStorage.removeItem('user_data');
     }
     return null;
   });
@@ -73,13 +73,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
   // Update localStorage when user changes
   useEffect(() => {
     if (user) {
-      const userToStore = {
-        ...user,
-        fullName: user.fullName || user.name,
-        ...defaultUser,
-        ...user
-      };
-      localStorage.setItem('user_data', JSON.stringify(userToStore));
+      localStorage.setItem('user_data', JSON.stringify(user));
     } else {
       localStorage.removeItem('user_data');
     }
@@ -89,11 +83,19 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
   const setUser = useCallback((newUser: User | null) => {
     if (newUser) {
       const completeUser = {
-        ...defaultUser,
-        ...newUser,
+        ...newUser, // Spread first to preserve all properties
         name: newUser.fullName || newUser.name || '',
-        fullName: newUser.fullName || newUser.name || '',
-        profilePicture: newUser.avatar || newUser.profilePicture || newUser.profileImage
+        email: newUser.email || '',
+        avatar: newUser.avatar || newUser.profilePicture || '',
+        profilePicture: newUser.profilePicture || newUser.avatar || '',
+        bio: newUser.bio || '',
+        location: newUser.location || '',
+        website: newUser.website || '',
+        github: newUser.github || '',
+        linkedin: newUser.linkedin || '',
+        skills: newUser.skills || [],
+        points: newUser.points || 0,
+        username: newUser.username || ''
       };
       
       setUserState(completeUser);
@@ -104,14 +106,36 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
 
+  // Add updateUser function for partial updates
+  const updateUser = useCallback((updates: Partial<User>) => {
+    setUserState(prev => {
+      if (!prev) return null;
+      
+      const updatedUser = {
+        ...prev,
+        ...updates,
+        // Ensure both avatar and profilePicture fields are kept in sync
+        avatar: updates.avatar !== undefined ? updates.avatar : (updates.profilePicture !== undefined ? updates.profilePicture : prev.avatar),
+        profilePicture: updates.profilePicture !== undefined ? updates.profilePicture : (updates.avatar !== undefined ? updates.avatar : prev.profilePicture)
+      };
+      
+      // Update localStorage
+      localStorage.setItem('user_data', JSON.stringify(updatedUser));
+      authService.setUser(updatedUser);
+      
+      return updatedUser;
+    });
+  }, []);
+
   // Logout function
   const logout = useCallback(() => {
-    setUser(null);
+    setUserState(null);
     authService.logout();
-  }, [setUser]);
+    localStorage.removeItem('user_data');
+  }, []);
 
   return (
-    <UserContext.Provider value={{ user, setUser, logout }}>
+    <UserContext.Provider value={{ user, setUser, updateUser, logout }}>
       {children}
     </UserContext.Provider>
   );

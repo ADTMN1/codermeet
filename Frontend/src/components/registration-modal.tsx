@@ -11,14 +11,15 @@ import {
 } from '../components/ui/dialog';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
-// import { Label } from './ui/label';
-import { toast } from 'sonner';
 import { Label } from './ui/label';
+import { toast } from 'sonner';
+import { useUser } from '../context/UserContext';
 
 interface RegistrationModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess: (mode: 'solo' | 'team') => void;
+  challengeId?: string; // Add challengeId prop
 }
 
 interface TeamMember {
@@ -32,7 +33,9 @@ export function RegistrationModal({
   open,
   onOpenChange,
   onSuccess,
+  challengeId
 }: RegistrationModalProps) {
+  const { user } = useUser();
   const [mode, setMode] = useState<'solo' | 'team'>('solo');
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([
     { id: '1', name: '', email: '', role: '' },
@@ -61,7 +64,7 @@ export function RegistrationModal({
     );
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     // Validation
@@ -75,18 +78,47 @@ export function RegistrationModal({
       }
     }
 
-    toast.success('Registration successful!', {
-      description:
-        mode === 'solo'
-          ? 'Good luck with the challenge!'
-          : `Team registered with ${teamMembers.length} members!`,
-    });
+    if (!user) {
+      toast.error('You must be logged in to register for challenges');
+      return;
+    }
 
-    onSuccess(mode);
+    if (!challengeId) {
+      toast.error('Challenge ID is required');
+      return;
+    }
 
-    // Reset form
-    setMode('solo');
-    setTeamMembers([{ id: '1', name: '', email: '', role: '' }]);
+    try {
+      // Call the registration API
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/challenges/${challengeId}/register`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': localStorage.getItem('auth_token') ? `Bearer ${localStorage.getItem('auth_token')}` : ''
+        }
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        toast.success('Registration successful!', {
+          description:
+            mode === 'solo'
+              ? 'Good luck with the challenge!'
+              : `Team registered with ${teamMembers.length} members!`,
+        });
+
+        onSuccess(mode);
+
+        // Reset form
+        setMode('solo');
+        setTeamMembers([{ id: '1', name: '', email: '', role: '' }]);
+      } else {
+        toast.error(data.message || 'Registration failed');
+      }
+    } catch (error) {
+      toast.error('Failed to register for challenge. Please try again.');
+    }
   };
 
   return (

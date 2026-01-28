@@ -11,6 +11,8 @@ import Dashboard from './pages/Dashboard/Dashboard';
 import WeeklyChallenge from './pages/Dashboard/WeeklyChallenge';
 import Community from './pages/Dashboard/Community';
 import Profile from './pages/profile/profile';
+import AdminRoute from './components/AdminRoute';
+import AdminDashboard from './pages/Admin/AdminDashboard';
 
 function App() {
   return (
@@ -66,6 +68,16 @@ function App() {
             {/* Optional: Redirect root to dashboard */}
             <Route path="" element={<Dashboard />} />
           </Route>
+
+          {/* Admin Route */}
+          <Route
+            path="/admin"
+            element={
+              <AdminRoute>
+                <AdminDashboard />
+              </AdminRoute>
+            }
+          />
         </Routes>
       </div>
     </BrowserRouter>

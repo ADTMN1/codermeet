@@ -35,6 +35,11 @@ avatarPublicId: { type: String },   // Cloudinary public_id (for delete)
       default: "Trial",
     },
     isProfessional: { type: Boolean, default: false },
+    role: {
+      type: String,
+      enum: ["user", "admin"],
+      default: "user",
+    },
   },
   { 
     timestamps: true,

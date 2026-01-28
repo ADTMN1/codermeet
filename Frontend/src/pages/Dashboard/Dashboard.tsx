@@ -146,10 +146,10 @@ const Dashboard: React.FC = () => {
             </div>
             <div className="flex items-center space-x-4 mt-4 md:mt-0">
               <div className="relative">
-                {user?.profileImage ? (
+                {user?.avatar || user?.profilePicture ? (
                   <img 
-                    src={user.profileImage} 
-                    alt={user.name} 
+                    src={user?.avatar || user?.profilePicture} 
+                    alt={user?.name} 
                     className="w-12 h-12 rounded-full object-cover border-2 border-purple-500"
                   />
                 ) : (

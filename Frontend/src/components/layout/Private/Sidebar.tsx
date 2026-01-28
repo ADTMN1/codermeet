@@ -1,3 +1,4 @@
+// Sidebar.tsx
 import React, { useState } from 'react';
 import { Link, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import {
@@ -16,7 +17,7 @@ import { Avatar, AvatarImage, AvatarFallback } from '../../ui/avatar';
 import { useUser } from '../../../context/UserContext';
 
 export default function Sidebar() {
-  const { user } = useUser();
+  const { user, logout } = useUser(); // Use logout from context
   const [collapsed, setCollapsed] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
@@ -31,8 +32,7 @@ export default function Sidebar() {
   ];
 
   const handleLogout = () => {
-    // Clear user data from localStorage if needed
-    localStorage.removeItem('user');
+    logout(); // Use the context logout function
     navigate('/');
   };
 
@@ -85,9 +85,10 @@ export default function Sidebar() {
             } group-hover:border-purple-400`}
           >
             <AvatarImage
-              src={user?.profileImage || user?.avatar}
+              src={user?.avatar || user?.profilePicture} // Use both avatar and profilePicture fields
               alt={user?.name || 'User'}
               className="object-cover"
+              key={user?.avatar || user?.profilePicture} // Add key to force re-render when avatar changes
             />
             <AvatarFallback className="bg-purple-600 text-white font-semibold">
               {getUserInitials()}

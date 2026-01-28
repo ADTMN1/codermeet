@@ -3,6 +3,8 @@ import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { useUser } from '../../context/UserContext';
 import { authService } from '../../services/auth';
+import { apiService } from '../../services/api';
+import { toast } from 'sonner';
 
 const LoginForm: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -86,21 +88,31 @@ const LoginForm: React.FC = () => {
       );
 
       // Save the token using authService
-      const token = response.data.token || (response.data.data && response.data.data.token);
-      if (token) {
-        authService.setToken(token);
-      }
+    const token = response.data.token;
 
-      // Get user data from either response.data.user or response.data.data
-      const userData = response.data.user || response.data.data;
+if (token && typeof token === 'string') {
+  try {
+    authService.setToken(token);
+    // Also save to localStorage if your app uses it directly
+    localStorage.setItem('auth_token', token);
+  } catch (err) {
+    toast.error('Failed to save authentication token');
+  }
+} else {
+  toast.warning('No token received from server');
+}
+
+    // response.data.data.token
+const userData = response.data.data; // <--- user info is here
+
       
       if (userData) {
-        // Update user context
+        // First, set basic user data from login response
         setUser({
           name: userData.name || userData.fullName || email.split('@')[0],
           email: userData.email || email,
-          avatar: userData.avatar,
-          profileImage: userData.profileImage,
+          avatar: userData.avatar || userData.profilePicture || userData.profileImage,
+          profilePicture: userData.profilePicture || userData.avatar || userData.profileImage,
           points: userData.points || 0,
           bio: userData.bio || '',
           location: userData.location || '',
@@ -109,13 +121,29 @@ const LoginForm: React.FC = () => {
           linkedin: userData.linkedin || '',
           skills: userData.skills || [],
           phone: userData.phone || '',
+          role: userData.role || 'user', // Add role field
+          username: userData.username || '',
+          plan: userData.plan || 'Trial',
         });
 
         // Save user data to localStorage
-        localStorage.setItem('user', JSON.stringify(userData));
+      localStorage.setItem('user_data', JSON.stringify(userData));
 
-        // Redirect to dashboard
-        navigate('/dashboard');
+        // Fetch fresh user data from server to ensure latest profile picture
+        try {
+          const freshUserData = await apiService.getProfile();
+          setUser(freshUserData);
+          localStorage.setItem('user_data', JSON.stringify(freshUserData));
+        } catch (fetchError) {
+          // Could not fetch fresh user data, using login data
+        }
+
+        // Redirect to appropriate dashboard
+        if (userData.role === 'admin') {
+          navigate('/admin');
+        } else {
+          navigate('/dashboard');
+        }
       } else {
         throw new Error('No user data received from server');
       }

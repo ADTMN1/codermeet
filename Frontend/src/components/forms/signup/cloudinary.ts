@@ -12,10 +12,9 @@ export const uploadToCloudinary = async (file: File) => {
       'https://api.cloudinary.com/v1_1/dsfwkhqwq/image/upload',
       formData
     );
-    // console.log('Cloudinary response:', res.data);
+    // Cloudinary response handled successfully
     return res.data.secure_url as string;
   } catch (err: any) {
-    console.error('Upload failed:', err.response?.data || err.message);
     return null;
   }
 };
