@@ -6,9 +6,10 @@ interface Props {
   formData: FormData;
   setFormData: React.Dispatch<React.SetStateAction<FormData>>;
   errors: { [key: string]: string };
+  onPlanSelect?: (plan: string) => void; // Optional callback for plan selection
 }
 
-const Step3Plan: React.FC<Props> = ({ formData, setFormData, errors }) => {
+const Step3Plan: React.FC<Props> = ({ formData, setFormData, errors, onPlanSelect }) => {
   const plans: {
     key: PlanType;
     title: string;
@@ -119,7 +120,12 @@ const Step3Plan: React.FC<Props> = ({ formData, setFormData, errors }) => {
                     ? 'bg-white text-purple-500 border-white'
                     : 'border-gray-400 text-gray-200 hover:bg-purple-600 hover:border-purple-600 hover:text-white'
                 }`}
-                onClick={() => setFormData({ ...formData, plan: plan.key })}
+                onClick={() => {
+                  setFormData({ ...formData, plan: plan.key });
+                  if (onPlanSelect) {
+                    onPlanSelect(plan.key);
+                  }
+                }}
               >
                 {formData.plan === plan.key ? 'Selected' : 'Select Plan'}
               </button>

@@ -28,6 +28,7 @@ export interface User {
   github?: string;
   linkedin?: string;
   skills?: string[];
+  isProfessional?: boolean; // Add missing property
 }
 
 interface UserContextType {

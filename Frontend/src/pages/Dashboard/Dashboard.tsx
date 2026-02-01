@@ -10,13 +10,15 @@ import {
   FaStar,
   FaChartLine,
   FaMedal,
-  FaAward
+  FaAward,
+  FaCheckCircle
 } from 'react-icons/fa';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useUser } from '../../context/UserContext';
+import { authService } from '../../services/auth';
 import axios from 'axios';
 
-interface LeaderboardUser {
+interface DashboardLeaderboardUser {
   name: string;
   points: number;
   rank: number;
@@ -26,15 +28,66 @@ interface LeaderboardUser {
 
 const Dashboard: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { user } = useUser();
-  const [leaderboard, setLeaderboard] = useState<LeaderboardUser[]>([]);
+  const [leaderboard, setLeaderboard] = useState<DashboardLeaderboardUser[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [showPaymentSuccess, setShowPaymentSuccess] = useState(false);
+  const [paymentTxRef, setPaymentTxRef] = useState<string>('');
   const [stats, setStats] = useState({
     totalChallenges: 0,
     completedChallenges: 0,
     rank: 0,
     totalUsers: 0,
   });
+
+  // Check for payment success in URL and recent payment completion
+  useEffect(() => {
+    const paymentSuccess = searchParams.get('payment');
+    const txRef = searchParams.get('tx_ref');
+    const token = searchParams.get('token');
+    const userParam = searchParams.get('user');
+    
+    // Check if user just came from Chapa payment (look for recent payment in session)
+    const sessionPayment = sessionStorage.getItem('recent_chapa_payment');
+    
+    // Handle token from URL (after payment)
+    if (token && !user) {
+      // Use the auth service to properly set the token
+      authService.setToken(token);
+      
+      // Handle user data if provided
+      if (userParam) {
+        try {
+          const userData = JSON.parse(decodeURIComponent(userParam));
+          authService.login(token, userData);
+        } catch (error) {
+          // Error parsing user data - handle silently
+        }
+      }
+      
+      // Reload the page to trigger authentication check
+      window.location.reload();
+      return;
+    }
+    
+    if (paymentSuccess === 'success' && txRef) {
+      setShowPaymentSuccess(true);
+      setPaymentTxRef(txRef);
+      
+      // Clear the URL parameters after showing the message
+      const newUrl = window.location.pathname;
+      window.history.replaceState({}, '', newUrl);
+      
+      // Clear the payment flag
+      sessionStorage.removeItem('recent_chapa_payment');
+    } else if (sessionPayment) {
+      // Show success notification if user was just redirected from Chapa
+      setShowPaymentSuccess(true);
+      setPaymentTxRef(sessionPayment);
+      sessionStorage.removeItem('recent_chapa_payment');
+    }
+  }, [searchParams, user]);
   
   // Calculate current user's rank
   const currentUserRank = React.useMemo(() => {
@@ -92,7 +145,19 @@ const Dashboard: React.FC = () => {
   const onprogress = 45;
 
   const handleJoin = () => {
+    if (user?.plan?.toLowerCase() === 'trial') {
+      alert('Upgrade to Basic or Premium plan to participate in challenges!');
+      return;
+    }
     navigate('/weeklyChallenge');
+  };
+
+  const handleSolveChallenge = () => {
+    if (user?.plan?.toLowerCase() === 'trial') {
+      alert('Upgrade to Basic or Premium plan to access coding challenges!');
+      return;
+    }
+    navigate('/daily-challenge');
   };
 
   const getPlanBadge = (plan?: string) => {
@@ -126,6 +191,33 @@ const Dashboard: React.FC = () => {
 
   return (
     <div className="flex min-h-screen bg-gray-900 text-gray-200">
+      {/* Payment Success Notification */}
+      {showPaymentSuccess && (
+        <div className="fixed top-0 left-0 right-0 z-50 bg-gradient-to-r from-green-600 to-blue-600 border-b border-green-500">
+          <div className="max-w-7xl mx-auto px-4 py-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <FaCheckCircle className="text-white text-2xl" />
+                <div>
+                  <h3 className="text-white font-semibold">Payment Successful!</h3>
+                  <p className="text-green-100 text-sm">
+                    Transaction {paymentTxRef} completed. Your subscription is now active.
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowPaymentSuccess(false)}
+                className="text-white hover:text-green-200 transition-colors"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Main Content */}
       <main className="flex-1 p-4 md:p-8 space-y-6 md:space-y-8">
         {/* Welcome Panel */}
@@ -185,8 +277,28 @@ const Dashboard: React.FC = () => {
             </div>
           </div>
 
-        </div> {/* Close the welcome panel div */}
-        
+          {/* Trial User Upgrade Prompt */}
+          {user?.plan?.toLowerCase() === 'trial' && (
+            <div className="mt-6 p-4 bg-gradient-to-r from-purple-900/50 to-pink-900/50 rounded-lg border border-purple-500/30">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-semibold text-purple-300 mb-1">Upgrade Your Plan!</h3>
+                  <p className="text-gray-300 text-sm">
+                    Get full access to challenges, submit solutions, and compete for prizes. 
+                    Upgrade to Basic or Premium to unlock all features.
+                  </p>
+                </div>
+                <button 
+                  onClick={() => navigate('/pricing')}
+                  className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-4 py-2 rounded-lg font-semibold hover:from-purple-600 hover:to-pink-600 transition cursor-pointer"
+                >
+                  Upgrade Now
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
         {/* Panels Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
           {/* Weekly Challenge */}
@@ -203,9 +315,14 @@ const Dashboard: React.FC = () => {
             <button
               type="button"
               onClick={handleJoin}
-              className="text-heading bg-neutral-primary box-border border border-transparent hover:bg-neutral-secondary-medium focus:ring-4 focus:ring-neutral-tertiary-soft font-medium leading-5 rounded-full text-sm px-4 py-2.5 focus:outline-none cursor-pointer hover:shadow-[0_0_15px_#C27AFF] shadow-md transition "
+              className={`text-heading font-medium leading-5 rounded-full text-sm px-4 py-2.5 focus:outline-none cursor-pointer transition shadow-md ${
+                user?.plan?.toLowerCase() === 'trial'
+                  ? 'bg-gray-600 text-gray-400 cursor-not-allowed hover:bg-gray-600'
+                  : 'bg-neutral-primary box-border border border-transparent hover:bg-neutral-secondary-medium focus:ring-4 focus:ring-neutral-tertiary-soft hover:shadow-[0_0_15px_#C27AFF] shadow-md transition'
+              }`}
+              disabled={user?.plan?.toLowerCase() === 'trial'}
             >
-              Join
+              {user?.plan?.toLowerCase() === 'trial' ? 'Upgrade Required' : 'Join'}
             </button>
 
             {/* Progress Bar */}
@@ -228,9 +345,15 @@ const Dashboard: React.FC = () => {
             </p>
             <button
               type="button"
-              className="text-heading bg-neutral-primary box-border border border-transparent hover:bg-neutral-secondary-medium focus:ring-4 focus:ring-neutral-tertiary-soft font-medium leading-5 rounded-full text-sm px-4 py-2.5 focus:outline-none cursor-pointer hover:shadow-[0_0_15px_#C27AFF] shadow-md transition "
+              onClick={handleSolveChallenge}
+              className={`text-heading font-medium leading-5 rounded-full text-sm px-4 py-2.5 focus:outline-none cursor-pointer transition shadow-md ${
+                user?.plan?.toLowerCase() === 'trial'
+                  ? 'bg-gray-600 text-gray-400 cursor-not-allowed hover:bg-gray-600'
+                  : 'bg-neutral-primary box-border border border-transparent hover:bg-neutral-secondary-medium focus:ring-4 focus:ring-neutral-tertiary-soft hover:shadow-[0_0_15px_#C27AFF] shadow-md transition'
+              }`}
+              disabled={user?.plan?.toLowerCase() === 'trial'}
             >
-              Solve Now
+              {user?.plan?.toLowerCase() === 'trial' ? 'Upgrade Required' : 'Solve Now'}
             </button>
           </div>
 
@@ -273,7 +396,7 @@ const Dashboard: React.FC = () => {
 
             <button
               type="button"
-              className="text-heading bg-neutral-primary box-border border border-transparent hover:bg-neutral-secondary-medium focus:ring-4 focus:ring-neutral-tertiary-soft font-medium leading-5 rounded-full text-sm px-4 py-2.5 focus:outline-none cursor-pointer hover:shadow-[0_0_15px_#C27AFF] shadow-md transition "
+              className="text-heading bg-neutral-primary box-border border border-transparent hover:bg-neutral-secondary-medium focus:ring-4 focus:ring-neutral-tertiary-soft font-medium leading-5 rounded-full text-sm px-4 py-2.5 focus:outline-none cursor-pointer hover:shadow-[0_0_15px_#C27AFF] shadow-md transition"
             >
               View Projects
             </button>
@@ -305,22 +428,23 @@ const Dashboard: React.FC = () => {
               <FaCode className="text-yellow-400 w-6 h-6" />
               <h2 className="text-xl font-bold text-white">Mentorship</h2>
             </div>
-            <p className="text-gray-400 mb-2">
-              Upcoming session: JavaScript Debugging
-            </p>
-            <p className="text-gray-500 mb-4">Mentor: @ExpertDev</p>
+            <div className="flex">
+              <p className="text-gray-400 mb-2">
+                Upcoming session: JavaScript Debugging
+              </p>
+              <p className="text-gray-500 mb-4">Mentor: @ExpertDev</p>
+            </div>
 
             <button
               type="button"
-              className="text-heading bg-neutral-primary box-border border border-transparent hover:bg-neutral-secondary-medium focus:ring-4 focus:ring-neutral-tertiary-soft font-medium leading-5 rounded-full text-sm px-4 py-2.5 focus:outline-none cursor-pointer hover:shadow-[0_0_15px_#C27AFF] shadow-md transition "
+              className="text-heading bg-neutral-primary box-border border border-transparent hover:bg-neutral-secondary-medium focus:ring-4 focus:ring-neutral-tertiary-soft font-medium leading-5 rounded-full text-sm px-4 py-2.5 focus:outline-none cursor-pointer hover:shadow-[0_0_15px_#C27AFF] shadow-md transition"
             >
               Join Session
             </button>
           </div>
 
-          {/* {Community Engagement} */}
+          {/* Community Engagement */}
           <div className="bg-gray-800 p-6 rounded-xl shadow-lg border border-gray-700 hover:shadow-blue-400/30 transition">
-            {/* Header */}
             <div className="flex items-center gap-3 mb-4">
               <FaUsers className="text-blue-400 w-6 h-6" />
               <h2 className="text-xl font-bold text-white">
@@ -328,7 +452,6 @@ const Dashboard: React.FC = () => {
               </h2>
             </div>
 
-            {/* Stats */}
             <ul className="text-gray-400 mb-4 space-y-1">
               <li> Messages: 45</li>
               <li>Bug Fixes: 12</li>
@@ -336,11 +459,9 @@ const Dashboard: React.FC = () => {
 
             <p className="text-gray-500 mb-4">5 new discussions</p>
 
-            {/* Button */}
-
             <button
               type="button"
-              className="text-heading bg-neutral-primary box-border border border-transparent hover:bg-neutral-secondary-medium focus:ring-4 focus:ring-neutral-tertiary-soft font-medium leading-5 rounded-full text-sm px-4 py-2.5 focus:outline-none cursor-pointer hover:shadow-[0_0_15px_#C27AFF] shadow-md transition "
+              className="text-heading bg-neutral-primary box-border border border-transparent hover:bg-neutral-secondary-medium focus:ring-4 focus:ring-neutral-tertiary-soft font-medium leading-5 rounded-full text-sm px-4 py-2.5 focus:outline-none cursor-pointer hover:shadow-[0_0_15px_#C27AFF] shadow-md transition"
             >
               View Discussions
             </button>
@@ -372,7 +493,7 @@ const Dashboard: React.FC = () => {
             </p>
             <button
               type="button"
-              className="text-heading bg-neutral-primary box-border border border-transparent hover:bg-neutral-secondary-medium focus:ring-4 focus:ring-neutral-tertiary-soft font-medium leading-5 rounded-full text-sm px-4 py-2.5 focus:outline-none cursor-pointer hover:shadow-[0_0_15px_#C27AFF] shadow-md transition "
+              className="text-heading bg-neutral-primary box-border border border-transparent hover:bg-neutral-secondary-medium focus:ring-4 focus:ring-neutral-tertiary-soft font-medium leading-5 rounded-full text-sm px-4 py-2.5 focus:outline-none cursor-pointer hover:shadow-[0_0_15px_#C27AFF] shadow-md transition"
             >
               Withdraw
             </button>

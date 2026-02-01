@@ -406,6 +406,23 @@ exports.registerForChallenge = async (req, res) => {
       });
     }
 
+    // Get user to check plan
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Check if user has a paid plan (Basic or Premium) - Trial users can only view
+    if (user.plan === 'Trial') {
+      return res.status(403).json({
+        success: false,
+        message: 'Trial users can only view challenges. Upgrade to Basic or Premium plan to participate.'
+      });
+    }
+
     // Check if user is already registered
     const isAlreadyRegistered = challenge.participants.some(
       participant => participant.user.toString() === userId

@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { Users, UsersRound, FileCheck, Trophy } from 'lucide-react';
 import { Card } from './ui/card';
 import { motion } from 'motion/react';
+import { leaderboardService } from '../services/leaderboardService';
 
 export function LiveStats() {
   const [stats, setStats] = useState({
@@ -43,11 +44,44 @@ export function LiveStats() {
     return () => clearInterval(timer);
   }, []);
 
-  const leaderboard = [
-    { rank: 1, name: 'CodeNinjas', score: 98, avatar: '🥇' },
-    { rank: 2, name: 'DevMasters', score: 95, avatar: '🥈' },
-    { rank: 3, name: 'ByteBuilders', score: 92, avatar: '🥉' },
-  ];
+  const [leaderboard, setLeaderboard] = useState<{ rank: number; name: string; score: number; avatar?: string }[]>([]);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const fallback = [
+      { rank: 1, name: 'CodeNinjas', score: 98, avatar: '🥇' },
+      { rank: 2, name: 'DevMasters', score: 95, avatar: '🥈' },
+      { rank: 3, name: 'ByteBuilders', score: 92, avatar: '🥉' },
+    ];
+
+    const fetchTop = async () => {
+      try {
+        const users = await leaderboardService.getTopUsers(3);
+        if (!mounted) return;
+
+        if (users && users.length > 0) {
+          const mapped = users.slice(0, 3).map(u => ({
+            rank: u.rank || 0,
+            name: u.fullName || u.username || u._id || 'User',
+            score: u.points || 0,
+            avatar: u.avatar || u.profileImage || (u.rank === 1 ? '🥇' : u.rank === 2 ? '🥈' : '🥉'),
+          }));
+          setLeaderboard(mapped);
+        } else {
+          setLeaderboard(fallback);
+        }
+      } catch (err) {
+        setLeaderboard(fallback);
+      }
+    };
+
+    fetchTop();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   return (
     <div className="space-y-6">

@@ -6,11 +6,13 @@ const cors = require("cors");
 const morgan = require("morgan");
 const rateLimit = require("express-rate-limit");
 const connectDB = require("./config/db");
-const authRoutes = require("./routes/auth");
-const userRoutes = require("./routes/user");
-const adminRoutes = require("./routes/admin");
-const challengeRoutes = require("./routes/challenges");
-const leaderboardRoutes = require("./routes/leaderboard");
+const authRoutes = require('./routes/auth');
+const userRoutes = require('./routes/user');
+const adminRoutes = require('./routes/admin');
+const challengeRoutes = require('./routes/challenges');
+const leaderboardRoutes = require('./routes/leaderboard');
+const paymentRoutes = require('./routes/payment');
+const resourceRoutes = require('./routes/resources');
 const { errorHandler } = require("./middlewares/errorHandler");
 const fs = require('fs');
 const path = require('path');
@@ -49,7 +51,19 @@ app.use(cors({
 }));
 
 // Middlewares
-app.use(helmet());
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com"],
+      imgSrc: ["'self'", "data:", "https:"],
+      scriptSrc: ["'self'"],
+      connectSrc: ["'self'", "https://api.chapa.co"],
+    },
+  },
+  crossOriginEmbedderPolicy: false,
+}));
 
 // Logging (dev only)
 if (process.env.NODE_ENV !== "production") {
@@ -74,16 +88,36 @@ const globalLimiter = rateLimit({
 });
 app.use(globalLimiter);
 
+// Stricter rate limiting for auth endpoints
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10, // 10 attempts per 15 minutes
+  message: "Too many authentication attempts, please try again later",
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Stricter rate limiting for payment endpoints
+const paymentLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5, // 5 payment attempts per 15 minutes
+  message: "Too many payment attempts, please try again later",
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 // Serve static files from uploads directory
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Routes
-app.use("/api/auth", authRoutes);
+app.use("/api/auth", authLimiter, authRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/admin/challenges", challengeRoutes); // Admin challenge routes
 app.use("/api/challenges", challengeRoutes); // Public challenge routes
 app.use("/api/leaderboard", leaderboardRoutes);
+app.use("/api/payment", paymentLimiter, paymentRoutes);
+app.use("/api/resources", resourceRoutes);
 
 // Error handler
 app.use(errorHandler);

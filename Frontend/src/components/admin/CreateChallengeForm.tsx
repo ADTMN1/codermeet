@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { X, Plus, Trash2 } from 'lucide-react';
 import { challengeService } from '../../services/challengeService';
+import { resourceService } from '../../services/resourceService';
 import { toast } from 'sonner';
 import { Challenge } from '../../services/challengeService';
 
@@ -20,7 +21,7 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({ onClose, onSu
     tags: [] as string[],
     requirements: [''],
     deliverables: [''],
-    resources: [{ title: '', url: '', type: 'article' }] as Array<{ title: string; url: string; type: string }>,
+    resources: [{ title: '', url: '', type: 'article', icon: 'BookOpen' }] as Array<{ title: string; url: string; type: string; icon: string }>,
     startDate: '',
     endDate: '',
     maxParticipants: '',
@@ -40,7 +41,7 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({ onClose, onSu
         tags: challenge.tags || [],
         requirements: challenge.requirements || [''],
         deliverables: challenge.deliverables || [''],
-        resources: challenge.resources || [{ title: '', url: '', type: 'article' }],
+        resources: challenge.resources?.map(r => ({ ...r, icon: r.icon || 'BookOpen' })) || [{ title: '', url: '', type: 'article', icon: 'BookOpen' }],
         startDate: challenge.startDate ? new Date(challenge.startDate).toISOString().split('T')[0] : '',
         endDate: challenge.endDate ? new Date(challenge.endDate).toISOString().split('T')[0] : '',
         maxParticipants: challenge.maxParticipants?.toString() || '',
@@ -75,6 +76,55 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({ onClose, onSu
     }));
   };
 
+  // Resource-specific handlers
+  const handleResourceChange = (index: number, field: string, value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      resources: prev.resources.map((resource, i) => 
+        i === index ? { ...resource, [field]: value } : resource
+      )
+    }));
+  };
+
+  const addResource = () => {
+    setFormData(prev => ({
+      ...prev,
+      resources: [...prev.resources, { title: '', url: '', type: 'article', icon: 'BookOpen' }]
+    }));
+  };
+
+  const removeResource = (index: number) => {
+    setFormData(prev => ({
+      ...prev,
+      resources: prev.resources.filter((_, i) => i !== index)
+    }));
+  };
+
+  // Helper functions for resource colors
+  const getResourceColor = (type: string): string => {
+    const colorMap: { [key: string]: string } = {
+      'documentation': 'text-blue-400',
+      'tutorial': 'text-green-400',
+      'tool': 'text-purple-400',
+      'library': 'text-yellow-400',
+      'template': 'text-cyan-400',
+      'ui': 'text-red-400'
+    };
+    return colorMap[type] || 'text-blue-400';
+  };
+
+  const getResourceBgColor = (type: string): string => {
+    const bgColorMap: { [key: string]: string } = {
+      'documentation': 'bg-blue-500/10',
+      'tutorial': 'bg-green-500/10',
+      'tool': 'bg-purple-500/10',
+      'library': 'bg-yellow-500/10',
+      'template': 'bg-cyan-500/10',
+      'ui': 'bg-red-500/10'
+    };
+    return bgColorMap[type] || 'bg-blue-500/10';
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -104,6 +154,31 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({ onClose, onSu
       } else {
         // Create new challenge
         await challengeService.createChallenge(challengeData as any);
+        
+        // Create resources for the challenge
+        const validResources = formData.resources.filter(res => res.title.trim() !== '' && res.url.trim() !== '');
+        if (validResources.length > 0) {
+          for (const resource of validResources) {
+            try {
+              await resourceService.createResource({
+                title: resource.title,
+                description: `Learning resource for challenge: ${formData.title}`,
+                link: resource.url,
+                icon: resource.icon,
+                color: getResourceColor(resource.type),
+                bgColor: getResourceBgColor(resource.type),
+                category: resource.type,
+                isActive: true,
+                order: 0
+              });
+            } catch (resourceError) {
+              console.error('Failed to create resource:', resourceError);
+              toast.warning(`Resource "${resource.title}" could not be created`);
+            }
+          }
+          toast.success(`${validResources.length} resources created successfully!`);
+        }
+        
         toast.success('Challenge created successfully!');
       }
       
@@ -362,6 +437,103 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({ onClose, onSu
             >
               <Plus className="h-4 w-4 mr-2" />
               Add Prize
+            </button>
+          </div>
+
+          {/* Resources Section */}
+          <div>
+            <label className="block text-lg font-semibold text-white mb-4">
+              Learning Resources
+            </label>
+            <p className="text-sm text-gray-400 mb-4">
+              Add learning resources that will help participants complete this challenge. These will be created as resources in the system.
+            </p>
+            {formData.resources.map((resource, index) => (
+              <div key={index} className="border border-gray-700 rounded-lg p-4 mb-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      Resource Title *
+                    </label>
+                    <input
+                      type="text"
+                      value={resource.title}
+                      onChange={(e) => handleResourceChange(index, 'title', e.target.value)}
+                      placeholder="e.g., React Documentation"
+                      className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      URL *
+                    </label>
+                    <input
+                      type="url"
+                      value={resource.url}
+                      onChange={(e) => handleResourceChange(index, 'url', e.target.value)}
+                      placeholder="https://example.com"
+                      className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      Category
+                    </label>
+                    <select
+                      value={resource.type}
+                      onChange={(e) => handleResourceChange(index, 'type', e.target.value)}
+                      className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-blue-500"
+                    >
+                      <option value="documentation">Documentation</option>
+                      <option value="tutorial">Tutorial</option>
+                      <option value="tool">Tool</option>
+                      <option value="library">Library</option>
+                      <option value="template">Template</option>
+                      <option value="ui">UI Component</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      Icon
+                    </label>
+                    <select
+                      value={resource.icon || 'BookOpen'}
+                      onChange={(e) => handleResourceChange(index, 'icon', e.target.value)}
+                      className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-blue-500"
+                    >
+                      <option value="BookOpen">BookOpen</option>
+                      <option value="FileText">FileText</option>
+                      <option value="Github">Github</option>
+                      <option value="Code">Code</option>
+                      <option value="Database">Database</option>
+                      <option value="Globe">Globe</option>
+                      <option value="Package">Package</option>
+                      <option value="Settings">Settings</option>
+                    </select>
+                  </div>
+                  <div className="flex items-end">
+                    {formData.resources.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removeResource(index)}
+                        className="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+            <button
+              type="button"
+              onClick={addResource}
+              className="flex items-center px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add Resource
             </button>
           </div>
 

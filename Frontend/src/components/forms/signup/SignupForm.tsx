@@ -19,16 +19,13 @@ import { uploadToCloudinary } from './cloudinary';
 import Step1Account from './Step1Account';
 import Step2Profile from './Step2Profile';
 import Step3Plan from './Step3Plan';
-import Step4Payment from './Step4Payment';
 
 const SignupForm: React.FC = () => {
   const [step, setStep] = useState<number>(1);
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [apiError, setApiError] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [paymentProof, setPaymentProof] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
-  const [uploadProgress, setUploadProgress] = useState<number>(0);
   const [showSuccessModal, setShowSuccessModal] = useState<boolean>(false);
 
   const navigate = useNavigate();
@@ -105,37 +102,6 @@ const SignupForm: React.FC = () => {
     }
   };
 
-  // Enhanced file change handler with validation
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-    if (!validTypes.includes(file.type)) {
-      setErrors((prev) => ({
-        ...prev,
-        paymentProof: 'Please upload a valid image (JPEG, PNG, GIF, WebP)',
-      }));
-      return;
-    }
-
-    const maxSize = 10 * 1024 * 1024; // 10MB
-    if (file.size > maxSize) {
-      setErrors((prev) => ({
-        ...prev,
-        paymentProof: 'File size must be less than 10MB',
-      }));
-      return;
-    }
-
-    setPaymentProof(file);
-    setErrors((prev) => {
-      const newErrors = { ...prev };
-      delete newErrors.paymentProof;
-      return newErrors;
-    });
-  };
-
   const checkExistingUser = async (field: 'email' | 'username', value: string): Promise<boolean> => {
     if (!value.trim()) return false;
     
@@ -144,8 +110,26 @@ const SignupForm: React.FC = () => {
       const response = await axios.get(`${API_BASE_URL}/api/auth/check-user`, {
         params: { field, value }
       });
-      return response.data.exists;
+      // Backend returns { available: true/false }, so we return !available for exists
+      return !response.data.available;
     } catch (error) {
+      console.error('Error checking user availability:', error);
+      return false;
+    }
+  };
+
+  const checkGithubAvailability = async (githubUrl: string): Promise<boolean> => {
+    if (!githubUrl.trim()) return false;
+    
+    try {
+      const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      const response = await axios.get(`${API_BASE_URL}/api/auth/check-github`, {
+        params: { githubUrl }
+      });
+      // Backend returns { available: true/false }, so we return !available for exists
+      return !response.data.available;
+    } catch (error) {
+      console.error('Error checking GitHub availability:', error);
       return false;
     }
   };
@@ -156,7 +140,7 @@ const SignupForm: React.FC = () => {
     setApiError('');
     
     // Validate current step only
-    const stepErrors = validateStep(formData, step, paymentProof);
+    const stepErrors = validateStep(formData, step);
     
     // If we're on step 1, check for existing email/username
     if (step === 1) {
@@ -180,6 +164,25 @@ const SignupForm: React.FC = () => {
         return;
       }
     }
+
+    // If we're on step 2, check for existing GitHub URL
+    if (step === 2) {
+      try {
+        const githubExists = await checkGithubAvailability(formData.github);
+        
+        if (githubExists) {
+          const newErrors = {...stepErrors};
+          newErrors.github = 'This GitHub URL is already associated with another account';
+          
+          setErrors(newErrors);
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+          return;
+        }
+      } catch (error) {
+        setApiError('Error verifying GitHub URL. Please try again.');
+        return;
+      }
+    }
     
     if (Object.keys(stepErrors).length > 0) {
       // Show errors for current step
@@ -192,7 +195,7 @@ const SignupForm: React.FC = () => {
     
     // Clear all errors and proceed to next step
     setErrors({});
-    if (step < 4) {
+    if (step < 3) { // Only 3 steps now
       setStep(step + 1);
     }
   };
@@ -211,8 +214,8 @@ const SignupForm: React.FC = () => {
     let allErrors: { [key: string]: string } = {};
     
     // Validate each step
-    for (let stepNum = 1; stepNum <= 4; stepNum++) {
-      const stepErrors = validateStep(formData, stepNum, paymentProof);
+    for (let stepNum = 1; stepNum <= 3; stepNum++) { 
+      const stepErrors = validateStep(formData, stepNum);
       allErrors = { ...allErrors, ...stepErrors };
     }
     
@@ -222,8 +225,8 @@ const SignupForm: React.FC = () => {
       setIsSubmitting(false);
       
       // Find which step has errors and go back to it
-      const errorSteps = [1, 2, 3, 4].filter(stepNum => {
-        const stepErrors = validateStep(formData, stepNum, paymentProof);
+      const errorSteps = [1, 2, 3].filter(stepNum => { // Only 3 steps now
+        const stepErrors = validateStep(formData, stepNum);
         return Object.keys(stepErrors).length > 0;
       });
       
@@ -235,23 +238,64 @@ const SignupForm: React.FC = () => {
     }
 
     try {
-      // Upload payment proof only on submit if needed
-      let paymentScreenshotUrl = '';
-      if (formData.plan !== 'trial' && paymentProof) {
-        paymentScreenshotUrl = (await uploadToCloudinary(paymentProof)) || '';
-        if (!paymentScreenshotUrl) {
-          setErrors((prev) => ({
-            ...prev,
-            paymentProof:
-              'Failed to upload payment screenshot. Please try again.',
-          }));
+      const API_BASE_URL =
+        import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      
+      // For paid plans, initialize payment first
+      if (formData.plan !== 'trial') {
+        try {
+          // Initialize payment with Chapa
+          const paymentPayload = {
+            plan: formData.plan,
+            userId: 'temp', // Will be updated after registration
+            email: formData.email,
+            fullName: formData.fullName
+          };
+
+          const paymentRes = await axios.post(
+            `${API_BASE_URL}/api/payment/initialize`,
+            paymentPayload,
+            {
+              timeout: 10000,
+              headers: { 'Content-Type': 'application/json' },
+            }
+          );
+
+          if (paymentRes.data.success) {
+            // Payment initialization successful
+            window.location.href = paymentRes.data.data.checkout_url;
+            
+            const checkoutUrl = paymentRes.data.data.checkout_url;
+            
+            // Validate checkout URL
+            if (!checkoutUrl || !checkoutUrl.startsWith('https://checkout.chapa.co')) {
+              showToast('Invalid payment URL. Please try again.', 'error');
+              setIsLoading(false);
+              return;
+            }
+            
+            // Store form data temporarily for after payment
+            localStorage.setItem('pending_registration', JSON.stringify({
+              formData,
+              paymentTxRef: paymentRes.data.data.tx_ref
+            }));
+
+            // Redirect to Chapa payment page
+            window.location.href = checkoutUrl;
+            return;
+          } else {
+            showToast('Failed to initialize payment. Please try again.', 'error');
+            setIsLoading(false);
+            return;
+          }
+        } catch (error: any) {
+          showToast('Payment initialization failed. Please try again.', 'error');
           setIsLoading(false);
           return;
         }
       }
 
-      const API_BASE_URL =
-        import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      // For trial plan, proceed with normal registration
       const payload = {
         fullName: formData.fullName,
         username: formData.username,
@@ -262,13 +306,7 @@ const SignupForm: React.FC = () => {
         skills: formData.skills,
         githubUrl: formData.github,
         bio: formData.bio,
-        plan:
-          formData.plan === 'trial'
-            ? 'Trial'
-            : formData.plan === 'basic'
-              ? 'Basic'
-              : 'Premium',
-        paymentScreenshot: paymentScreenshotUrl,
+        plan: 'Trial', // Always Trial for direct registration
       };
 
       const res = await axios.post(
@@ -280,19 +318,26 @@ const SignupForm: React.FC = () => {
         }
       );
 
+      // Set authentication token
+      if (res.data.token) {
+        localStorage.setItem('auth_token', res.data.token);
+      }
+
       // Set user data in context
       if (res.data.user) {
         setUser({
-          _id: res.data.user._id,
-          name: formData.fullName,
-          email: formData.email,
-          username: formData.username,
-          plan: formData.plan.toLowerCase(),
-          bio: formData.bio,
-          skills: formData.skills,
-          github: formData.github,
+          _id: res.data.user.id,
+          name: res.data.user.fullName || formData.fullName,
+          fullName: res.data.user.fullName || formData.fullName,
+          email: res.data.user.email,
+          username: res.data.user.username,
+          plan: res.data.user.plan?.toLowerCase() || formData.plan.toLowerCase(),
+          bio: res.data.user.bio || formData.bio,
+          skills: res.data.user.skills || formData.skills,
+          github: res.data.user.github || formData.github,
           points: 0, // Initial points
-          // Add other fields as needed
+          role: res.data.user.role,
+          isProfessional: res.data.user.isProfessional,
         });
       }
 
@@ -348,7 +393,7 @@ const SignupForm: React.FC = () => {
         {/* Enhanced Progress Indicator */}
         <div className="mb-8">
           <div className="flex items-center justify-between mb-3">
-            {[1, 2, 3, 4].map((s) => (
+            {[1, 2, 3].map((s) => (
               <div key={s} className="flex flex-col items-center">
                 <div
                   className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold transition-all duration-300 ${
@@ -362,14 +407,14 @@ const SignupForm: React.FC = () => {
                 <span className={`text-xs mt-2 transition-colors duration-300 ${
                   step >= s ? 'text-purple-400' : 'text-gray-500'
                 }`}>
-                  {s === 1 ? 'Account' : s === 2 ? 'Profile' : s === 3 ? 'Plan' : 'Payment'}
+                  {s === 1 ? 'Account' : s === 2 ? 'Profile' : 'Plan'}
                 </span>
               </div>
             ))}
           </div>
           <div className="relative">
             <div className="flex justify-between">
-              {[1, 2, 3].map((s) => (
+              {[1, 2].map((s) => (
                 <div
                   key={s}
                   className={`flex-1 h-1 mx-1 transition-all duration-500 ${
@@ -410,16 +455,6 @@ const SignupForm: React.FC = () => {
           />
         )}
 
-        {step === 4 && (
-          <Step4Payment
-            formData={formData}
-            handleChange={handleChange}
-            handleFileChange={handleFileChange}
-            paymentProof={paymentProof}
-            errors={errors}
-          />
-        )}
-
         {/* Enhanced Navigation Buttons */}
         <div className="flex justify-between items-center mt-8">
           {step > 1 && (
@@ -434,7 +469,7 @@ const SignupForm: React.FC = () => {
             </button>
           )}
           <div className="flex-1"></div>
-          {step < 4 ? (
+          {step < 3 ? (
             <button
               type="button"
               onClick={handleNext}

@@ -40,6 +40,19 @@ avatarPublicId: { type: String },   // Cloudinary public_id (for delete)
       enum: ["user", "admin"],
       default: "user",
     },
+    points: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    rank: {
+      type: Number,
+      default: 0,
+    },
+    lastPointsUpdate: {
+      type: Date,
+      default: Date.now,
+    },
   },
   { 
     timestamps: true,

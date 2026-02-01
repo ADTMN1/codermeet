@@ -32,6 +32,8 @@ const registerLimiter = rateLimit({
 });
 
 // Auth routes
+router.get("/check-user", authController.checkUserAvailability);
+router.get("/check-github", authController.checkGithubAvailability);
 router.post("/register", registerLimiter, registerValidators, checkValidation, authController.register);
 router.post("/login", loginLimiter, loginValidators, checkValidation, authController.login);
 router.post("/logout", authController.logout);

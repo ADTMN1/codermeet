@@ -11,6 +11,8 @@ import Dashboard from './pages/Dashboard/Dashboard';
 import WeeklyChallenge from './pages/Dashboard/WeeklyChallenge';
 import Community from './pages/Dashboard/Community';
 import Profile from './pages/profile/profile';
+import Pricing from './pages/Pricing';
+import PaymentSuccess from './pages/PaymentSuccess';
 import AdminRoute from './components/AdminRoute';
 import AdminDashboard from './pages/Admin/AdminDashboard';
 
@@ -56,6 +58,18 @@ function App() {
                 <MentorshipPreview />
               </>
             }
+          />
+
+          {/* Pricing Page - Public but shows user's current plan */}
+          <Route
+            path="/pricing"
+            element={<Pricing />}
+          />
+
+          {/* Payment Success Page - After payment */}
+          <Route
+            path="/payment-success"
+            element={<PaymentSuccess />}
           />
 
           {/* Dashboard Layout Routes - including profile */}
