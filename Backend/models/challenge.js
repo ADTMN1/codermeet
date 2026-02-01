@@ -13,7 +13,7 @@ const submissionSchema = new mongoose.Schema({
   },
   content: {
     type: String,
-    required: true
+    required: false // Make content optional since we're using githubUrl and description
   },
   files: [{
     filename: String,

@@ -5,7 +5,6 @@ import {
   Upload,
   Github,
   FileArchive,
-  Clock,
   CheckCircle,
   Circle,
   ArrowRight,
@@ -15,37 +14,39 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from '../components/ui/label';
 import { toast } from 'sonner';
+import { submissionService, SubmissionData } from '../services/submissionService';
 
 interface UploadSectionProps {
   registrationMode: 'solo' | 'team';
+  challengeId?: string;
 }
 
-export function UploadSection({ registrationMode }: UploadSectionProps) {
+export function UploadSection({ registrationMode, challengeId }: UploadSectionProps) {
   const [githubUrl, setGithubUrl] = useState('');
   const [fileName, setFileName] = useState('');
   const [submitted, setSubmitted] = useState(false);
-  const [timeLeft, setTimeLeft] = useState({
-    days: 5,
-    hours: 12,
-    minutes: 34,
-  });
+  const [loading, setLoading] = useState(false);
+  const [submission, setSubmission] = useState<any>(null);
 
+  // Check if user has already submitted
   useEffect(() => {
-    const timer = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev.minutes > 0) {
-          return { ...prev, minutes: prev.minutes - 1 };
-        } else if (prev.hours > 0) {
-          return { ...prev, hours: prev.hours - 1, minutes: 59 };
-        } else if (prev.days > 0) {
-          return { ...prev, days: prev.days - 1, hours: 23, minutes: 59 };
+    const checkSubmission = async () => {
+      if (!challengeId) return;
+      
+      try {
+        const userSubmission = await submissionService.getUserSubmission(challengeId);
+        if (userSubmission) {
+          setSubmission(userSubmission);
+          setSubmitted(true);
+          setGithubUrl(userSubmission.githubUrl || '');
         }
-        return prev;
-      });
-    }, 60000);
+      } catch (error) {
+        // Expected error when no submission exists - silently handle
+      }
+    };
 
-    return () => clearInterval(timer);
-  }, []);
+    checkSubmission();
+  }, [challengeId]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -53,16 +54,53 @@ export function UploadSection({ registrationMode }: UploadSectionProps) {
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!challengeId) {
+      toast.error('Challenge ID is required for submission');
+      return;
+    }
+    
     if (!githubUrl && !fileName) {
       toast.error('Please provide either a GitHub URL or upload a file');
       return;
     }
-    setSubmitted(true);
-    toast.success('Project submitted successfully!', {
-      description: 'Your submission has been received and will be evaluated.',
-    });
+
+    setLoading(true);
+    
+    try {
+      const submissionData: SubmissionData = {
+        githubUrl: githubUrl,
+        description: `Project submitted by ${registrationMode === 'solo' ? 'individual' : 'team'} participant`,
+        files: fileName ? [{
+          filename: fileName,
+          url: '', // Will be populated when file upload is implemented
+          size: 0
+        }] : []
+      };
+
+      const result = await submissionService.submitProject(challengeId, submissionData);
+      
+      setSubmitted(true);
+      setSubmission(result.data);
+      
+      toast.success('🚀 Project submitted successfully!', {
+        description: 'Your project has been submitted and will be reviewed by our team.',
+        duration: 5000,
+      });
+    } catch (error: any) {
+      if (error.message && error.message.includes('already submitted')) {
+        toast.error('🚫 Resubmission not allowed', {
+          description: 'You have already submitted a project for this challenge.',
+          duration: 5000,
+        });
+      } else {
+        toast.error(error.message || 'Failed to submit project');
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   const progressSteps = [
@@ -146,28 +184,6 @@ export function UploadSection({ registrationMode }: UploadSectionProps) {
           </div>
         </div>
 
-        {/* Submission Deadline Timer */}
-        <div className="p-4 rounded-lg bg-gradient-to-r from-red-900/20 to-orange-900/20 border border-red-500/30">
-          <div className="flex items-center gap-2 mb-2">
-            <Clock className="w-5 h-5 text-red-400" />
-            <span className="text-red-300">Submission Deadline</span>
-          </div>
-          <div className="flex gap-4">
-            <div className="text-center">
-              <div className="text-2xl text-red-300">{timeLeft.days}</div>
-              <div className="text-xs text-slate-400">Days</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl text-red-300">{timeLeft.hours}</div>
-              <div className="text-xs text-slate-400">Hours</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl text-red-300">{timeLeft.minutes}</div>
-              <div className="text-xs text-slate-400">Minutes</div>
-            </div>
-          </div>
-        </div>
-
         {/* Upload Form */}
         {!submitted ? (
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -218,19 +234,88 @@ export function UploadSection({ registrationMode }: UploadSectionProps) {
 
             <Button
               type="submit"
-              className="w-full bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white"
+              disabled={loading}
+              className="w-full bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <Upload className="w-4 h-4 mr-2" />
-              Submit Project
+              {loading ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                  Submitting...
+                </>
+              ) : (
+                <>
+                  <Upload className="w-4 h-4 mr-2" />
+                  Submit Project
+                </>
+              )}
             </Button>
           </form>
         ) : (
-          <div className="p-6 rounded-lg bg-gradient-to-r from-green-900/20 to-emerald-900/20 border border-green-500/30 text-center">
-            <CheckCircle className="w-12 h-12 text-green-400 mx-auto mb-3" />
-            <p className="text-green-300">Project submitted successfully!</p>
-            <p className="text-sm text-slate-400 mt-2">
-              Your submission is being evaluated by our team.
-            </p>
+          <div className="p-6 rounded-lg bg-gradient-to-r from-green-900/20 to-emerald-900/20 border border-green-500/30">
+            <div className="text-center mb-4">
+              <CheckCircle className="w-12 h-12 text-green-400 mx-auto mb-3" />
+              <p className="text-green-300 font-semibold">Project submitted successfully!</p>
+              <p className="text-sm text-slate-400 mt-2">
+                Your submission is being evaluated by our team.
+              </p>
+            </div>
+            
+            {/* Submission Details */}
+            {submission && (
+              <div className="space-y-3 mt-6 p-4 rounded-lg bg-slate-800/50 border border-slate-700/50">
+                <h4 className="text-sm font-medium text-slate-300 mb-3">Submission Details</h4>
+                
+                {submission.githubUrl && (
+                  <div className="flex items-center gap-2">
+                    <Github className="w-4 h-4 text-slate-400" />
+                    <a 
+                      href={submission.githubUrl} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-sm text-blue-400 hover:text-blue-300 truncate"
+                    >
+                      {submission.githubUrl}
+                    </a>
+                  </div>
+                )}
+                
+                {submission.files && submission.files.length > 0 && (
+                  <div className="flex items-center gap-2">
+                    <FileArchive className="w-4 h-4 text-slate-400" />
+                    <span className="text-sm text-slate-300">
+                      {submission.files[0].filename}
+                    </span>
+                  </div>
+                )}
+                
+                <div className="flex items-center justify-between pt-2 border-t border-slate-700">
+                  <span className="text-xs text-slate-500">
+                    Submitted: {new Date(submission.submittedAt).toLocaleDateString()}
+                  </span>
+                  <span className={`px-2 py-1 rounded-full text-xs ${
+                    submission.status === 'pending' ? 'bg-orange-500/20 text-orange-300' :
+                    submission.status === 'reviewed' ? 'bg-blue-500/20 text-blue-300' :
+                    submission.status === 'accepted' ? 'bg-green-500/20 text-green-300' :
+                    'bg-red-500/20 text-red-300'
+                  }`}>
+                    {submission.status.charAt(0).toUpperCase() + submission.status.slice(1)}
+                  </span>
+                </div>
+                
+                {submission.feedback && (
+                  <div className="mt-3 p-3 rounded-lg bg-slate-900/50 border border-slate-700">
+                    <p className="text-xs text-slate-400 mb-1">Feedback:</p>
+                    <p className="text-sm text-slate-300">{submission.feedback}</p>
+                  </div>
+                )}
+              </div>
+            )}
+            
+            <div className="mt-4 text-center">
+              <p className="text-xs text-slate-500">
+                You cannot edit or resubmit your project. Contact support if you need assistance.
+              </p>
+            </div>
           </div>
         )}
       </div>

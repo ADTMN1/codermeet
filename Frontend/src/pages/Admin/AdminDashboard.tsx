@@ -36,6 +36,10 @@ import { adminService, User, UserStats, SystemHealth, SystemActivity } from '../
 import { challengeService, Challenge, ChallengeStats } from '../../services/challengeService';
 import { toast } from 'sonner';
 import CreateChallengeForm from '../../components/admin/CreateChallengeForm';
+import { SubmissionsManagement } from '../../components/admin/SubmissionsManagement';
+import { Card } from '../../components/ui/card';
+import { Button } from '../../components/ui/button';
+import { Label } from '../../components/ui/label';
 
 const AdminDashboard: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
@@ -45,7 +49,8 @@ const AdminDashboard: React.FC = () => {
   const [challenges, setChallenges] = useState<Challenge[]>([]);
   const [challengeStats, setChallengeStats] = useState<ChallengeStats | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'users' | 'challenges' | 'system'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'challenges' | 'submissions' | 'system'>('users');
+  const [selectedChallengeForSubmissions, setSelectedChallengeForSubmissions] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterRole, setFilterRole] = useState('all');
   const [filterPlan, setFilterPlan] = useState('all');
@@ -269,6 +274,17 @@ const AdminDashboard: React.FC = () => {
             >
               <Trophy className="h-4 w-4 mr-2" />
               Challenges
+            </button>
+            <button
+              onClick={() => setActiveTab('submissions')}
+              className={`flex-1 flex items-center justify-center px-4 py-2 rounded-md transition-colors ${
+                activeTab === 'submissions'
+                  ? 'bg-blue-600 text-white'
+                  : 'text-gray-400 hover:text-white hover:bg-gray-800'
+              }`}
+            >
+              <FileText className="h-4 w-4 mr-2" />
+              Submissions
             </button>
             <button
               onClick={() => setActiveTab('system')}
@@ -721,6 +737,44 @@ const AdminDashboard: React.FC = () => {
               </div>
             </div>
           </>
+        )}
+
+        {/* Submissions Tab */}
+        {activeTab === 'submissions' && (
+          <div className="space-y-6">
+            {/* Challenge Selector */}
+            <Card className="bg-slate-900/50 border-slate-700/50 p-4">
+              <div className="flex items-center gap-4">
+                <div className="flex-1">
+                  <Label className="text-slate-300 mb-2 block">Select Challenge</Label>
+                  <select
+                    value={selectedChallengeForSubmissions || ''}
+                    onChange={(e) => setSelectedChallengeForSubmissions(e.target.value || null)}
+                    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white"
+                  >
+                    <option value="">All Challenges</option>
+                    {challenges.map((challenge) => (
+                      <option key={challenge._id} value={challenge._id}>
+                        {challenge.title} ({challenge.status})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex items-end">
+                  <Button
+                    onClick={() => setSelectedChallengeForSubmissions(null)}
+                    variant="outline"
+                    className="border-slate-600 text-slate-300 hover:bg-slate-800"
+                  >
+                    Clear
+                  </Button>
+                </div>
+              </div>
+            </Card>
+
+            {/* Submissions Management */}
+            <SubmissionsManagement challengeId={selectedChallengeForSubmissions || undefined} />
+          </div>
         )}
 
         {/* System Tab */}

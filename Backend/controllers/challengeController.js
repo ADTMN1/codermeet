@@ -252,6 +252,226 @@ exports.getChallengeStats = async (req, res) => {
   }
 };
 
+// Submit project for a challenge
+exports.submitProject = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+    const { githubUrl, description, files } = req.body;
+
+    // Validate required fields
+    if (!githubUrl && (!files || files.length === 0)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Either GitHub URL or files are required'
+      });
+    }
+
+    const challenge = await Challenge.findById(id);
+    if (!challenge) {
+      return res.status(404).json({
+        success: false,
+        message: 'Challenge not found'
+      });
+    }
+
+    // Check if user is registered for this challenge
+    const isRegistered = challenge.participants.some(
+      participant => participant.user.toString() === userId
+    );
+
+    if (!isRegistered) {
+      return res.status(403).json({
+        success: false,
+        message: 'You must be registered for this challenge to submit a project'
+      });
+    }
+
+    // Check if user has already submitted
+    const existingSubmissionIndex = challenge.submissions.findIndex(
+      submission => submission.userId.toString() === userId
+    );
+
+    if (existingSubmissionIndex !== -1) {
+      return res.status(400).json({
+        success: false,
+        message: 'You have already submitted a project for this challenge. Resubmission is not allowed.'
+      });
+    }
+
+    const submissionData = {
+      userId: userId,
+      content: description || 'Project submission via GitHub URL', // Provide default content
+      githubUrl: githubUrl || '',
+      description: description || '',
+      files: files || [],
+      submittedAt: new Date(),
+      status: 'pending'
+    };
+
+    // Create new submission
+    challenge.submissions.push(submissionData);
+
+    await challenge.save();
+
+    // Populate submission data for response
+    await Challenge.populate(challenge, {
+      path: 'submissions.userId',
+      select: 'fullName username email avatar'
+    });
+
+    const submission = challenge.submissions.find(
+      sub => sub.userId.toString() === userId
+    );
+
+    res.status(200).json({
+      success: true,
+      message: 'Project submitted successfully!',
+      data: submission
+    });
+  } catch (error) {
+    console.error('Error submitting project:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error submitting project',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+    });
+  }
+};
+
+// Get all submissions across all challenges (admin only)
+exports.getAllSubmissions = async (req, res) => {
+  try {
+    const { status, page = 1, limit = 10 } = req.query;
+    
+    const challenges = await Challenge.find({})
+      .populate('submissions.userId', 'fullName username email avatar')
+      .populate('submissions.reviewedBy', 'fullName username');
+
+    let allSubmissions = [];
+    
+    challenges.forEach(challenge => {
+      challenge.submissions.forEach(submission => {
+        allSubmissions.push({
+          ...submission.toObject(),
+          challengeTitle: challenge.title,
+          challengeId: challenge._id,
+          challengeStatus: challenge.status
+        });
+      });
+    });
+
+    // Filter by status if provided
+    if (status) {
+      allSubmissions = allSubmissions.filter(sub => sub.status === status);
+    }
+
+    // Sort by submission date (newest first)
+    allSubmissions.sort((a, b) => new Date(b.submittedAt) - new Date(a.submittedAt));
+
+    // Pagination
+    const startIndex = (page - 1) * limit;
+    const endIndex = startIndex + parseInt(limit);
+    const paginatedSubmissions = allSubmissions.slice(startIndex, endIndex);
+
+    res.status(200).json({
+      success: true,
+      data: paginatedSubmissions,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total: allSubmissions.length,
+        pages: Math.ceil(allSubmissions.length / limit)
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching all submissions',
+      error: error.message
+    });
+  }
+};
+
+// Get user's submission for a challenge
+exports.getUserSubmission = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+
+    const challenge = await Challenge.findById(id)
+      .populate('submissions.userId', 'fullName username email avatar');
+
+    if (!challenge) {
+      return res.status(404).json({
+        success: false,
+        message: 'Challenge not found'
+      });
+    }
+
+    const submission = challenge.submissions.find(
+      sub => sub.userId._id ? sub.userId._id.toString() === userId : sub.userId.toString() === userId
+    );
+
+    if (!submission) {
+      return res.status(404).json({
+        success: false,
+        message: 'No submission found'
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: submission
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching submission',
+      error: error.message
+    });
+  }
+};
+
+// Check if user is registered for a challenge
+exports.checkRegistration = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+
+    const challenge = await Challenge.findById(id);
+    if (!challenge) {
+      return res.status(404).json({
+        success: false,
+        message: 'Challenge not found'
+      });
+    }
+
+    // Check if user is in participants list
+    const isRegistered = challenge.participants.some(
+      participant => participant.user.toString() === userId
+    );
+
+    res.status(200).json({
+      success: true,
+      isRegistered,
+      challenge: {
+        id: challenge._id,
+        title: challenge.title,
+        status: challenge.status,
+        startDate: challenge.startDate,
+        endDate: challenge.endDate
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Error checking registration',
+      error: error.message
+    });
+  }
+};
+
 // Review submission
 exports.reviewSubmission = async (req, res) => {
   try {

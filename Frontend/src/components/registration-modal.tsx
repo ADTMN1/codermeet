@@ -101,11 +101,12 @@ export function RegistrationModal({
       const data = await response.json();
 
       if (data.success) {
-        toast.success('Registration successful!', {
+        toast.success('🎉 Registration Successful!', {
           description:
             mode === 'solo'
-              ? 'Good luck with the challenge!'
-              : `Team registered with ${teamMembers.length} members!`,
+              ? 'You are now registered for this challenge. Good luck!'
+              : `Your team of ${teamMembers.length} members is now registered!`,
+          duration: 5000, // Show for 5 seconds
         });
 
         onSuccess(mode);

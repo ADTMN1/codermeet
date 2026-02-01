@@ -22,9 +22,13 @@ router.delete('/:id', adminAuth, challengeController.deleteChallenge);
 // User registration routes (require auth)
 router.post('/:id/register', auth, challengeController.registerForChallenge);
 router.post('/:id/unregister', auth, challengeController.unregisterFromChallenge);
+router.get('/:id/check-registration', auth, challengeController.checkRegistration);
+router.post('/:id/submit', auth, challengeController.submitProject);
+router.get('/:id/my-submission', auth, challengeController.getUserSubmission);
 
 // Admin-only submission management
 router.get('/:id/submissions', adminAuth, challengeController.getChallengeSubmissions);
+router.get('/submissions/all', adminAuth, challengeController.getAllSubmissions);
 router.put('/:challengeId/submissions/:submissionId/review', adminAuth, challengeController.reviewSubmission);
 
 // Admin-only winner selection

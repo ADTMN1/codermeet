@@ -1,6 +1,5 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 
-import { useState } from 'react';
 import { ChallengeHeader } from '../../components/challenge-header';
 // import { ChallengeOverviewCard } from './components/challenge-overview-card';
 import { RegistrationModal } from '../../components/registration-modal';
@@ -19,8 +18,10 @@ import { Toaster } from '../../components/ui/sonner';
 import { UploadSection } from '../../components/upload-section';
 import { ResourcesCard } from '../../components/resources-card';
 import { WinnersSection } from '../../components/winners-section';
+import { useUser } from '../../context/UserContext';
 
 export default function WeeklyChallenge() {
+  const { user } = useUser();
   const [isRegistered, setIsRegistered] = useState(false);
   const [registrationModalOpen, setRegistrationModalOpen] = useState(false);
   const [registrationMode, setRegistrationMode] = useState<'solo' | 'team'>(
@@ -30,6 +31,31 @@ export default function WeeklyChallenge() {
 
   // Challenge deadline passed (set to false initially, true to show winners)
   const [challengeEnded, setChallengeEnded] = useState(false);
+
+  // Check if user is registered for the current challenge
+  useEffect(() => {
+    const checkRegistration = async () => {
+      if (!user || !challenge?._id) return;
+      
+      try {
+        const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/challenges/${challenge._id}/check-registration`, {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': localStorage.getItem('auth_token') ? `Bearer ${localStorage.getItem('auth_token')}` : ''
+          }
+        });
+        
+        const data = await response.json();
+        if (data.success) {
+          setIsRegistered(data.isRegistered);
+        }
+      } catch (error) {
+        // Error checking registration - assume not registered
+      }
+    };
+
+    checkRegistration();
+  }, [user, challenge]);
 
   const handleJoinClick = () => {
     setRegistrationModalOpen(true);
@@ -60,7 +86,7 @@ export default function WeeklyChallenge() {
             />
 
             {isRegistered && (
-              <UploadSection registrationMode={registrationMode} />
+              <UploadSection registrationMode={registrationMode} challengeId={challenge?._id} />
             )}
 
             <ScoringCriteria />

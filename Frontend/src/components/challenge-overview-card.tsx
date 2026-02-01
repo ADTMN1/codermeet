@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Clock, Users, CheckCircle2, Trophy } from 'lucide-react';
+import { Calendar, Clock, Users, Trophy } from 'lucide-react';
 import { Card } from './ui/card';
 import { Button } from './ui/button';
 import { challengeService, Challenge } from '../services/challengeService';
@@ -244,14 +244,7 @@ export function ChallengeOverviewCard({
 
         {/* CTA Button */}
         <div>
-          {isRegistered ? (
-            <div className="flex items-center justify-center gap-2 p-4 rounded-lg bg-green-500/10 border border-green-500/30">
-              <CheckCircle2 className="w-5 h-5 text-green-400" />
-              <span className="text-green-300">
-                Registration Successful! You're all set.
-              </span>
-            </div>
-          ) : (
+          {!isRegistered ? (
             <Button
               onClick={onJoinClick}
               className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white shadow-lg shadow-purple-500/30 transition-all duration-300 hover:shadow-purple-500/50 hover:scale-[1.02]"
@@ -260,7 +253,7 @@ export function ChallengeOverviewCard({
               <Users className="w-5 h-5 mr-2" />
               Join Challenge
             </Button>
-          )}
+          ) : null}
         </div>
       </div>
     </Card>
