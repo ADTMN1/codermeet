@@ -28,6 +28,7 @@ export default function WeeklyChallenge() {
     'solo'
   );
   const [challenge, setChallenge] = useState<any>(null); // Add challenge state
+  const [submission, setSubmission] = useState<any>(null); // Add submission state
 
   // Challenge deadline passed (set to false initially, true to show winners)
   const [challengeEnded, setChallengeEnded] = useState(false);
@@ -55,6 +56,32 @@ export default function WeeklyChallenge() {
     };
 
     checkRegistration();
+  }, [user, challenge]);
+
+  // Fetch user's submission
+  useEffect(() => {
+    const fetchSubmission = async () => {
+      if (!user || !challenge?._id) return;
+      
+      try {
+        const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/challenges/${challenge._id}/my-submission`, {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': localStorage.getItem('auth_token') ? `Bearer ${localStorage.getItem('auth_token')}` : ''
+          }
+        });
+        
+        const data = await response.json();
+        if (data.success) {
+          setSubmission(data.data);
+        }
+      } catch (error) {
+        // No submission found or error
+        setSubmission(null);
+      }
+    };
+
+    fetchSubmission();
   }, [user, challenge]);
 
   const handleJoinClick = () => {
@@ -101,7 +128,7 @@ export default function WeeklyChallenge() {
             <LiveStats />
             {/* <AIMentor /> */}
             <ResourcesCard />
-            <TimelineTracker isRegistered={isRegistered} />
+            <TimelineTracker isRegistered={isRegistered} challenge={challenge} submission={submission} />
           </div>
         </div>
       </div>
