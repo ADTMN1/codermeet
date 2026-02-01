@@ -12,6 +12,9 @@ router.use(adminRateLimiter);
 // Public routes (no admin auth required)
 router.get('/', challengeController.getAllChallenges); // Get all challenges (public)
 
+// Public stats endpoint (no auth required)
+router.get('/:id/stats', challengeController.getChallengeByIdStats);
+
 // Admin-only routes (require admin auth)
 router.post('/', adminAuth, challengeController.createChallenge);
 router.get('/stats', adminAuth, challengeController.getChallengeStats); // Must come before /:id

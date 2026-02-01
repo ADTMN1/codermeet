@@ -56,6 +56,7 @@ exports.checkUserAvailability = async (req, res) => {
   }
 };
 
+
 // Check GitHub URL availability
 exports.checkGithubAvailability = async (req, res) => {
   try {

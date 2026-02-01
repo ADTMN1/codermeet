@@ -173,6 +173,43 @@ exports.deleteChallenge = async (req, res) => {
   }
 };
 
+// Get individual challenge statistics
+exports.getChallengeByIdStats = async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const challenge = await Challenge.findById(id)
+      .populate('participants', 'fullName username')
+      .populate('submissions');
+    
+    if (!challenge) {
+      return res.status(404).json({
+        success: false,
+        message: 'Challenge not found'
+      });
+    }
+
+    const stats = {
+      participants: challenge.participants?.length || 0,
+      teams: challenge.teams?.length || 0,
+      submissions: challenge.submissions?.length || 0,
+      title: challenge.title,
+      status: challenge.status
+    };
+
+    res.status(200).json({
+      success: true,
+      data: stats
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching challenge statistics',
+      error: error.message
+    });
+  }
+};
+
 // Get challenge statistics
 exports.getChallengeStats = async (req, res) => {
   try {

@@ -125,7 +125,7 @@ export default function WeeklyChallenge() {
 
           {/* Right Column - Sidebar */}
           <div className="space-y-6">
-            <LiveStats />
+            <LiveStats challengeId={challenge?._id} />
             {/* <AIMentor /> */}
             <ResourcesCard />
             <TimelineTracker isRegistered={isRegistered} challenge={challenge} submission={submission} />

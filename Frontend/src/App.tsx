@@ -11,6 +11,7 @@ import Dashboard from './pages/Dashboard/Dashboard';
 import WeeklyChallenge from './pages/Dashboard/WeeklyChallenge';
 import Community from './pages/Dashboard/Community';
 import Profile from './pages/profile/profile';
+import Resources from './pages/Resources';
 import Pricing from './pages/Pricing';
 import PaymentSuccess from './pages/PaymentSuccess';
 import AdminRoute from './components/AdminRoute';
@@ -77,6 +78,7 @@ function App() {
             <Route path="dashboard" element={<Dashboard />} />
             <Route path="weeklyChallenge" element={<WeeklyChallenge />} />
             <Route path="community" element={<Community />} />
+            <Route path="resources" element={<Resources />} />
             <Route path="profile" element={<Profile />} />
 
             {/* Optional: Redirect root to dashboard */}

@@ -1,5 +1,7 @@
 // socket/socketHandler.js
 const Message = require('../models/message');
+const Challenge = require('../models/challenge');
+const User = require('../models/user');
 const jwt = require('jsonwebtoken');
 
 // Authentication middleware for Socket.IO
@@ -23,6 +25,31 @@ const authenticateSocket = async (socket, next) => {
 module.exports = (io) => {
   // Store online users per challenge
   const challengeUsers = new Map(); // challengeId -> Set of userIds
+
+  // Function to broadcast live statistics
+  const broadcastLiveStats = async (challengeId) => {
+    try {
+      // Get real-time statistics
+      const [participants, teams, submissions] = await Promise.all([
+        Challenge.findById(challengeId).populate('participants'),
+        Challenge.findById(challengeId).populate('teams'),
+        Challenge.findById(challengeId).populate('submissions')
+      ]);
+
+      const stats = {
+        participants: participants?.participants?.length || 0,
+        teams: participants?.teams?.length || 0,
+        submissions: participants?.submissions?.length || 0,
+        onlineUsers: challengeUsers.get(challengeId)?.size || 0,
+        timestamp: new Date().toISOString()
+      };
+
+      // Broadcast to all users in challenge
+      io.to(`challenge-${challengeId}`).emit('live-stats-update', stats);
+    } catch (error) {
+      console.error('Error broadcasting live stats:', error);
+    }
+  };
 
   // Apply authentication middleware
   io.use(authenticateSocket);
@@ -68,6 +95,9 @@ module.exports = (io) => {
       socket.emit('online-users', {
         count: challengeUsers.get(challengeId).size
       });
+
+      // Broadcast live statistics when user joins
+      broadcastLiveStats(challengeId);
     });
 
     // Handle new message
@@ -183,7 +213,18 @@ module.exports = (io) => {
             userId: socket.userId,
             onlineCount: users.size
           });
+
+          // Broadcast live statistics when user leaves
+          broadcastLiveStats(socket.challengeId);
         }
+      }
+    });
+
+    // Handle request for live statistics
+    socket.on('request-live-stats', (data) => {
+      const { challengeId } = data;
+      if (challengeId) {
+        broadcastLiveStats(challengeId);
       }
     });
   });

@@ -3,11 +3,13 @@ import { BookOpen, FileText, Github, ExternalLink, Code, Database, Globe, Packag
 import { Card } from './ui/card';
 import { Button } from './ui/button';
 import { resourceService, Resource } from '../services/resourceService';
+import { useNavigate } from 'react-router-dom';
 
 export function ResourcesCard() {
   const [resources, setResources] = useState<Resource[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const navigate = useNavigate();
 
   // Icon mapping
   const iconMap = {
@@ -50,8 +52,7 @@ export function ResourcesCard() {
 
   // Handle browse all resources
   const handleBrowseAll = () => {
-    // You can navigate to a full resources page or open a modal
-    console.log('Browse all resources');
+    navigate('/resources');
   };
 
   return (

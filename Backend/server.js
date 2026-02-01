@@ -95,12 +95,28 @@ app.use((req, res, next) => {
   next();
 });
 
-// Global rate limiter
+// Global rate limiter - Professional settings for production
 const globalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 300,
+  max: 1000, // 1000 requests per 15 minutes (reasonable for production)
+  message: {
+    error: "Too many requests, please try again later",
+    retryAfter: "15 minutes"
+  },
   standardHeaders: true,
   legacyHeaders: false,
+  // Skip successful requests from rate limiting
+  skipSuccessfulRequests: false,
+  // Skip failed requests from rate limiting  
+  skipFailedRequests: false,
+  // Add custom handler for rate limit exceeded
+  handler: (req, res) => {
+    res.status(429).json({
+      error: "Too many requests",
+      message: "Rate limit exceeded. Please try again later.",
+      retryAfter: Math.ceil(15 * 60) // 15 minutes in seconds
+    });
+  }
 });
 app.use(globalLimiter);
 

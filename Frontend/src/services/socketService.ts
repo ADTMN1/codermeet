@@ -162,6 +162,21 @@ class SocketService {
     this.socket?.on('disconnect', callback);
   }
 
+  // Generic event listener
+  on(event: string, callback: (data: any) => void) {
+    this.socket?.on(event, callback);
+  }
+
+  // Generic event emitter
+  emit(event: string, data: any) {
+    this.socket?.emit(event, data);
+  }
+
+  // Request live statistics
+  requestLiveStats(challengeId: string) {
+    this.socket?.emit('request-live-stats', { challengeId });
+  }
+
   // Remove event listeners
   off(event: string, callback?: any) {
     this.socket?.off(event, callback);
