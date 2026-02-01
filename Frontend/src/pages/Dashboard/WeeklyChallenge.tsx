@@ -120,7 +120,7 @@ export default function WeeklyChallenge() {
 
             {challengeEnded && <WinnersSection />}
 
-            <DiscussionSection />
+            <DiscussionSection challengeId={challenge?._id} />
           </div>
 
           {/* Right Column - Sidebar */}

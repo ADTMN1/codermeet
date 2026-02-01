@@ -145,6 +145,31 @@ exports.register = async (req, res) => {
       return res.status(400).json({ success: false, message: "Password must be at least 8 characters" });
     }
 
+    // Validate plan field
+    if (!plan || typeof plan !== 'string') {
+      return res.status(400).json({ success: false, message: "Plan is required" });
+    }
+    
+    const validPlans = ["Trial", "Basic", "Premium"];
+    if (!validPlans.includes(plan)) {
+      return res.status(400).json({ success: false, message: `Invalid plan. Must be one of: ${validPlans.join(', ')}` });
+    }
+
+    // Validate primaryLanguage
+    if (primaryLanguage && typeof primaryLanguage !== 'string') {
+      return res.status(400).json({ success: false, message: "Primary language must be a string" });
+    }
+
+    // Validate skills if provided
+    if (skills && !Array.isArray(skills)) {
+      return res.status(400).json({ success: false, message: "Skills must be an array" });
+    }
+
+    // Validate githubUrl if provided
+    if (githubUrl && typeof githubUrl !== 'string') {
+      return res.status(400).json({ success: false, message: "GitHub URL must be a string" });
+    }
+
     // Sanitize inputs
     const sanitizedFullName = fullName.trim().substring(0, 50);
     const sanitizedUsername = username.trim().substring(0, 20);

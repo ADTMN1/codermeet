@@ -1,6 +1,8 @@
 // server.js
 require("dotenv").config();
 const express = require("express");
+const http = require('http');
+const socketIo = require('socket.io');
 const helmet = require("helmet");
 const cors = require("cors");
 const morgan = require("morgan");
@@ -13,11 +15,25 @@ const challengeRoutes = require('./routes/challenges');
 const leaderboardRoutes = require('./routes/leaderboard');
 const paymentRoutes = require('./routes/payment');
 const resourceRoutes = require('./routes/resources');
+const messageRoutes = require('./routes/messages');
 const { errorHandler } = require("./middlewares/errorHandler");
+const socketHandler = require('./socket/socketHandler');
 const fs = require('fs');
 const path = require('path');
 
 const app = express();
+const server = http.createServer(app);
+const io = socketIo(server, {
+  cors: {
+    origin: process.env.FRONTEND_URL?.split(',') || ["http://localhost:3000", "http://localhost:5173"],
+    methods: ["GET", "POST"],
+    credentials: true
+  }
+});
+
+// Initialize socket handlers
+socketHandler(io);
+
 const PORT = process.env.PORT || 5000;
 
 // Connect DB
@@ -118,11 +134,13 @@ app.use("/api/challenges", challengeRoutes); // Public challenge routes
 app.use("/api/leaderboard", leaderboardRoutes);
 app.use("/api/payment", paymentLimiter, paymentRoutes);
 app.use("/api/resources", resourceRoutes);
+app.use("/api", messageRoutes); // Message routes (mounted at /api to handle /api/challenges/:id/messages)
 
 // Error handler
 app.use(errorHandler);
 
 // Start server
-app.listen(PORT, () => {
-  // Server started successfully
+server.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+  console.log(`Socket.IO server initialized`);
 });
