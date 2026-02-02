@@ -27,6 +27,7 @@ import DailyChallengesSimple from './pages/Admin/DailyChallengesSimple';
 import WeeklyContestsSimple from './pages/Admin/WeeklyContestsSimple';
 import AnalyticsSimple from './pages/Admin/AnalyticsSimple';
 import AdminSettingsSimple from './pages/Admin/AdminSettingsSimple';
+import ChallengeDetail from './pages/Admin/ChallengeDetail';
 
 function App() {
   return (
@@ -109,6 +110,7 @@ function App() {
             <Route index element={<DashboardOverview />} />
             <Route path="users" element={<UserManagement />} />
             <Route path="challenges" element={<ChallengesHub />} />
+            <Route path="challenges/:id" element={<ChallengeDetail />} />
             <Route path="submissions" element={<SubmissionsSimple />} />
             <Route path="system" element={<SystemHealthSimple />} />
             <Route path="daily-challenges" element={<DailyChallengesSimple />} />

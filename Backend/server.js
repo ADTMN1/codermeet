@@ -19,6 +19,8 @@ const messageRoutes = require('./routes/messages');
 const dailyChallengeRoutes = require('./routes/dailyChallenge');
 const { errorHandler } = require("./middlewares/errorHandler");
 const socketHandler = require('./socket/socketHandler');
+const uploadSecurity = require('./middleware/uploadSecurity');
+const logger = require('./utils/logger');
 const fs = require('fs');
 const path = require('path');
 
@@ -87,9 +89,9 @@ if (process.env.NODE_ENV !== "production") {
   app.use(morgan("dev"));
 }
 
-// Body parser with increased limit for file uploads
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+// Body parser with reasonable limits for security
+app.use(express.json({ limit: '5mb' }));
+app.use(express.urlencoded({ extended: true, limit: '5mb' }));
 
 // Request logging middleware
 app.use((req, res, next) => {
@@ -152,13 +154,13 @@ app.use("/api/leaderboard", leaderboardRoutes);
 app.use("/api/payment", paymentLimiter, paymentRoutes);
 app.use("/api/resources", resourceRoutes);
 app.use("/api/daily-challenge", dailyChallengeRoutes);
-app.use("/api", messageRoutes); // Message routes (mounted at /api to handle /api/challenges/:id/messages)
+app.use("/api/messages", messageRoutes); // Message routes (mounted at /api to handle /api/challenges/:id/messages)
 
 // Error handler
 app.use(errorHandler);
 
 // Start server
 server.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-  console.log(`Socket.IO server initialized`);
+  logger.info(`Server running on port ${PORT}`);
+  logger.info(`Socket.IO server initialized`);
 });
