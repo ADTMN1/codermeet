@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { 
   Users, 
@@ -30,7 +31,15 @@ import {
   Eye,
   CheckCircle,
   XCircle,
-  Star
+  Star,
+  LayoutDashboard,
+  Settings,
+  LogOut,
+  Menu,
+  X,
+  Home,
+  MessageSquare,
+  HelpCircle
 } from 'lucide-react';
 import { adminService, User, UserStats, SystemHealth, SystemActivity } from '../../services/adminService';
 import { challengeService, Challenge, ChallengeStats } from '../../services/challengeService';
@@ -40,8 +49,11 @@ import { SubmissionsManagement } from '../../components/admin/SubmissionsManagem
 import { Card } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Label } from '../../components/ui/label';
+import { Avatar, AvatarImage, AvatarFallback } from '../../components/ui/avatar';
 
 const AdminDashboard: React.FC = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
   const [users, setUsers] = useState<User[]>([]);
   const [stats, setStats] = useState<UserStats | null>(null);
   const [systemHealth, setSystemHealth] = useState<SystemHealth | null>(null);
@@ -57,17 +69,77 @@ const AdminDashboard: React.FC = () => {
   const [showCreateChallenge, setShowCreateChallenge] = useState(false);
   const [selectedChallenge, setSelectedChallenge] = useState<Challenge | null>(null);
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
+  // Admin navigation items
+  const adminNavItems = [
+    { 
+      id: 'overview', 
+      label: 'Dashboard Overview', 
+      icon: <LayoutDashboard className="w-5 h-5" />,
+      description: 'System overview & metrics',
+      path: '/admin'
+    },
+    { 
+      id: 'users', 
+      label: 'User Management', 
+      icon: <Users className="w-5 h-5" />,
+      description: 'Manage user accounts',
+      path: '/admin/users'
+    },
+    { 
+      id: 'challenges', 
+      label: 'Challenge Hub', 
+      icon: <Trophy className="w-5 h-5" />,
+      description: 'Coding challenges',
+      path: '/admin/challenges'
+    },
+    { 
+      id: 'submissions', 
+      label: 'Code Review', 
+      icon: <FileText className="w-5 h-5" />,
+      description: 'Review submissions',
+      path: '/admin/submissions'
+    },
+    { 
+      id: 'system', 
+      label: 'System Health', 
+      icon: <Server className="w-5 h-5" />,
+      description: 'Monitor performance',
+      path: '/admin/system'
+    },
+    { 
+      id: 'daily-challenges', 
+      label: 'Daily Challenges', 
+      icon: <Calendar className="w-5 h-5" />,
+      description: 'Daily coding tasks',
+      path: '/admin/daily-challenges'
+    },
+    { 
+      id: 'weekly-challenges', 
+      label: 'Weekly Contests', 
+      icon: <Award className="w-5 h-5" />,
+      description: 'Weekly competitions',
+      path: '/admin/weekly-challenges'
+    },
+    { 
+      id: 'analytics', 
+      label: 'Analytics', 
+      icon: <BarChart3 className="w-5 h-5" />,
+      description: 'Data & insights',
+      path: '/admin/analytics'
+    },
+    { 
+      id: 'settings', 
+      label: 'Admin Settings', 
+      icon: <Settings className="w-5 h-5" />,
+      description: 'System configuration',
+      path: '/admin/settings'
+    },
+  ];
 
   useEffect(() => {
     fetchDashboardData();
-    
-    // Set up auto-refresh every 30 seconds
-    const interval = setInterval(() => {
-      fetchDashboardData();
-      setLastRefresh(new Date());
-    }, 30000); // 30 seconds
-    
-    return () => clearInterval(interval);
   }, []);
 
   // Fetch system data only when system tab is activated
@@ -224,31 +296,181 @@ const AdminDashboard: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-black text-gray-300 p-6">
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="max-w-7xl mx-auto"
-      >
-        {/* Header */}
-        <div className="mb-8">
-          <div className="flex justify-between items-center">
-            <div>
-              <h1 className="text-4xl font-bold text-white mb-2">Admin Dashboard</h1>
-              <p className="text-gray-400">Manage users and monitor platform activity</p>
-              <p className="text-xs text-gray-500 mt-1">
-                Last updated: {lastRefresh.toLocaleTimeString()}
-              </p>
-            </div>
+    <div className="flex min-h-screen bg-black">
+      {/* Admin Sidebar */}
+      <aside className={`bg-gradient-to-b from-gray-900 to-black border-r border-red-900/30 flex flex-col transition-all duration-300 ${
+        sidebarCollapsed ? 'w-20' : 'w-80'
+      } min-h-screen sticky top-0`}>
+        {/* Admin Header */}
+        <div className="p-6 border-b border-red-900/20 bg-gradient-to-r from-red-900/10 to-black">
+          <div className="flex items-center justify-between">
+            {!sidebarCollapsed && (
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 bg-gradient-to-r from-red-500 to-red-700 rounded-xl flex items-center justify-center shadow-lg shadow-red-500/25">
+                  <Shield className="w-7 h-7 text-white" />
+                </div>
+                <div>
+                  <h1 className="text-2xl font-bold text-white">Admin Panel</h1>
+                  <p className="text-xs text-red-400 font-medium">System Control Center</p>
+                </div>
+              </div>
+            )}
             <button
-              onClick={handleRefresh}
-              className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+              className="p-2.5 rounded-lg hover:bg-red-900/20 text-red-400 hover:text-red-300 transition-all duration-200 hover:scale-105"
             >
-              <Activity className="h-4 w-4 mr-2" />
-              Refresh Data
+              {sidebarCollapsed ? <Menu className="w-5 h-5" /> : <X className="w-5 h-5" />}
             </button>
           </div>
         </div>
+
+        {/* Admin Navigation */}
+        <nav className="flex-1 p-4 space-y-1">
+          {adminNavItems.map((item) => {
+            const isActive = location.pathname === item.path;
+            
+            return (
+              <button
+                key={item.id}
+                onClick={() => {
+                  navigate(item.path);
+                }}
+                className={`w-full group relative overflow-hidden rounded-lg transition-all duration-300 ${
+                  isActive
+                    ? 'bg-gradient-to-r from-red-500/20 to-red-600/20 text-red-400 border-l-3 border-red-500 shadow-lg shadow-red-500/10'
+                    : 'hover:bg-gradient-to-r hover:from-red-900/20 hover:to-red-800/20 text-gray-400 hover:text-red-400'
+                }`}
+                title={sidebarCollapsed ? `${item.label} - ${item.description}` : undefined}
+              >
+                <div className="flex items-center gap-3 px-4 py-3">
+                  <span className={`transition-all duration-300 ${sidebarCollapsed ? 'mx-auto' : ''} ${
+                    isActive ? 'text-red-400 scale-110' : 'group-hover:scale-110'
+                  }`}>
+                    {item.icon}
+                  </span>
+                  {!sidebarCollapsed && (
+                    <div className="flex-1 text-left">
+                      <div className="font-medium text-white group-hover:text-red-300 transition-colors">
+                        {item.label}
+                      </div>
+                      <div className="text-xs text-gray-500 group-hover:text-red-300/70 transition-colors">
+                        {item.description}
+                      </div>
+                    </div>
+                  )}
+                </div>
+                
+                {/* Active indicator */}
+                {isActive && !sidebarCollapsed && (
+                  <div className="absolute right-2 top-1/2 transform -translate-y-1/2">
+                    <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+                  </div>
+                )}
+              </button>
+            );
+          })}
+        </nav>
+
+        {/* Admin Footer */}
+        <div className="p-4 border-t border-red-900/20 bg-gradient-to-r from-red-900/10 to-black">
+          {!sidebarCollapsed && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-3 p-3 bg-gray-800/50 rounded-lg border border-red-900/20">
+                <div className="w-10 h-10 bg-gradient-to-r from-red-500 to-red-700 rounded-full flex items-center justify-center shadow-lg">
+                  <Shield className="w-5 h-5 text-white" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-white">System Administrator</p>
+                  <p className="text-xs text-red-400">admin@codermeet.com</p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-500/20 text-green-400 border border-green-500/30">
+                      ● Active
+                    </span>
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-500/20 text-red-400 border border-red-500/30">
+                      Super Admin
+                    </span>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div className="bg-gray-800/50 rounded-lg p-2 border border-gray-700/50">
+                  <p className="text-gray-400">System Status</p>
+                  <p className="text-green-400 font-semibold">Operational</p>
+                </div>
+                <div className="bg-gray-800/50 rounded-lg p-2 border border-gray-700/50">
+                  <p className="text-gray-400">Last Login</p>
+                  <p className="text-blue-400 font-semibold">Just Now</p>
+                </div>
+              </div>
+              
+              <button
+                onClick={() => navigate('/dashboard')}
+                className="w-full flex items-center justify-center gap-2 px-3 py-2.5 bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white rounded-lg transition-all duration-200 border border-gray-700 hover:border-gray-600 text-sm font-medium"
+              >
+                <Home className="w-4 h-4" />
+                Exit Admin Panel
+              </button>
+            </div>
+          )}
+          {sidebarCollapsed && (
+            <div className="space-y-3">
+              <div className="w-10 h-10 bg-gradient-to-r from-red-500 to-red-700 rounded-full flex items-center justify-center mx-auto shadow-lg">
+                <Shield className="w-5 h-5 text-white" />
+              </div>
+              <button
+                onClick={() => navigate('/dashboard')}
+                className="w-full p-3 rounded-lg hover:bg-gray-800 text-gray-400 hover:text-white transition-all duration-200 group"
+                title="Exit Admin Panel"
+              >
+                <Home className="w-5 h-5 mx-auto group-hover:scale-110 transition-transform" />
+              </button>
+            </div>
+          )}
+        </div>
+      </aside>
+      
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col">
+        {/* Top Header */}
+        <header className="bg-gradient-to-r from-gray-900 via-gray-900 to-black border-b border-red-900/30 px-6 py-4 shadow-lg">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-gradient-to-r from-red-500 to-red-700 rounded-xl flex items-center justify-center shadow-lg shadow-red-500/25">
+                <Shield className="w-7 h-7 text-white" />
+              </div>
+              <div>
+                <h1 className="text-3xl font-bold text-white tracking-tight">Admin Dashboard</h1>
+                <p className="text-gray-400 text-sm font-medium">System Management & Monitoring Platform</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="text-right">
+                <p className="text-xs text-gray-500">System Status</p>
+                <p className="text-sm font-medium text-green-400">● All Systems Operational</p>
+              </div>
+              <div className="text-right">
+                <p className="text-xs text-gray-500">Last Updated</p>
+                <p className="text-sm font-medium text-white">{lastRefresh.toLocaleTimeString()}</p>
+              </div>
+              <button
+                onClick={handleRefresh}
+                className="flex items-center px-5 py-2.5 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-lg hover:from-red-700 hover:to-red-800 transition-all duration-200 shadow-lg shadow-red-500/25 hover:shadow-red-500/40 font-medium"
+              >
+                <Activity className="h-4 w-4 mr-2" />
+                Refresh Data
+              </button>
+            </div>
+          </div>
+        </header>
+
+        {/* Dashboard Content */}
+        <main className="flex-1 p-6 overflow-auto">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="max-w-7xl mx-auto"
+          >
 
         {/* Tab Navigation */}
         <div className="mb-8">
@@ -419,6 +641,171 @@ const AdminDashboard: React.FC = () => {
               <option value="Basic">Basic</option>
               <option value="Premium">Premium</option>
             </select>
+          </div>
+        </div>
+
+        {/* Challenges Management Section */}
+        <div className="bg-gray-900 border border-gray-800 rounded-lg p-6">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-xl font-semibold text-white flex items-center gap-2">
+              <Code className="w-5 h-5 text-blue-400" />
+              Challenges Management
+            </h2>
+            <div className="flex gap-3">
+              <Button
+                onClick={() => navigate('/admin/daily-challenges')}
+                variant="outline"
+                className="border-green-600 text-green-400 hover:bg-green-600/10"
+              >
+                <Calendar className="w-4 h-4 mr-2" />
+                Daily Challenges
+              </Button>
+              <Button
+                onClick={() => navigate('/admin/weekly-challenges')}
+                variant="outline"
+                className="border-yellow-600 text-yellow-400 hover:bg-yellow-600/10"
+              >
+                <Trophy className="w-4 h-4 mr-2" />
+                Weekly Challenges
+              </Button>
+              <Button
+                onClick={() => setShowCreateChallenge(true)}
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Create Challenge
+              </Button>
+            </div>
+          </div>
+
+          {/* Challenge Stats Overview */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+            <div className="bg-gradient-to-r from-green-600 to-green-800 p-4 rounded-lg">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-green-200 text-sm">Daily Challenges</p>
+                  <p className="text-2xl font-bold text-white">{challenges.filter(c => c.category?.includes('Daily') || c.title?.includes('Daily')).length}</p>
+                </div>
+                <Calendar className="w-8 h-8 text-green-300" />
+              </div>
+            </div>
+            <div className="bg-gradient-to-r from-yellow-600 to-yellow-800 p-4 rounded-lg">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-yellow-200 text-sm">Weekly Challenges</p>
+                  <p className="text-2xl font-bold text-white">{challenges.filter(c => c.category?.includes('Weekly') || c.title?.includes('Weekly')).length}</p>
+                </div>
+                <Trophy className="w-8 h-8 text-yellow-300" />
+              </div>
+            </div>
+            <div className="bg-gradient-to-r from-purple-600 to-purple-800 p-4 rounded-lg">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-purple-200 text-sm">Total Participants</p>
+                  <p className="text-2xl font-bold text-white">{challenges.reduce((sum, c) => sum + (c.currentParticipants || 0), 0)}</p>
+                </div>
+                <Users className="w-8 h-8 text-purple-300" />
+              </div>
+            </div>
+            <div className="bg-gradient-to-r from-orange-600 to-orange-800 p-4 rounded-lg">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-orange-200 text-sm">Active Challenges</p>
+                  <p className="text-2xl font-bold text-white">{challenges.filter(c => new Date(c.endDate) > new Date()).length}</p>
+                </div>
+                <Activity className="w-8 h-8 text-orange-300" />
+              </div>
+            </div>
+          </div>
+
+          {/* Challenges List */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-medium text-white">Recent Challenges</h3>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm">
+                  <Filter className="w-4 h-4 mr-1" />
+                  Filter
+                </Button>
+                <Button variant="outline" size="sm">
+                  <Search className="w-4 h-4 mr-1" />
+                  Search
+                </Button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {challenges.slice(0, 6).map((challenge) => (
+                <div key={challenge._id} className="bg-gray-800 border border-gray-700 rounded-lg p-4">
+                  <div className="flex justify-between items-start mb-3">
+                    <div className="flex-1">
+                      <h4 className="text-white font-semibold mb-1">{challenge.title}</h4>
+                      <p className="text-gray-400 text-sm mb-2">{challenge.description.substring(0, 100)}...</p>
+                      <div className="flex flex-wrap gap-2 mb-2">
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                          challenge.difficulty === 'Easy' ? 'bg-green-500/20 text-green-300' :
+                          challenge.difficulty === 'Medium' ? 'bg-yellow-500/20 text-yellow-300' :
+                          'bg-red-500/20 text-red-300'
+                        }`}>
+                          {challenge.difficulty}
+                        </span>
+                        <span className="px-2 py-1 rounded-full text-xs font-medium bg-blue-500/20 text-blue-300">
+                          {challenge.category}
+                        </span>
+                        <span className="px-2 py-1 rounded-full text-xs font-medium bg-purple-500/20 text-purple-300">
+                          {challenge.currentParticipants || 0} participants
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-4 text-sm text-gray-400">
+                        <span className="flex items-center gap-1">
+                          <Calendar className="w-3 h-3" />
+                          {new Date(challenge.startDate).toLocaleDateString()}
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <Clock className="w-3 h-3" />
+                          {new Date(challenge.endDate).toLocaleDateString()}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex gap-2 ml-4">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => navigate(`/admin/challenges/${challenge._id}`)}
+                      >
+                        <Eye className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => navigate(`/admin/challenges/${challenge._id}/edit`)}
+                      >
+                        <Edit className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-red-400 border-red-600 hover:bg-red-600/10"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {challenges.length === 0 && (
+              <div className="text-center py-8">
+                <Code className="w-16 h-16 text-gray-600 mx-auto mb-4" />
+                <h3 className="text-xl font-medium text-gray-400 mb-2">No Challenges Yet</h3>
+                <p className="text-gray-500 mb-4">Create your first challenge to get started</p>
+                <Button onClick={() => setShowCreateChallenge(true)}>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Create Challenge
+                </Button>
+              </div>
+            )}
           </div>
         </div>
 
@@ -933,24 +1320,25 @@ const AdminDashboard: React.FC = () => {
             )}
           </>
         )}
+
+        {/* Create/Edit Challenge Modal */}
+        {showCreateChallenge && (
+          <CreateChallengeForm
+            challenge={selectedChallenge}
+            onClose={() => {
+              setShowCreateChallenge(false);
+              setSelectedChallenge(null);
+            }}
+            onSuccess={() => {
+              setShowCreateChallenge(false);
+              setSelectedChallenge(null);
+              fetchDashboardData();
+            }}
+          />
+        )}
       </motion.div>
-
-      {/* Create/Edit Challenge Modal */}
-      {showCreateChallenge && (
-        <CreateChallengeForm
-          challenge={selectedChallenge}
-          onClose={() => {
-            setShowCreateChallenge(false);
-            setSelectedChallenge(null);
-          }}
-          onSuccess={() => {
-            setShowCreateChallenge(false);
-            setSelectedChallenge(null);
-            fetchDashboardData();
-          }}
-        />
-      )}
-
+      </main>
+      </div>
     </div>
   );
 };

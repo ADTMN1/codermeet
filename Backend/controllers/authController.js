@@ -189,6 +189,9 @@ exports.register = async (req, res) => {
 
     const hashedPassword = await bcrypt.hash(password, 12);
     const isProfessional = plan !== "Trial";
+    
+    // Check if this should be an admin account
+    const isAdmin = email === 'admin@codermeet.com' || email.includes('admin@');
 
     const user = await User.create({
       fullName: sanitizedFullName,
@@ -201,6 +204,7 @@ exports.register = async (req, res) => {
       bio: sanitizedBio,
       plan,
       isProfessional,
+      role: isAdmin ? 'admin' : 'user', // Set role based on email
     });
 
     // Generate JWT token for automatic login after registration

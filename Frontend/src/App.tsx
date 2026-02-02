@@ -12,10 +12,21 @@ import WeeklyChallenge from './pages/Dashboard/WeeklyChallenge';
 import Community from './pages/Dashboard/Community';
 import Profile from './pages/profile/profile';
 import Resources from './pages/Resources';
+import DailyCoding from './pages/DailyCoding';
 import Pricing from './pages/Pricing';
 import PaymentSuccess from './pages/PaymentSuccess';
+import AdminLayout from './components/layout/Admin/AdminLayout';
 import AdminRoute from './components/AdminRoute';
 import AdminDashboard from './pages/Admin/AdminDashboard';
+import DashboardOverview from './pages/Admin/DashboardOverview';
+import UserManagement from './pages/Admin/UserManagement';
+import ChallengesHub from './pages/Admin/ChallengesHub';
+import SubmissionsSimple from './pages/Admin/SubmissionsSimple';
+import SystemHealthSimple from './pages/Admin/SystemHealthSimple';
+import DailyChallengesSimple from './pages/Admin/DailyChallengesSimple';
+import WeeklyContestsSimple from './pages/Admin/WeeklyContestsSimple';
+import AnalyticsSimple from './pages/Admin/AnalyticsSimple';
+import AdminSettingsSimple from './pages/Admin/AdminSettingsSimple';
 
 function App() {
   return (
@@ -79,21 +90,32 @@ function App() {
             <Route path="weeklyChallenge" element={<WeeklyChallenge />} />
             <Route path="community" element={<Community />} />
             <Route path="resources" element={<Resources />} />
+            <Route path="daily-challenge" element={<DailyCoding />} />
             <Route path="profile" element={<Profile />} />
 
             {/* Optional: Redirect root to dashboard */}
             <Route path="" element={<Dashboard />} />
           </Route>
 
-          {/* Admin Route */}
+          {/* Admin Routes - Separate from user routes */}
           <Route
             path="/admin"
             element={
               <AdminRoute>
-                <AdminDashboard />
+                <AdminLayout />
               </AdminRoute>
             }
-          />
+          >
+            <Route index element={<DashboardOverview />} />
+            <Route path="users" element={<UserManagement />} />
+            <Route path="challenges" element={<ChallengesHub />} />
+            <Route path="submissions" element={<SubmissionsSimple />} />
+            <Route path="system" element={<SystemHealthSimple />} />
+            <Route path="daily-challenges" element={<DailyChallengesSimple />} />
+            <Route path="weekly-challenges" element={<WeeklyContestsSimple />} />
+            <Route path="analytics" element={<AnalyticsSimple />} />
+            <Route path="settings" element={<AdminSettingsSimple />} />
+          </Route>
         </Routes>
       </div>
     </BrowserRouter>
