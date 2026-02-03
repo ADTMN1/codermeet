@@ -14,8 +14,8 @@ const AdminRoute: React.FC<AdminRouteProps> = ({ children }) => {
     return <Navigate to="/login" replace />;
   }
 
-  // Check if user has admin role (you might need to add this to the user context)
-  if (user.role !== 'admin') {
+  // Check if user has admin role (admin or super_admin)
+  if (!user.role || !['admin', 'super_admin'].includes(user.role)) {
     return <Navigate to="/dashboard" replace />;
   }
 

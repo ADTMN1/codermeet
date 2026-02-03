@@ -1,6 +1,7 @@
 // services/messageService.ts
 import axios from 'axios';
 import { API_CONFIG } from '../config/api';
+import { authService } from './auth';
 
 export interface Message {
   _id: string;
@@ -49,18 +50,21 @@ class MessageService {
     pagination: any 
   }> {
     try {
+      const token = authService.getToken();
+      
       const response = await axios.get(
         `${API_CONFIG.BASE_URL}/challenges/${challengeId}/messages`,
         {
           params: { page, limit },
           headers: {
-            'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+            'Authorization': token ? `Bearer ${token}` : ''
           }
         }
       );
       
       return response.data;
     } catch (error: any) {
+      console.error('❌ MessageService error:', error.response?.status, error.response?.data);
       throw new Error(error.response?.data?.message || 'Failed to fetch messages');
     }
   }
@@ -68,13 +72,14 @@ class MessageService {
   // Create a new message
   async createMessage(challengeId: string, messageData: CreateMessageData): Promise<Message> {
     try {
+      const token = authService.getToken();
       const response = await axios.post(
         `${API_CONFIG.BASE_URL}/challenges/${challengeId}/messages`,
         messageData,
         {
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+            'Authorization': token ? `Bearer ${token}` : ''
           }
         }
       );
@@ -88,12 +93,13 @@ class MessageService {
   // Like/unlike a message
   async toggleLike(messageId: string): Promise<Message> {
     try {
+      const token = authService.getToken();
       const response = await axios.put(
         `${API_CONFIG.BASE_URL}/messages/${messageId}/like`,
         {},
         {
           headers: {
-            'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+            'Authorization': token ? `Bearer ${token}` : ''
           }
         }
       );
@@ -107,11 +113,12 @@ class MessageService {
   // Delete a message
   async deleteMessage(messageId: string): Promise<void> {
     try {
+      const token = authService.getToken();
       await axios.delete(
         `${API_CONFIG.BASE_URL}/messages/${messageId}`,
         {
           headers: {
-            'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+            'Authorization': token ? `Bearer ${token}` : ''
           }
         }
       );
@@ -123,7 +130,7 @@ class MessageService {
   // Create a reply to a message
   async createReply(messageId: string, replyData: CreateReplyData): Promise<Message> {
     try {
-      const token = localStorage.getItem('auth_token');
+      const token = authService.getToken();
       
       const response = await axios.post(
         `${API_CONFIG.BASE_URL}/messages/${messageId}/replies`,
@@ -131,7 +138,7 @@ class MessageService {
         {
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
+            'Authorization': token ? `Bearer ${token}` : ''
           }
         }
       );
@@ -145,12 +152,13 @@ class MessageService {
   // Like/unlike a reply
   async toggleReplyLike(messageId: string, replyId: string): Promise<Message> {
     try {
+      const token = authService.getToken();
       const response = await axios.put(
         `${API_CONFIG.BASE_URL}/messages/${messageId}/replies/${replyId}/like`,
         {},
         {
           headers: {
-            'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+            'Authorization': token ? `Bearer ${token}` : ''
           }
         }
       );
@@ -164,11 +172,12 @@ class MessageService {
   // Delete a reply
   async deleteReply(messageId: string, replyId: string): Promise<void> {
     try {
+      const token = authService.getToken();
       await axios.delete(
         `${API_CONFIG.BASE_URL}/messages/${messageId}/replies/${replyId}`,
         {
           headers: {
-            'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+            'Authorization': token ? `Bearer ${token}` : ''
           }
         }
       );

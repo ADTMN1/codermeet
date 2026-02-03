@@ -139,7 +139,7 @@ const userData = response.data.data; // <--- user info is here
         }
 
         // Redirect to appropriate dashboard
-        if (userData.role === 'admin') {
+        if (userData.role === 'admin' || userData.role === 'super_admin') {
           navigate('/admin');
         } else {
           navigate('/dashboard');

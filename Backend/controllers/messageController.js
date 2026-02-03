@@ -6,11 +6,19 @@ const User = require('../models/user');
 // Get messages for a challenge
 exports.getMessages = async (req, res) => {
   try {
-    const { challengeId } = req.params;
+    const { id } = req.params;
     const { page = 1, limit = 50 } = req.query;
 
+    // Validate challenge ID
+    if (!id) {
+      return res.status(400).json({
+        success: false,
+        message: 'Challenge ID is required'
+      });
+    }
+
     // Verify challenge exists
-    const challenge = await Challenge.findById(challengeId);
+    const challenge = await Challenge.findById(id);
     if (!challenge) {
       return res.status(404).json({
         success: false,
@@ -18,25 +26,32 @@ exports.getMessages = async (req, res) => {
       });
     }
 
-    const messages = await Message.find({ challengeId })
-      .populate('author', 'fullName username avatar')
-      .populate('likes', 'fullName username')
-      .populate('replies.author', 'fullName username avatar')
-      .populate('replies.likes', 'fullName username')
-      .sort({ createdAt: -1 })
-      .limit(limit * 1)
-      .skip((page - 1) * limit);
+    // Try populate with error handling
+    let messages;
+    try {
+      messages = await Message.find({ challengeId: id })
+        .populate('author', 'fullName username avatar')
+        .sort({ createdAt: -1 })
+        .limit(parseInt(limit))
+        .skip((parseInt(page) - 1) * parseInt(limit));
+    } catch (populateError) {
+      // Fallback to simple query without populate
+      messages = await Message.find({ challengeId: id })
+        .sort({ createdAt: -1 })
+        .limit(parseInt(limit))
+        .skip((parseInt(page) - 1) * parseInt(limit));
+    }
 
-    const total = await Message.countDocuments({ challengeId });
+    const total = await Message.countDocuments({ challengeId: id });
 
     res.status(200).json({
       success: true,
-      data: messages,
+      data: messages || [],
       pagination: {
         page: parseInt(page),
         limit: parseInt(limit),
         total,
-        pages: Math.ceil(total / limit)
+        pages: Math.ceil(total / parseInt(limit))
       }
     });
   } catch (error) {
@@ -51,9 +66,10 @@ exports.getMessages = async (req, res) => {
 // Create a new message
 exports.createMessage = async (req, res) => {
   try {
-    const { challengeId } = req.params;
+    const { id } = req.params;
     const { content } = req.body;
-    const userId = req.user.id;
+    
+    const userId = req.user?.id || req.userProfile?._id;
 
     // Validate required fields
     if (!content || content.trim().length === 0) {
@@ -64,7 +80,7 @@ exports.createMessage = async (req, res) => {
     }
 
     // Verify challenge exists
-    const challenge = await Challenge.findById(challengeId);
+    const challenge = await Challenge.findById(id);
     if (!challenge) {
       return res.status(404).json({
         success: false,
@@ -76,7 +92,7 @@ exports.createMessage = async (req, res) => {
     const message = new Message({
       content: content.trim(),
       author: userId,
-      challengeId
+      challengeId: id
     });
 
     await message.save();
@@ -184,8 +200,6 @@ exports.createReply = async (req, res) => {
     const { content, parentReplyId } = req.body;
     const userId = req.user.id;
 
-    console.log('🔍 Reply request:', { messageId, content, parentReplyId, userId });
-
     // Validate required fields
     if (!content || content.trim().length === 0) {
       return res.status(400).json({
@@ -197,59 +211,30 @@ exports.createReply = async (req, res) => {
     // Find the message
     const message = await Message.findById(messageId);
     if (!message) {
-      console.log('❌ Message not found:', messageId);
       return res.status(404).json({
         success: false,
         message: 'Message not found'
       });
     }
 
-    console.log('✅ Message found:', message._id, 'Challenge:', message.challengeId);
 
     // Verify user is part of the challenge
     const challenge = await Challenge.findById(message.challengeId);
     if (!challenge) {
-      console.log('❌ Challenge not found:', message.challengeId);
       return res.status(404).json({
         success: false,
         message: 'Challenge not found'
       });
     }
 
-    console.log('✅ Challenge found:', challenge._id, 'Participants:', challenge.participants.length);
-    
-    // Debug: Log all participants in detail
-    console.log('🔍 All participants:', challenge.participants.map(p => ({
-      participantId: p._id,
-      userId: p.user?._id,
-      fullName: p.user?.fullName,
-      joinedAt: p.joinedAt,
-      participantObject: p
-    })));
-
     // Check if user is registered for the challenge
     const isRegistered = challenge.participants.some(
       participant => {
         // Handle both direct user ID and nested user object
         const participantUserId = participant.user?._id || participant._id || participant;
-        console.log('🔍 Checking participant:', {
-          participantUserId,
-          targetUserId: userId,
-          match: participantUserId.toString() === userId,
-          participantObject: participant
-        });
         return participantUserId.toString() === userId;
       }
     );
-
-    console.log('👤 User registration check:', { 
-      userId, 
-      isRegistered, 
-      participants: challenge.participants.map(p => ({
-        id: p.user?._id || p._id || p,
-        name: p.user?.fullName || 'Unknown'
-      }))
-    });
 
     if (!isRegistered) {
       return res.status(403).json({

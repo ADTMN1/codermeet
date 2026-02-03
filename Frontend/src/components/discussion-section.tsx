@@ -455,6 +455,12 @@ export function DiscussionSection({ challengeId }: DiscussionSectionProps) {
       'bg-pink-500', 'bg-yellow-500', 'bg-red-500',
       'bg-indigo-500', 'bg-cyan-500', 'bg-orange-500'
     ];
+    
+    // Handle undefined or null userId
+    if (!userId) {
+      return colors[0]; // Default color
+    }
+    
     return colors[userId.charCodeAt(0) % colors.length];
   };
 
@@ -562,19 +568,23 @@ export function DiscussionSection({ challengeId }: DiscussionSectionProps) {
             </div>
           ) : (
             messages.map((msg) => {
+              const authorId = msg.author?._id || 'unknown';
+              const authorName = msg.author?.fullName || 'Unknown User';
+              const authorAvatar = msg.author?.avatar;
+              
               return (
                 <div key={msg._id} className="p-3 rounded-lg bg-slate-800/30 border border-slate-700/30">
                   <div className="flex items-start gap-3">
-                    <div className={`w-10 h-10 ${getUserAvatarColor(msg.author._id)} rounded-full flex items-center justify-center text-white font-semibold text-sm`}>
-                      {msg.author.avatar ? (
-                        <img src={msg.author.avatar} alt={msg.author.fullName} className="w-full h-full rounded-full object-cover" />
+                    <div className={`w-10 h-10 ${getUserAvatarColor(authorId)} rounded-full flex items-center justify-center text-white font-semibold text-sm`}>
+                      {authorAvatar ? (
+                        <img src={authorAvatar} alt={authorName} className="w-full h-full rounded-full object-cover" />
                       ) : (
-                        getUserInitials(msg.author.fullName)
+                        getUserInitials(authorName)
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
-                        <span className="text-slate-200">{msg.author.fullName}</span>
+                        <span className="text-slate-200">{authorName}</span>
                         <span className="text-xs text-slate-500">
                           {msg.timeAgo || messageService.formatTimeAgo(msg.createdAt)}
                         </span>

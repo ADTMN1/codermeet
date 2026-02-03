@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
+import { adminService } from '../../services/adminService';
 import { 
   Settings, 
   Shield, 
@@ -32,19 +34,54 @@ const AdminSettingsSimple: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'general' | 'security' | 'notifications' | 'appearance' | 'data' | 'profile'>('general');
   const [saving, setSaving] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [loading, setLoading] = useState(true);
+  
+  // Password modal state
+  const [passwordData, setPasswordData] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: ''
+  });
   
   // Profile State
   const [profileSettings, setProfileSettings] = useState({
-    fullName: 'Admin User',
-    email: 'admin@codermeet.com',
-    role: 'Super Administrator',
-    department: 'IT Administration',
-    phone: '+1 (555) 123-4567',
-    location: 'San Francisco, CA',
-    bio: 'System administrator responsible for platform management and security.',
-    joinedDate: 'January 15, 2024',
-    lastLogin: 'Just now'
+    fullName: '',
+    email: '',
+    role: '',
+    department: '',
+    phone: '',
+    location: '',
+    bio: '',
+    joinedDate: '',
+    lastLogin: ''
   });
+
+  // Load admin profile data
+  useEffect(() => {
+    const loadProfile = async () => {
+      try {
+        const profile = await adminService.getProfile();
+        setProfileSettings({
+          fullName: profile.fullName || '',
+          email: profile.email || '',
+          role: profile.role || '',
+          department: profile.adminProfile?.department || '',
+          phone: '',
+          location: profile.location || '',
+          bio: profile.bio || '',
+          joinedDate: new Date(profile.createdAt).toLocaleDateString(),
+          lastLogin: profile.adminProfile?.lastLoginIP ? 'Just now' : 'Unknown'
+        });
+      } catch (error) {
+        console.error('Failed to load profile:', error);
+        toast.error('Failed to load profile data');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadProfile();
+  }, []);
   
   // General Settings State
   const [generalSettings, setGeneralSettings] = useState({
@@ -82,13 +119,61 @@ const AdminSettingsSimple: React.FC = () => {
 
   const handleSave = async () => {
     setSaving(true);
-    setTimeout(() => {
+    try {
+      const updateData = {
+        fullName: profileSettings.fullName,
+        email: profileSettings.email,
+        location: profileSettings.location,
+        bio: profileSettings.bio,
+        // Map department to adminProfile.department
+        adminProfile: {
+          department: profileSettings.department
+        }
+      };
+
+      const response = await adminService.updateProfile(updateData);
+      
+      if (response.success) {
+        toast.success('Profile updated successfully!');
+      } else {
+        toast.error(response.message || 'Failed to update profile');
+      }
+    } catch (error: any) {
+      console.error('Profile update error:', error);
+      toast.error(error.response?.data?.message || 'Failed to update profile');
+    } finally {
       setSaving(false);
-    }, 1500);
+    }
   };
 
-  const handlePasswordChange = () => {
-    setShowPasswordModal(true);
+  const handlePasswordChange = async () => {
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      toast.error('Passwords do not match');
+      return;
+    }
+
+    if (passwordData.newPassword.length < 8) {
+      toast.error('Password must be at least 8 characters long');
+      return;
+    }
+
+    try {
+      const response = await adminService.changePassword({
+        currentPassword: passwordData.currentPassword,
+        newPassword: passwordData.newPassword
+      });
+
+      if (response.success) {
+        toast.success('Password changed successfully!');
+        setShowPasswordModal(false);
+        setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+      } else {
+        toast.error(response.message || 'Failed to change password');
+      }
+    } catch (error: any) {
+      console.error('Password change error:', error);
+      toast.error(error.response?.data?.message || 'Failed to change password');
+    }
   };
 
   const handleLogout = () => {
@@ -398,14 +483,14 @@ const AdminSettingsSimple: React.FC = () => {
                 Quick Actions
               </h3>
               <div className="space-y-3">
-                <Button
-                  onClick={handlePasswordChange}
-                  variant="outline"
-                  className="w-full border-blue-600 text-blue-400 hover:bg-blue-600/10"
-                >
-                  <Key className="w-4 h-4 mr-2" />
-                  Change Password
-                </Button>
+                  <Button
+                    onClick={() => setShowPasswordModal(true)}
+                    variant="outline"
+                    className="w-full border-blue-600 text-blue-400 hover:bg-blue-600/10"
+                  >
+                    <Key className="w-4 h-4 mr-2" />
+                    Change Password
+                  </Button>
                 <Button
                   variant="outline"
                   className="w-full border-green-600 text-green-400 hover:bg-green-600/10"
@@ -532,32 +617,38 @@ const AdminSettingsSimple: React.FC = () => {
             <h3 className="text-lg font-semibold text-white mb-4">Change Admin Password</h3>
             
             <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">Current Password</label>
-                <input
-                  type="password"
-                  className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-red-500"
-                  placeholder="Enter current password"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">New Password</label>
-                <input
-                  type="password"
-                  className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-red-500"
-                  placeholder="Enter new password"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">Confirm New Password</label>
-                <input
-                  type="password"
-                  className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-red-500"
-                  placeholder="Confirm new password"
-                />
-              </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">Current Password</label>
+                  <input
+                    type="password"
+                    value={passwordData.currentPassword}
+                    onChange={(e) => setPasswordData({...passwordData, currentPassword: e.target.value})}
+                    className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-red-500"
+                    placeholder="Enter current password"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">New Password</label>
+                  <input
+                    type="password"
+                    value={passwordData.newPassword}
+                    onChange={(e) => setPasswordData({...passwordData, newPassword: e.target.value})}
+                    className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-red-500"
+                    placeholder="Enter new password"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">Confirm New Password</label>
+                  <input
+                    type="password"
+                    value={passwordData.confirmPassword}
+                    onChange={(e) => setPasswordData({...passwordData, confirmPassword: e.target.value})}
+                    className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-red-500"
+                    placeholder="Confirm new password"
+                  />
+                </div>
             </div>
             
             <div className="flex gap-3 pt-4">
@@ -569,9 +660,7 @@ const AdminSettingsSimple: React.FC = () => {
                 Cancel
               </Button>
               <Button
-                onClick={() => {
-                  setShowPasswordModal(false);
-                }}
+                onClick={handlePasswordChange}
                 className="bg-blue-600 hover:bg-blue-700 text-white"
               >
                 Change Password

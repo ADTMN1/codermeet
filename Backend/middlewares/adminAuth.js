@@ -1,35 +1,49 @@
 // middlewares/adminAuth.js
-const jwt = require("jsonwebtoken");
-const User = require("../models/user");
+const { requireAdmin, logAdminAction } = require('./roleBasedAuth');
+const AuditService = require('../services/auditService');
 
-module.exports = async (req, res, next) => {
+// Enhanced admin authentication with audit logging
+const adminAuth = async (req, res, next) => {
   try {
-    const header = req.headers.authorization;
-    if (!header)
-      return res.status(401).json({ message: "Authorization required" });
-
-    const parts = header.split(" ");
-    if (parts.length !== 2 || parts[0] !== "Bearer") {
-      return res.status(401).json({ message: "Authorization required" });
-    }
-
-    const token = parts[1];
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    // Use the new requireAdmin middleware
+    return requireAdmin(req, res, next);
+  } catch (error) {
+    // Log failed admin access attempt
+    await AuditService.logSecurityEvent(req, 'access_denied', {
+      resource: 'admin_panel',
+      errorMessage: error.message
+    });
     
-    // Get user with role information
-    const user = await User.findById(decoded.id);
-    if (!user) {
-      return res.status(401).json({ message: "User not found" });
-    }
-
-    if (user.role !== "admin") {
-      return res.status(403).json({ message: "Admin access required" });
-    }
-
-    req.user = decoded;
-    req.userRole = user.role;
-    next();
-  } catch (err) {
-    return res.status(401).json({ message: "Invalid or expired token" });
+    return res.status(error.status || 403).json({
+      success: false,
+      message: error.message || "Admin access required"
+    });
   }
 };
+
+// Admin authentication with action logging
+const adminAuthWithLogging = (action) => {
+  return async (req, res, next) => {
+    try {
+      // First authenticate as admin
+      await requireAdmin(req, res, () => {});
+      
+      // Log the admin action
+      await logAdminAction(action)(req, res, next);
+    } catch (error) {
+      // Log failed admin access attempt
+      await AuditService.logSecurityEvent(req, 'access_denied', {
+        resource: 'admin_panel',
+        action,
+        errorMessage: error.message
+      });
+      
+      return res.status(error.status || 403).json({
+        success: false,
+        message: error.message || "Admin access required"
+      });
+    }
+  };
+};
+
+module.exports = { adminAuth, adminAuthWithLogging };

@@ -14,7 +14,8 @@ const authenticateSocket = async (socket, next) => {
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    socket.userId = decoded.id;
+    // Handle both token formats - some use 'id', others use 'userId'
+    socket.userId = decoded.id || decoded.userId;
     next();
   } catch (error) {
     console.error('Socket authentication error:', error.message);
@@ -103,6 +104,9 @@ module.exports = (io) => {
     // Handle new message
     socket.on('send-message', async (data) => {
       console.log('📤 Received send-message:', data);
+      console.log('🔐 Socket userId:', socket.userId);
+      console.log('🏠 Socket challengeId:', socket.challengeId);
+      
       try {
         const { challengeId, content } = data;
         const userId = socket.userId; // Use authenticated userId
@@ -110,6 +114,12 @@ module.exports = (io) => {
         if (!userId) {
           console.log('❌ No userId found for message');
           socket.emit('error', { message: 'User not authenticated' });
+          return;
+        }
+        
+        if (!challengeId || !content) {
+          console.log('❌ Missing challengeId or content');
+          socket.emit('error', { message: 'Missing required fields' });
           return;
         }
         

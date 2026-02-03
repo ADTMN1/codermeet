@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const DailyChallenge = require('../models/dailyChallenge');
 const DailySubmission = require('../models/dailySubmission');
 const User = require('../models/user');
@@ -340,4 +341,153 @@ async function updateRankings(challengeId) {
   await challenge.save();
 }
 
-const mongoose = require('mongoose');
+// Create new daily challenge (admin only)
+exports.createChallenge = async (req, res) => {
+  try {
+    const challengeData = req.body;
+    
+    // Set the date to today if not provided
+    if (!challengeData.date) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      challengeData.date = today;
+    }
+
+    // Check if challenge already exists for this date
+    const existingChallenge = await DailyChallenge.findOne({
+      date: challengeData.date
+    });
+
+    if (existingChallenge) {
+      return res.status(400).json({
+        success: false,
+        message: 'A challenge already exists for this date'
+      });
+    }
+
+    const challenge = new DailyChallenge(challengeData);
+    await challenge.save();
+
+    res.status(201).json({
+      success: true,
+      message: 'Daily challenge created successfully',
+      data: challenge
+    });
+  } catch (error) {
+    console.error('Error creating challenge:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error creating daily challenge',
+      error: error.message
+    });
+  }
+};
+
+// Update daily challenge (admin only)
+exports.updateChallenge = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updateData = req.body;
+
+    const challenge = await DailyChallenge.findByIdAndUpdate(
+      id,
+      updateData,
+      { new: true, runValidators: true }
+    );
+
+    if (!challenge) {
+      return res.status(404).json({
+        success: false,
+        message: 'Challenge not found'
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Challenge updated successfully',
+      data: challenge
+    });
+  } catch (error) {
+    console.error('Error updating challenge:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error updating daily challenge',
+      error: error.message
+    });
+  }
+};
+
+// Get all daily challenges (admin only)
+exports.getAllChallenges = async (req, res) => {
+  try {
+    const { page = 1, limit = 10, status = 'all' } = req.query;
+    
+    let query = {};
+    if (status === 'active') {
+      query.isActive = true;
+    } else if (status === 'inactive') {
+      query.isActive = false;
+    }
+
+    const challenges = await DailyChallenge.find(query)
+      .sort({ date: -1 })
+      .limit(limit * 1)
+      .skip((page - 1) * limit)
+      .populate('winners.userId', 'fullName username');
+
+    const total = await DailyChallenge.countDocuments(query);
+
+    // Convert Mongoose documents to plain objects to avoid circular references
+    const challengesData = challenges.map(challenge => challenge.toObject());
+
+    res.status(200).json({
+      success: true,
+      data: {
+        challenges: challengesData,
+        pagination: {
+          current: page,
+          pages: Math.ceil(total / limit),
+          total
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching challenges:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching daily challenges',
+      error: error.message
+    });
+  }
+};
+
+// Delete daily challenge (admin only)
+exports.deleteChallenge = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const challenge = await DailyChallenge.findByIdAndDelete(id);
+
+    if (!challenge) {
+      return res.status(404).json({
+        success: false,
+        message: 'Challenge not found'
+      });
+    }
+
+    // Also delete all submissions for this challenge
+    await DailySubmission.deleteMany({ challengeId: id });
+
+    res.status(200).json({
+      success: true,
+      message: 'Challenge and associated submissions deleted successfully'
+    });
+  } catch (error) {
+    console.error('Error deleting challenge:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error deleting daily challenge',
+      error: error.message
+    });
+  }
+};

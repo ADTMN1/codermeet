@@ -98,6 +98,43 @@ export interface SystemActivity {
 }
 
 export const adminService = {
+  // Admin profile methods
+  getProfile: async () => {
+    return retryRequest(async () => {
+      const response = await axios.get(`${API_URL}/api/admin/profile`, {
+        headers: getAuthHeaders(),
+      });
+      return response.data.data;
+    });
+  },
+
+  updateProfile: async (profileData: any) => {
+    return retryRequest(async () => {
+      const response = await axios.put(`${API_URL}/api/admin/profile`, profileData, {
+        headers: getAuthHeaders(),
+      });
+      return response.data;
+    });
+  },
+
+  changePassword: async (passwordData: { currentPassword: string; newPassword: string }) => {
+    return retryRequest(async () => {
+      const response = await axios.put(`${API_URL}/api/admin/change-password`, passwordData, {
+        headers: getAuthHeaders(),
+      });
+      return response.data;
+    });
+  },
+
+  toggleTwoFactor: async (enabled: boolean) => {
+    return retryRequest(async () => {
+      const response = await axios.post(`${API_URL}/api/admin/toggle-2fa`, { enabled }, {
+        headers: getAuthHeaders(),
+      });
+      return response.data;
+    });
+  },
+
   // Get all users
   getAllUsers: async (): Promise<User[]> => {
     return retryRequest(async () => {

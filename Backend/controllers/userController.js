@@ -26,7 +26,7 @@ exports.checkUser = async (req, res) => {
 // Get current logged-in user
 exports.me = async (req, res) => {
   try {
-    const user = await User.findById(req.user.id).select("-password -tokens");
+    const user = await User.findById(req.userProfile?._id || req.user?.id).select("-password -tokens");
     if (!user) return res.status(404).json({ success: false, message: "User not found" });
 
     res.status(200).json({ success: true, data: user, message: "User profile retrieved successfully" });
@@ -38,7 +38,7 @@ exports.me = async (req, res) => {
 // Update user profile
 exports.updateProfile = async (req, res) => {
   try {
-    const userId = req.user.id;
+    const userId = req.userProfile?._id || req.user?.id;
 
     const {
       name,
@@ -98,7 +98,7 @@ exports.updateProfile = async (req, res) => {
 // Update only profile picture
 exports.updateProfilePicture = async (req, res) => {
   try {
-    const userId = req.user.id;
+    const userId = req.userProfile?._id || req.user?.id;
 
     if (!req.file) return res.status(400).json({ success: false, message: "No file uploaded" });
 

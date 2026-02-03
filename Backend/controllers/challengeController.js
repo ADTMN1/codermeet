@@ -7,7 +7,7 @@ exports.createChallenge = async (req, res) => {
   try {
     const challengeData = {
       ...req.body,
-      createdBy: req.user.id
+      createdBy: req.userProfile?._id || req.user?.id
     };
 
     const challenge = new Challenge(challengeData);
@@ -52,33 +52,39 @@ exports.getAllChallenges = async (req, res) => {
     if (search) {
       query.$or = [
         { title: { $regex: search, $options: 'i' } },
-        { description: { $regex: search, $options: 'i' } },
-        { tags: { $in: [new RegExp(search, 'i')] } }
+        { description: { $regex: search, $options: 'i' } }
       ];
     }
+
+    // Convert to numbers and validate
+    const pageNum = parseInt(page) || 1;
+    const limitNum = parseInt(limit) || 10;
 
     const challenges = await Challenge.find(query)
       .populate('createdBy', 'fullName username email')
       .populate('participants.user', 'fullName username avatar')
-      .populate('submissions.userId', 'fullName username avatar')
-      .populate('prizes.winner', 'fullName username avatar')
       .sort({ createdAt: -1 })
-      .limit(limit * 1)
-      .skip((page - 1) * limit);
+      .limit(limitNum)
+      .skip((pageNum - 1) * limitNum);
 
     const total = await Challenge.countDocuments(query);
 
+    // Convert Mongoose documents to plain objects to avoid circular references
+    const challengesData = challenges.map(challenge => challenge.toObject());
+
     res.status(200).json({
       success: true,
-      data: challenges,
+      data: challengesData,
       pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
+        page: pageNum,
+        limit: limitNum,
         total,
-        pages: Math.ceil(total / limit)
+        pages: Math.ceil(total / limitNum)
       }
     });
   } catch (error) {
+    console.error('❌ DEBUG: Error in getAllChallenges:', error);
+    console.error('❌ DEBUG: Error stack:', error.stack);
     res.status(500).json({
       success: false,
       message: 'Error fetching challenges',
@@ -293,7 +299,7 @@ exports.getChallengeStats = async (req, res) => {
 exports.submitProject = async (req, res) => {
   try {
     const { id } = req.params;
-    const userId = req.user.id;
+    const userId = req.userProfile?._id || req.user?.id;
     const { githubUrl, description, files } = req.body;
 
     // Validate required fields
@@ -434,7 +440,7 @@ exports.getAllSubmissions = async (req, res) => {
 exports.getUserSubmission = async (req, res) => {
   try {
     const { id } = req.params;
-    const userId = req.user.id;
+    const userId = req.userProfile?._id || req.user?.id;
 
     const challenge = await Challenge.findById(id)
       .populate('submissions.userId', 'fullName username email avatar');
@@ -447,7 +453,10 @@ exports.getUserSubmission = async (req, res) => {
     }
 
     const submission = challenge.submissions.find(
-      sub => sub.userId._id ? sub.userId._id.toString() === userId : sub.userId.toString() === userId
+      sub => {
+        const submissionUserId = sub.userId._id ? sub.userId._id.toString() : sub.userId.toString();
+        return submissionUserId === userId.toString();
+      }
     );
 
     if (!submission) {
@@ -474,7 +483,7 @@ exports.getUserSubmission = async (req, res) => {
 exports.checkRegistration = async (req, res) => {
   try {
     const { id } = req.params;
-    const userId = req.user.id;
+    const userId = req.userProfile?._id || req.user?.id;
 
     const challenge = await Challenge.findById(id);
     if (!challenge) {
@@ -534,7 +543,7 @@ exports.reviewSubmission = async (req, res) => {
     submission.status = status;
     submission.score = score;
     submission.feedback = feedback;
-    submission.reviewedBy = req.user.id;
+    submission.reviewedBy = req.userProfile?._id || req.user?.id;
     submission.reviewedAt = new Date();
 
     await challenge.save();
@@ -653,7 +662,7 @@ exports.getChallengeSubmissions = async (req, res) => {
 exports.registerForChallenge = async (req, res) => {
   try {
     const { id } = req.params;
-    const userId = req.user.id;
+    const userId = req.userProfile?._id || req.user?.id;
 
     const challenge = await Challenge.findById(id);
     if (!challenge) {
@@ -739,7 +748,7 @@ exports.registerForChallenge = async (req, res) => {
 exports.unregisterFromChallenge = async (req, res) => {
   try {
     const { id } = req.params;
-    const userId = req.user.id;
+    const userId = req.userProfile?._id || req.user?.id;
 
     const challenge = await Challenge.findById(id);
     if (!challenge) {

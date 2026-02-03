@@ -2,8 +2,8 @@
 const express = require('express');
 const router = express.Router();
 const challengeController = require('../controllers/challengeController');
-const adminAuth = require('../middlewares/adminAuth');
-const auth = require('../middlewares/auth');
+const messageController = require('../controllers/messageController');
+const { authenticate, requirePermission } = require('../middlewares/roleBasedAuth');
 const { adminRateLimiter } = require('../middlewares/rateLimiter');
 
 // Apply rate limiting to all routes
@@ -12,29 +12,34 @@ router.use(adminRateLimiter);
 // Public routes (no admin auth required)
 router.get('/', challengeController.getAllChallenges); // Get all challenges (public)
 
-// Public stats endpoint (no auth required)
+// Admin-only routes (require admin auth)
+router.get('/admin', authenticate, requirePermission('content', 'read'), challengeController.getAllChallenges); // Admin challenge management
+router.post('/', authenticate, requirePermission('content', 'create'), challengeController.createChallenge);
+router.get('/stats', authenticate, requirePermission('content', 'read'), challengeController.getChallengeStats); // Admin stats endpoint
+router.get('/:id', challengeController.getChallengeById); // Get specific challenge
+router.put('/:id', authenticate, requirePermission('content', 'update'), challengeController.updateChallenge);
+router.delete('/:id', authenticate, requirePermission('content', 'delete'), challengeController.deleteChallenge);
+
+// Public stats endpoint (no auth required) - moved after specific routes
 router.get('/:id/stats', challengeController.getChallengeByIdStats);
 
-// Admin-only routes (require admin auth)
-router.post('/', adminAuth, challengeController.createChallenge);
-router.get('/stats', adminAuth, challengeController.getChallengeStats); // Must come before /:id
-router.get('/:id', challengeController.getChallengeById); // Get specific challenge
-router.put('/:id', adminAuth, challengeController.updateChallenge);
-router.delete('/:id', adminAuth, challengeController.deleteChallenge);
-
 // User registration routes (require auth)
-router.post('/:id/register', auth, challengeController.registerForChallenge);
-router.post('/:id/unregister', auth, challengeController.unregisterFromChallenge);
-router.get('/:id/check-registration', auth, challengeController.checkRegistration);
-router.post('/:id/submit', auth, challengeController.submitProject);
-router.get('/:id/my-submission', auth, challengeController.getUserSubmission);
+router.post('/:id/register', authenticate, challengeController.registerForChallenge);
+router.post('/:id/unregister', authenticate, challengeController.unregisterFromChallenge);
+router.get('/:id/check-registration', authenticate, challengeController.checkRegistration);
+router.post('/:id/submit', authenticate, challengeController.submitProject);
+router.get('/:id/my-submission', authenticate, challengeController.getUserSubmission);
 
 // Admin-only submission management
-router.get('/:id/submissions', adminAuth, challengeController.getChallengeSubmissions);
-router.get('/submissions/all', adminAuth, challengeController.getAllSubmissions);
-router.put('/:challengeId/submissions/:submissionId/review', adminAuth, challengeController.reviewSubmission);
+router.get('/:id/submissions', authenticate, requirePermission('content', 'read'), challengeController.getChallengeSubmissions);
+router.get('/submissions/all', authenticate, requirePermission('content', 'read'), challengeController.getAllSubmissions);
+router.put('/:challengeId/submissions/:submissionId/review', authenticate, requirePermission('content', 'update'), challengeController.reviewSubmission);
 
 // Admin-only winner selection
-router.post('/:id/select-winners', adminAuth, challengeController.selectWinners);
+router.post('/:id/select-winners', authenticate, requirePermission('content', 'manage'), challengeController.selectWinners);
+
+// Challenge discussion routes
+router.get('/:id/messages', authenticate, messageController.getMessages);
+router.post('/:id/messages', authenticate, messageController.createMessage);
 
 module.exports = router;

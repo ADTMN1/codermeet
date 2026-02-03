@@ -19,6 +19,7 @@ import { UploadSection } from '../../components/upload-section';
 import { ResourcesCard } from '../../components/resources-card';
 import { WinnersSection } from '../../components/winners-section';
 import { useUser } from '../../context/UserContext';
+import { authService } from '../../services/auth';
 
 export default function WeeklyChallenge() {
   const { user } = useUser();
@@ -39,10 +40,11 @@ export default function WeeklyChallenge() {
       if (!user || !challenge?._id) return;
       
       try {
+        const token = authService.getToken();
         const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/challenges/${challenge._id}/check-registration`, {
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': localStorage.getItem('auth_token') ? `Bearer ${localStorage.getItem('auth_token')}` : ''
+            'Authorization': token ? `Bearer ${token}` : ''
           }
         });
         
@@ -64,18 +66,21 @@ export default function WeeklyChallenge() {
       if (!user || !challenge?._id) return;
       
       try {
+        const token = authService.getToken();
+        
         const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/challenges/${challenge._id}/my-submission`, {
           headers: {
-            'Content-Type': 'application/json',
-            'Authorization': localStorage.getItem('auth_token') ? `Bearer ${localStorage.getItem('auth_token')}` : ''
+            'Authorization': token ? `Bearer ${token}` : ''
           }
         });
         
         const data = await response.json();
+        
         if (data.success) {
           setSubmission(data.data);
         }
       } catch (error) {
+        console.error('❌ Submission fetch error:', error);
         // No submission found or error
         setSubmission(null);
       }

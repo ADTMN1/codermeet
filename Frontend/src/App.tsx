@@ -1,5 +1,6 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { Toaster } from './components/ui/sonner';
 
 import Navbar from './components/layout/Public/Navbar';
 import Home from './pages/Home';
@@ -28,6 +29,7 @@ import WeeklyContestsSimple from './pages/Admin/WeeklyContestsSimple';
 import AnalyticsSimple from './pages/Admin/AnalyticsSimple';
 import AdminSettingsSimple from './pages/Admin/AdminSettingsSimple';
 import ChallengeDetail from './pages/Admin/ChallengeDetail';
+import SystemHealth from './pages/Admin/SystemHealth';
 
 function App() {
   return (
@@ -112,13 +114,14 @@ function App() {
             <Route path="challenges" element={<ChallengesHub />} />
             <Route path="challenges/:id" element={<ChallengeDetail />} />
             <Route path="submissions" element={<SubmissionsSimple />} />
-            <Route path="system" element={<SystemHealthSimple />} />
+            <Route path="system" element={<SystemHealth />} />
             <Route path="daily-challenges" element={<DailyChallengesSimple />} />
             <Route path="weekly-challenges" element={<WeeklyContestsSimple />} />
             <Route path="analytics" element={<AnalyticsSimple />} />
             <Route path="settings" element={<AdminSettingsSimple />} />
           </Route>
         </Routes>
+        <Toaster />
       </div>
     </BrowserRouter>
   );

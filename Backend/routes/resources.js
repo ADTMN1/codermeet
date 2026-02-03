@@ -8,17 +8,18 @@ const {
   deleteResource,
   toggleResource
 } = require('../controllers/resourceController');
-const auth = require('../middlewares/auth');
-const adminAuth = require('../middlewares/adminAuth');
+const { authenticate } = require('../middlewares/roleBasedAuth');
+const { adminAuth } = require('../middlewares/adminAuth');
 
 // Public routes
 router.get('/', getResources);
 
 // Admin routes
-router.get('/admin', auth, adminAuth, getAllResources);
-router.post('/', auth, adminAuth, createResource);
-router.put('/:id', auth, adminAuth, updateResource);
-router.delete('/:id', auth, adminAuth, deleteResource);
-router.patch('/:id/toggle', auth, adminAuth, toggleResource);
+router.get('/admin', authenticate, adminAuth, getAllResources);
+router.post('/', authenticate, adminAuth, createResource);
+router.put('/:id', authenticate, adminAuth, updateResource);
+router.delete('/:id', authenticate, adminAuth, deleteResource);
+router.patch('/:id/toggle', authenticate, adminAuth, toggleResource);
+
 
 module.exports = router;

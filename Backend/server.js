@@ -17,6 +17,8 @@ const paymentRoutes = require('./routes/payment');
 const resourceRoutes = require('./routes/resources');
 const messageRoutes = require('./routes/messages');
 const dailyChallengeRoutes = require('./routes/dailyChallenge');
+const twoFactorRoutes = require('./routes/twoFactor');
+const sessionRoutes = require('./routes/sessions');
 const { errorHandler } = require("./middlewares/errorHandler");
 const socketHandler = require('./socket/socketHandler');
 const uploadSecurity = require('./middleware/uploadSecurity');
@@ -154,6 +156,8 @@ app.use("/api/leaderboard", leaderboardRoutes);
 app.use("/api/payment", paymentLimiter, paymentRoutes);
 app.use("/api/resources", resourceRoutes);
 app.use("/api/daily-challenge", dailyChallengeRoutes);
+app.use("/api/2fa", twoFactorRoutes); // 2FA routes
+app.use("/api/sessions", sessionRoutes); // Session management routes
 app.use("/api/messages", messageRoutes); // Message routes (mounted at /api to handle /api/challenges/:id/messages)
 
 // Error handler

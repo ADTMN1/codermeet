@@ -154,7 +154,7 @@ exports.refreshToken = async (req, res) => {
 // Get session info
 exports.getSessionInfo = async (req, res) => {
   try {
-    const user = await User.findById(req.admin.userId).select('-password');
+    const user = await User.findById(req.userProfile._id).select('-password');
     
     if (!user || user.role !== 'admin') {
       return res.status(401).json({
@@ -190,7 +190,7 @@ exports.getSessionInfo = async (req, res) => {
 // Get admin profile
 exports.getAdminProfile = async (req, res) => {
   try {
-    const user = await User.findById(req.admin.userId).select('-password');
+    const user = await User.findById(req.userProfile._id).select('-password');
     
     if (!user) {
       return res.status(404).json({
@@ -212,8 +212,8 @@ exports.getAdminProfile = async (req, res) => {
 // Update admin profile
 exports.updateAdminProfile = async (req, res) => {
   try {
-    const { fullName, email, phone, location, bio } = req.body;
-    const userId = req.admin.userId;
+    const { fullName, email, phone, location, bio, adminProfile } = req.body;
+    const userId = req.userProfile._id;
 
     const updateData = {};
     if (fullName) updateData.fullName = fullName;
@@ -221,6 +221,14 @@ exports.updateAdminProfile = async (req, res) => {
     if (phone) updateData.phone = phone;
     if (location) updateData.location = location;
     if (bio) updateData.bio = bio;
+
+    // Handle nested adminProfile updates
+    if (adminProfile) {
+      updateData.adminProfile = {};
+      if (adminProfile.department) {
+        updateData.adminProfile.department = adminProfile.department;
+      }
+    }
 
     const user = await User.findByIdAndUpdate(
       userId,
@@ -242,7 +250,11 @@ exports.updateAdminProfile = async (req, res) => {
     });
 
   } catch (err) {
-    res.status(500).json({ success: false, message: "Server error" });
+    console.error('Admin profile update error:', err);
+    res.status(500).json({ 
+      success: false, 
+      message: err.message || "Server error" 
+    });
   }
 };
 
@@ -250,7 +262,7 @@ exports.updateAdminProfile = async (req, res) => {
 exports.changeAdminPassword = async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body;
-    const userId = req.admin.userId;
+    const userId = req.userProfile._id;
 
     if (!currentPassword || !newPassword) {
       return res.status(400).json({
@@ -303,7 +315,7 @@ exports.changeAdminPassword = async (req, res) => {
 exports.toggleTwoFactorAuth = async (req, res) => {
   try {
     const { enabled } = req.body;
-    const userId = req.admin.userId;
+    const userId = req.userProfile._id;
 
     // In a real implementation, you would set up 2FA here
     // For now, just return success
@@ -580,8 +592,7 @@ exports.updateUserPoints = async (req, res) => {
       });
     }
 
-    // Log the points update (you could create a separate model for this)
-    console.log(`Admin updated ${user.username}'s points to ${points}. Reason: ${reason || 'No reason provided'}`);
+    // Points updated successfully
 
     res.status(200).json({
       success: true,
@@ -626,8 +637,7 @@ exports.addBonusPoints = async (req, res) => {
       { new: true, runValidators: true }
     ).select('-password');
 
-    // Log the bonus points
-    console.log(`Admin added ${bonusPoints} bonus points to ${user.username}. New total: ${newPoints}. Reason: ${reason || 'No reason provided'}`);
+    // Bonus points added successfully
 
     res.status(200).json({
       success: true,
@@ -733,7 +743,7 @@ exports.resetLeaderboard = async (req, res) => {
       }
     );
 
-    console.log(`Admin reset leaderboard for ${result.modifiedCount} users`);
+    // Leaderboard reset completed
 
     res.status(200).json({
       success: true,
@@ -778,6 +788,109 @@ exports.getSystemHealth = async (req, res) => {
         },
         timestamp: new Date().toISOString(),
       },
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+// Promote user to admin
+exports.promoteToAdmin = async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ 
+        success: false, 
+        message: "User not found" 
+      });
+    }
+
+    // Promote to admin
+    user.role = 'admin';
+    user.plan = 'Premium';
+    user.isProfessional = true;
+    user.setDefaultPermissions();
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: "User promoted to admin successfully",
+      data: {
+        user: {
+          _id: user._id,
+          fullName: user.fullName,
+          email: user.email,
+          username: user.username,
+          role: user.role,
+          plan: user.plan
+        }
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+// Demote admin to user
+exports.demoteFromAdmin = async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ 
+        success: false, 
+        message: "User not found" 
+      });
+    }
+
+    // Don't allow demoting the last admin
+    const adminCount = await User.countDocuments({ role: 'admin' });
+    if (adminCount <= 1) {
+      return res.status(400).json({ 
+        success: false, 
+        message: "Cannot demote the last admin user" 
+      });
+    }
+
+    // Demote to trial user
+    user.role = 'trial';
+    user.plan = 'Trial';
+    user.isProfessional = false;
+    user.permissions = [];
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Admin demoted to regular user successfully",
+      data: {
+        user: {
+          _id: user._id,
+          fullName: user.fullName,
+          email: user.email,
+          username: user.username,
+          role: user.role,
+          plan: user.plan
+        }
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+// Get all admin users
+exports.getAdminUsers = async (req, res) => {
+  try {
+    const admins = await User.find({ role: 'admin' })
+      .select('-password')
+      .sort({ createdAt: -1 });
+
+    res.status(200).json({
+      success: true,
+      data: admins,
     });
   } catch (err) {
     res.status(500).json({ success: false, message: "Server error" });

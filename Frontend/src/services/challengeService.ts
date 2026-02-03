@@ -146,7 +146,7 @@ export const challengeService = {
     search?: string;
   }): Promise<{ data: Challenge[]; pagination: any }> => {
     return retryRequest(async () => {
-      const response = await axios.get(`${API_URL}/api/admin/challenges`, {
+      const response = await axios.get(`${API_URL}/api/admin/challenges/admin`, {
         params,
         headers: getAuthHeaders(),
       });
