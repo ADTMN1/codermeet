@@ -3,23 +3,65 @@ const DailyChallenge = require('../models/dailyChallenge');
 const DailySubmission = require('../models/dailySubmission');
 const User = require('../models/user');
 
+// Helper function to get next challenge time
+function getNextChallengeTime() {
+  const now = new Date();
+  const tomorrow = new Date(now);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  tomorrow.setHours(0, 0, 0, 0);
+  
+  const timeUntilNext = tomorrow.getTime() - now.getTime();
+  const hours = Math.floor(timeUntilNext / (1000 * 60 * 60));
+  const minutes = Math.floor((timeUntilNext % (1000 * 60 * 60)) / (1000 * 60));
+  
+  return {
+    nextChallengeDate: tomorrow.toISOString(),
+    timeRemaining: {
+      hours,
+      minutes,
+      totalMilliseconds: timeUntilNext
+    }
+  };
+}
+
 // Get today's daily challenge
 exports.getTodayChallenge = async (req, res) => {
   try {
+    // Create today's date range in local timezone
     const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
+    
+    console.log('API looking for challenge between:', startOfDay.toISOString(), 'and', endOfDay.toISOString());
     
     const challenge = await DailyChallenge.findOne({
-      date: today,
+      date: {
+        $gte: startOfDay,
+        $lt: endOfDay
+      },
       isActive: true
     }).populate('winners.userId', 'fullName username avatar');
 
     if (!challenge) {
-      return res.status(404).json({
-        success: false,
-        message: 'No daily challenge available today'
+      return res.status(200).json({
+        success: true,
+        data: {
+          challenge: null,
+          message: 'No daily challenge available today. Please check back tomorrow for a new coding challenge!',
+          nextChallengeTime: getNextChallengeTime(),
+          userSubmission: null,
+          hasSubmitted: false,
+          userStats: req.user ? {
+            totalSolved: 0,
+            bestScore: 0,
+            prizesWon: 0,
+            currentStreak: 0
+          } : null
+        }
       });
     }
+
+    console.log('✅ Found challenge:', challenge.title);
 
     // Check if user has already submitted (only if user is authenticated)
     let userSubmission = null;
@@ -138,18 +180,35 @@ exports.submitSolution = async (req, res) => {
 // Get daily leaderboard
 exports.getDailyLeaderboard = async (req, res) => {
   try {
+    // Create today's date range in local timezone
     const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
 
     const challenge = await DailyChallenge.findOne({
-      date: today,
+      date: {
+        $gte: startOfDay,
+        $lt: endOfDay
+      },
       isActive: true
     });
 
     if (!challenge) {
-      return res.status(404).json({
-        success: false,
-        message: 'No daily challenge available'
+      return res.status(200).json({
+        success: true,
+        data: {
+          leaderboard: [],
+          message: 'No daily challenge available today. Leaderboard will be available when a new challenge is posted.',
+          nextChallengeTime: getNextChallengeTime(),
+          challenge: {
+            title: 'No Active Challenge',
+            prizes: {
+              first: { amount: 0, type: 'mobile_card', currency: 'ETB' },
+              second: { amount: 0, type: 'mobile_card', currency: 'ETB' },
+              third: { amount: 0, type: 'mobile_card', currency: 'ETB' }
+            }
+          }
+        }
       });
     }
 
@@ -182,6 +241,7 @@ exports.getDailyLeaderboard = async (req, res) => {
       }
     });
   } catch (error) {
+    console.error('Error fetching leaderboard:', error);
     res.status(500).json({
       success: false,
       message: 'Error fetching leaderboard',

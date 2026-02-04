@@ -485,25 +485,37 @@ export default function DailyCoding() {
                 <div className="flex items-center justify-between">
                   <div>
                     <div className="text-white font-medium">Correctness</div>
-                    <div className="text-xs text-slate-400">{challenge.scoringCriteria.correctness.description}</div>
+                    <div className="text-xs text-slate-400">
+                      {challenge.scoringCriteria?.correctness?.description || 'Code correctness and accuracy'}
+                    </div>
                   </div>
-                  <div className="text-blue-400 font-bold">{Math.round(challenge.scoringCriteria.correctness.weight * 100)}%</div>
+                  <div className="text-blue-400 font-bold">
+                    {Math.round((challenge.scoringCriteria?.correctness?.weight || 0.6) * 100)}%
+                  </div>
                 </div>
                 
                 <div className="flex items-center justify-between">
                   <div>
                     <div className="text-white font-medium">Speed</div>
-                    <div className="text-xs text-slate-400">{challenge.scoringCriteria.speed.description}</div>
+                    <div className="text-xs text-slate-400">
+                      {challenge.scoringCriteria?.speed?.description || 'Execution speed and efficiency'}
+                    </div>
                   </div>
-                  <div className="text-green-400 font-bold">{Math.round(challenge.scoringCriteria.speed.weight * 100)}%</div>
+                  <div className="text-green-400 font-bold">
+                    {Math.round((challenge.scoringCriteria?.speed?.weight || 0.2) * 100)}%
+                  </div>
                 </div>
                 
                 <div className="flex items-center justify-between">
                   <div>
                     <div className="text-white font-medium">Efficiency</div>
-                    <div className="text-xs text-slate-400">{challenge.scoringCriteria.efficiency.description}</div>
+                    <div className="text-xs text-slate-400">
+                      {challenge.scoringCriteria?.efficiency?.description || 'Memory usage and optimization'}
+                    </div>
                   </div>
-                  <div className="text-purple-400 font-bold">{Math.round(challenge.scoringCriteria.efficiency.weight * 100)}%</div>
+                  <div className="text-purple-400 font-bold">
+                    {Math.round((challenge.scoringCriteria?.efficiency?.weight || 0.2) * 100)}%
+                  </div>
                 </div>
               </div>
             </div>
