@@ -64,7 +64,6 @@ class MessageService {
       
       return response.data;
     } catch (error: any) {
-      console.error('❌ MessageService error:', error.response?.status, error.response?.data);
       throw new Error(error.response?.data?.message || 'Failed to fetch messages');
     }
   }

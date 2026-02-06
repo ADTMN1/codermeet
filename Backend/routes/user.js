@@ -39,6 +39,9 @@ const checkUserLimiter = rateLimit({
 // Get current logged-in user
 router.get("/me", authMiddleware, userController.me);
 
+// Get user's projects
+router.get("/projects", authMiddleware, userController.getUserProjects);
+
 // Update full profile (with optional avatar)
 router.put(
   "/profile",

@@ -18,6 +18,7 @@ import BusinessIdeaCompetition from './pages/Dashboard/BusinessIdeaCompetition';
 import MentorshipDashboard from './pages/MentorshipDashboard/MentorshipDashboard';
 import Pricing from './pages/Pricing';
 import PaymentSuccess from './pages/PaymentSuccess';
+import ViewProjects from './pages/Projects/ViewProjects';
 import AdminLayout from './components/layout/Admin/AdminLayout';
 import AdminRoute from './components/AdminRoute';
 import AdminDashboard from './pages/Admin/AdminDashboard';
@@ -100,6 +101,7 @@ function App() {
             <Route path="business-competition" element={<BusinessIdeaCompetition />} />
             <Route path="mentorship-dashboard" element={<MentorshipDashboard />} />
             <Route path="profile" element={<Profile />} />
+            <Route path="projects" element={<ViewProjects />} />
 
             {/* Optional: Redirect root to dashboard */}
             <Route path="" element={<Dashboard />} />

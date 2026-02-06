@@ -419,6 +419,7 @@ const Dashboard: React.FC = () => {
 
             <button
               type="button"
+              onClick={() => navigate('/projects')}
               className="text-heading bg-neutral-primary box-border border border-transparent hover:bg-neutral-secondary-medium focus:ring-4 focus:ring-neutral-tertiary-soft font-medium leading-5 rounded-full text-sm px-4 py-2.5 focus:outline-none cursor-pointer hover:shadow-[0_0_15px_#C27AFF] shadow-md transition"
             >
               View Projects

@@ -74,15 +74,15 @@ class AuditService {
           AuditLog.logAction(logData).then(log => {
             resolve(log);
           }).catch(error => {
-            console.error('Audit logging failed:', error);
-            resolve(null);
+            // Audit logging failed - continue without logging
+            return null;
           });
           
           originalSend.call(this, data);
         };
       });
     } catch (error) {
-      console.error('Audit service error:', error);
+      // Audit service error - continue without logging
       return null;
     }
   }

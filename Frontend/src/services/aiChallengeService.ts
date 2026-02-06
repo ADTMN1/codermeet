@@ -79,9 +79,8 @@ class AIChallengeService {
       }
       
       return data;
-    } catch (error) {
-      console.error('Error generating challenge:', error);
-      throw error;
+    } catch (error: any) {
+      throw new Error(error.response?.data?.message || 'Failed to generate challenge');
     }
   }
 
@@ -105,9 +104,8 @@ class AIChallengeService {
       }
       
       return data;
-    } catch (error) {
-      console.error('Error generating and creating challenge:', error);
-      throw error;
+    } catch (error: any) {
+      throw new Error(error.response?.data?.message || 'Failed to generate and create challenge');
     }
   }
 

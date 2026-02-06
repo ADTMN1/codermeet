@@ -79,17 +79,7 @@ class FreeAIExecutor {
           }
         });
       } catch (error) {
-        console.error('Gemini API Error:', error);
-        results.push({
-          testCaseIndex: testCase.index || 0,
-          input: testCase.input,
-          expectedOutput: testCase.expectedOutput,
-          actualOutput: 'AI evaluation failed',
-          passed: false,
-          executionTime: 0,
-          memoryUsage: 0,
-          error: error.message
-        });
+        throw new Error(`AI evaluation failed: ${error.message}`);
       }
     }
 
@@ -156,7 +146,7 @@ class FreeAIExecutor {
           }
         });
       } catch (error) {
-        console.error('HuggingFace API Error:', error);
+        // HuggingFace API error handling
         results.push({
           testCaseIndex: testCase.index || 0,
           input: testCase.input,
@@ -235,7 +225,7 @@ class FreeAIExecutor {
           }
         });
       } catch (error) {
-        console.error('Groq API Error:', error);
+        // Groq API error handling
         results.push({
           testCaseIndex: testCase.index || 0,
           input: testCase.input,

@@ -80,7 +80,6 @@ class SubmissionService {
         return null;
       }
       // For other errors, log and rethrow
-      console.error('Error fetching submission:', error.response?.data?.message || error.message);
       throw new Error(error.response?.data?.message || 'Failed to fetch submission');
     }
   }

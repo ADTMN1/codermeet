@@ -94,7 +94,6 @@ Return the response in this exact JSON format:
       // Build prompt
       const prompt = this.buildChallengePrompt(difficulty, category, timeLimit, maxPoints, topic);
       
-      console.log('📝 Calling Groq API...');
       const apiStartTime = Date.now();
       
       const response = await this.groq.chat.completions.create({
@@ -115,24 +114,19 @@ Return the response in this exact JSON format:
       });
 
       const apiEndTime = Date.now();
-      console.log(`⚡ Groq API took ${apiEndTime - apiStartTime}ms`);
 
       const content = response.choices[0].message.content;
-      console.log('📊 Parsing AI response...');
       
       const parseStartTime = Date.now();
       const challengeData = this.parseChallengeResponse(content, difficulty, category, timeLimit, maxPoints);
       
       const parseEndTime = Date.now();
-      console.log(`⚡ Parsing took ${parseEndTime - parseStartTime}ms`);
       
       const totalTime = Date.now() - startTime;
-      console.log(`🎯 Total generation time: ${totalTime}ms`);
       
       return challengeData;
     } catch (error) {
       const totalTime = Date.now() - startTime;
-      console.error(`❌ Generation failed after ${totalTime}ms:`, error.message);
       throw new Error(`Failed to generate challenge: ${error.message}`);
     }
   }
@@ -179,51 +173,7 @@ Return the response in this exact JSON format:
       
       return challengeData;
     } catch (error) {
-      console.error('Error parsing AI response:', error);
-      console.error('Raw content:', content);
-      
-      // Return fallback challenge data
-      return {
-        title: "Algorithm Challenge",
-        description: "Solve this algorithmic problem efficiently.",
-        difficulty,
-        category,
-        timeLimit,
-        maxPoints,
-        hint: "Think about the optimal approach",
-        examples: [
-          {
-            input: "sample input",
-            output: "sample output",
-            explanation: "Sample explanation"
-          }
-        ],
-        constraints: [
-          "Time complexity should be optimal",
-          "Handle edge cases"
-        ],
-        testCases: [
-          {
-            input: "test input",
-            expectedOutput: "test output",
-            weight: 1
-          }
-        ],
-        scoringCriteria: {
-          correctness: { weight: 0.6, description: "All test cases pass correctly" },
-          speed: { weight: 0.2, description: "Efficient time complexity implementation" },
-          efficiency: { weight: 0.2, description: "Optimal space complexity" }
-        },
-        prizes: [
-          {
-            rank: 1,
-            points: maxPoints,
-            description: "First place prize"
-          }
-        ],
-        tags: [category.toLowerCase(), difficulty.toLowerCase()],
-        solutionApproach: "Use an efficient algorithm to solve this problem"
-      };
+      throw new Error(`Failed to parse AI response: ${error.message}`);
     }
   }
 
@@ -399,205 +349,52 @@ Return the response in this exact JSON format:
         weeklyChallenges
       };
     } catch (error) {
-      console.error('Error getting weekly schedule:', error);
-      throw new Error(`Failed to get weekly schedule: ${error.message}`);
-    }
-  }
-
-  // Bulk register challenges with preferences
-  async bulkRegisterChallenges(startDate, preferences = {}) {
-    try {
-      const { 
-        difficulties = ['Easy', 'Medium', 'Hard'],
-        categories = ['Algorithms', 'Data Structures', 'Strings', 'Arrays', 'Trees'],
-        timeLimit = 30,
-        maxPoints = 100,
-        skipReserved = true,
-        notifyOnSkip = true
-      } = preferences;
-      
-      const weeklySchedule = await this.getWeeklySchedule(startDate, preferences);
-      
-      if (weeklySchedule.isFullyBooked) {
-        return {
-          success: false,
-          message: 'Week is fully booked. No available dates.',
-          schedule: weeklySchedule
-        };
-      }
-      
-      const registeredChallenges = [];
-      const skippedDates = [];
-      const notifications = [];
-      
-      for (const availableDate of weeklySchedule.availableDates) {
-        try {
-          const challengeData = await this.generateDailyChallenge({
-            difficulty: difficulties[registeredChallenges.length % difficulties.length],
-            category: categories[registeredChallenges.length % categories.length],
-            timeLimit,
-            maxPoints
-          });
-          
-          const savedChallenge = await this.createChallengeInDatabase(challengeData, availableDate.date);
-          registeredChallenges.push(savedChallenge);
-          
-          notifications.push({
-            type: 'success',
-            message: `Challenge registered for ${availableDate.dayName}, ${availableDate.month} ${availableDate.day}`,
-            date: availableDate.date,
-            challenge: savedChallenge.title
-          });
-          
-        } catch (error) {
-          console.error(`Failed to register challenge for ${availableDate.date}:`, error);
-          skippedDates.push({
-            date: availableDate.date,
-            reason: error.message,
-            dateInfo: availableDate
-          });
-          
-          if (notifyOnSkip) {
-            notifications.push({
-              type: 'warning',
-              message: `Failed to register challenge for ${availableDate.dayName}: ${error.message}`,
-              date: availableDate.date,
-              error: error.message
-            });
-          }
-        }
-      }
-      
-      // Check if next week needs attention
-      const nextWeek = new Date(startDate);
-      nextWeek.setDate(startDate.getDate() + 7);
-      const nextWeekSchedule = await this.getWeeklySchedule(nextWeek);
-      
-      if (nextWeekSchedule.availableCount > 3) {
-        notifications.push({
-          type: 'alert',
-          message: `Next week has ${nextWeekSchedule.availableCount} available dates. Consider scheduling challenges.`,
-          week: 'next',
-          availableCount: nextWeekSchedule.availableCount
-        });
-      }
-      
       return {
-        success: true,
-        message: `Successfully registered ${registeredChallenges.length} challenges`,
-        registeredChallenges,
-        skippedDates,
-        notifications,
-        schedule: weeklySchedule,
-        nextWeekSchedule
+        success: false,
+        error: error.message,
+        weeklyChallenges: []
       };
-    } catch (error) {
-      console.error('Error in bulk registration:', error);
-      throw new Error(`Failed bulk registration: ${error.message}`);
     }
   }
 
-  // Generate weekly challenges
-  async generateWeeklyChallenges(startDate, difficulties = ['Easy', 'Medium', 'Hard']) {
+  // Generate challenge for specific date
+  async generateChallengeForDate(date, options = {}) {
+    const {
+      timeLimit = 30,
+      maxPoints = 100,
+      difficulties = ['Easy', 'Medium', 'Hard'],
+      categories = ['Algorithms', 'Data Structures', 'Problem Solving']
+    } = options;
+
     try {
-      console.log('🗓️ Debug - Service: Starting weekly challenges generation...');
-      console.log('📅 Debug - Service: Start date:', startDate.toDateString());
-      console.log('🎯 Debug - Service: Difficulties:', difficulties);
+      const difficulty = difficulties[Math.floor(Math.random() * difficulties.length)];
+      const category = categories[Math.floor(Math.random() * categories.length)];
       
-      const challenges = [];
+      const challengeData = await this.generateChallenge(difficulty, category, timeLimit, maxPoints);
       
-      for (let i = 0; i < 7; i++) {
-        const date = new Date(startDate);
-        date.setDate(startDate.getDate() + i);
-        
-        console.log(`📅 Debug - Service: Day ${i + 1}: ${date.toDateString()}`);
-        
-        const difficulty = difficulties[i % difficulties.length];
-        console.log(`🎯 Debug - Service: Using difficulty: ${difficulty}`);
-        
-        try {
-          console.log('🚀 Debug - Service: Generating daily challenge...');
-          const challengeData = await this.generateDailyChallenge({
-            difficulty,
-            category: 'Mixed',
-            timeLimit: 30,
-            maxPoints: 100
-          });
-          
-          console.log(`✅ Debug - Service: Generated challenge: ${challengeData.title}`);
-          
-          console.log('💾 Debug - Service: Saving challenge to database...');
-          const savedChallenge = await this.createChallengeInDatabase(challengeData, date);
-          challenges.push(savedChallenge);
-          
-          console.log(`💾 Debug - Service: Saved challenge for ${date.toDateString()}`);
-          
-        } catch (error) {
-          console.error(`❌ Debug - Service: Failed to generate challenge for day ${i + 1}:`, error.message);
-          console.error(`❌ Debug - Service: Error stack:`, error.stack);
-          // Continue with next day instead of failing completely
-        }
+      if (challengeData.success) {
+        const savedChallenge = await this.createChallengeInDatabase(challengeData.data, date);
+        return savedChallenge;
+      } else {
+        throw new Error('Failed to generate challenge');
       }
-      
-      console.log(`🎉 Debug - Service: Weekly generation complete: ${challenges.length}/7 challenges created`);
-      return challenges;
-      
     } catch (error) {
-      console.error('🚨 Debug - Service: Error in generateWeeklyChallenges:', error);
-      console.error('🚨 Debug - Service: Error stack:', error.stack);
-      throw error;
+      throw new Error(`Failed to generate challenge for date: ${error.message}`);
     }
-  }
-
-  // Auto-generate challenges for next N days
-  async autoGenerateChallenges(daysAhead = 7) {
-    const challenges = [];
-    
-    for (let i = 1; i <= daysAhead; i++) {
-      const date = new Date();
-      date.setDate(date.getDate() + i);
-      
-      const challengeData = await this.generateDailyChallenge({
-        difficulty: 'Medium',
-        category: 'Algorithms',
-        timeLimit: 30,
-        maxPoints: 100
-      });
-      
-      const savedChallenge = await this.createChallengeInDatabase(challengeData, date);
-      challenges.push(savedChallenge);
-    }
-    
-    return challenges;
   }
 
   // Generate topic-specific challenge
   async generateTopicChallenge(topic, options = {}) {
-    const challengeData = await this.generateDailyChallenge({
-      ...options,
-      topic
-    });
-    
-    return await this.createChallengeInDatabase(challengeData);
-  }
-
-  // Bulk generate challenges
-  async bulkGenerate(startDate, endDate, options = {}) {
-    const challenges = [];
-    const start = new Date(startDate);
-    const end = new Date(endDate);
-    const days = Math.ceil((end - start) / (1000 * 60 * 60 * 24));
-    
-    for (let i = 0; i < days; i++) {
-      const date = new Date(start);
-      date.setDate(start.getDate() + i);
+    try {
+      const challengeData = await this.generateDailyChallenge({
+        ...options,
+        topic
+      });
       
-      const challengeData = await this.generateDailyChallenge(options);
-      const savedChallenge = await this.createChallengeInDatabase(challengeData, date);
-      challenges.push(savedChallenge);
+      return await this.createChallengeInDatabase(challengeData);
+    } catch (error) {
+      throw new Error(`Failed to generate topic challenge: ${error.message}`);
     }
-    
-    return challenges;
   }
 }
 

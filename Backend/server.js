@@ -39,9 +39,6 @@ const io = socketIo(server, {
   }
 });
 
-// Initialize socket handlers
-socketHandler(io);
-
 const PORT = process.env.PORT || 5000;
 
 // Connect DB

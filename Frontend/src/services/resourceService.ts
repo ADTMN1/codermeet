@@ -32,7 +32,6 @@ class ResourceService {
       const response = await axios.get(`${API_URL}/resources`);
       return response.data;
     } catch (error: any) {
-      console.error('Error fetching resources:', error);
       throw new Error(error.response?.data?.message || 'Failed to fetch resources');
     }
   }
@@ -45,8 +44,7 @@ class ResourceService {
       });
       return response.data;
     } catch (error: any) {
-      console.error('Error fetching all resources:', error);
-      throw new Error(error.response?.data?.message || 'Failed to fetch resources');
+      throw new Error(error.response?.data?.message || 'Failed to fetch all resources');
     }
   }
 
@@ -58,7 +56,6 @@ class ResourceService {
       });
       return response.data;
     } catch (error: any) {
-      console.error('Error creating resource:', error);
       throw new Error(error.response?.data?.message || 'Failed to create resource');
     }
   }
@@ -71,7 +68,6 @@ class ResourceService {
       });
       return response.data;
     } catch (error: any) {
-      console.error('Error updating resource:', error);
       throw new Error(error.response?.data?.message || 'Failed to update resource');
     }
   }
@@ -83,7 +79,6 @@ class ResourceService {
         headers: getAuthHeaders()
       });
     } catch (error: any) {
-      console.error('Error deleting resource:', error);
       throw new Error(error.response?.data?.message || 'Failed to delete resource');
     }
   }
@@ -96,7 +91,6 @@ class ResourceService {
       });
       return response.data;
     } catch (error: any) {
-      console.error('Error toggling resource:', error);
       throw new Error(error.response?.data?.message || 'Failed to toggle resource');
     }
   }
