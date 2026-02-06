@@ -39,7 +39,11 @@ import {
   X,
   Home,
   MessageSquare,
-  HelpCircle
+  HelpCircle,
+  Brain,
+  Sparkles,
+  RefreshCw,
+  CalendarDays
 } from 'lucide-react';
 import { adminService, User, UserStats, SystemHealth, SystemActivity } from '../../services/adminService';
 import { challengeService, Challenge, ChallengeStats } from '../../services/challengeService';
@@ -655,10 +659,10 @@ const AdminDashboard: React.FC = () => {
               <Button
                 onClick={() => navigate('/admin/daily-challenges')}
                 variant="outline"
-                className="border-green-600 text-green-400 hover:bg-green-600/10"
+                className="border-purple-600 text-purple-400 hover:bg-purple-600/10"
               >
                 <Calendar className="w-4 h-4 mr-2" />
-                Daily Challenges
+                AI Daily Challenges
               </Button>
               <Button
                 onClick={() => navigate('/admin/weekly-challenges')}
@@ -674,6 +678,13 @@ const AdminDashboard: React.FC = () => {
               >
                 <Plus className="w-4 h-4 mr-2" />
                 Create Challenge
+              </Button>
+              <Button
+                onClick={() => navigate('/admin/ai-daily-challenges')}
+                className="bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white"
+              >
+                <Brain className="w-4 h-4 mr-2" />
+                AI Generate
               </Button>
             </div>
           </div>

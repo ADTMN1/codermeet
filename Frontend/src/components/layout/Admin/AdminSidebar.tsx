@@ -14,7 +14,8 @@ import {
   Menu,
   X,
   Home,
-  Shield
+  Shield,
+  Lightbulb
 } from 'lucide-react';
 
 const AdminSidebar: React.FC = () => {
@@ -89,6 +90,13 @@ const AdminSidebar: React.FC = () => {
       icon: <BarChart3 className="w-5 h-5" />,
       description: 'Data & insights',
       path: '/admin/analytics'
+    },
+    { 
+      id: 'business-ideas', 
+      label: 'Business Ideas', 
+      icon: <Lightbulb className="w-5 h-5" />,
+      description: 'Review competition entries',
+      path: '/admin/business-ideas'
     },
     { 
       id: 'settings', 

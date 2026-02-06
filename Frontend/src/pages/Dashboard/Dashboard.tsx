@@ -11,8 +11,10 @@ import {
   FaChartLine,
   FaMedal,
   FaAward,
-  FaCheckCircle
+  FaCheckCircle,
+  FaLightbulb
 } from 'react-icons/fa';
+
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useUser } from '../../context/UserContext';
 import { authService } from '../../services/auth';
@@ -40,6 +42,7 @@ const Dashboard: React.FC = () => {
     rank: 0,
     totalUsers: 0,
   });
+  const [mentorshipSession, setMentorshipSession] = useState<any>(null);
 
   // Check for payment success in URL and recent payment completion
   useEffect(() => {
@@ -108,10 +111,15 @@ const Dashboard: React.FC = () => {
       try {
         const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
         
-        // Fetch leaderboard data
-        const [leaderboardRes, statsRes] = await Promise.all([
+        // Fetch leaderboard data, stats, and mentorship session
+        const [leaderboardRes, statsRes, mentorshipRes] = await Promise.all([
           axios.get(`${API_BASE_URL}/api/leaderboard`),
           axios.get(`${API_BASE_URL}/api/users/${user._id}/stats`, {
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+            }
+          }),
+          axios.get(`${API_BASE_URL}/api/mentorship/upcoming`, {
             headers: {
               'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
             }
@@ -120,6 +128,9 @@ const Dashboard: React.FC = () => {
         
         setLeaderboard(leaderboardRes.data);
         setStats(statsRes.data);
+        if (mentorshipRes.data.success) {
+          setMentorshipSession(mentorshipRes.data.data);
+        }
         
       } catch (error) {
         // Fallback to sample data if API fails
@@ -158,6 +169,18 @@ const Dashboard: React.FC = () => {
       return;
     }
     navigate('/daily-challenge');
+  };
+
+  const handleMentorshipAction = () => {
+    if (mentorshipSession) {
+      // Join existing session
+      alert(`Joining session: ${mentorshipSession.topic} with ${mentorshipSession.mentor.username}`);
+      // In a real app, this would navigate to a video call or session page
+      // navigate(`/mentorship/session/${mentorshipSession.id}`);
+    } else {
+      // Navigate to mentorship dashboard
+      navigate('/mentorship-dashboard');
+    }
   };
 
   const getPlanBadge = (plan?: string) => {
@@ -428,18 +451,32 @@ const Dashboard: React.FC = () => {
               <FaCode className="text-yellow-400 w-6 h-6" />
               <h2 className="text-xl font-bold text-white">Mentorship</h2>
             </div>
-            <div className="flex">
-              <p className="text-gray-400 mb-2">
-                Upcoming session: JavaScript Debugging
-              </p>
-              <p className="text-gray-500 mb-4">Mentor: @ExpertDev</p>
-            </div>
+            {mentorshipSession ? (
+              <div>
+                <p className="text-gray-400 mb-2">
+                  Upcoming session: {mentorshipSession.topic}
+                </p>
+                <p className="text-gray-500 mb-4">
+                  Mentor: {mentorshipSession.mentor.username}
+                </p>
+              </div>
+            ) : (
+              <div>
+                <p className="text-gray-400 mb-2">
+                  No upcoming sessions
+                </p>
+                <p className="text-gray-500 mb-4">
+                  Book a session with a mentor
+                </p>
+              </div>
+            )}
 
             <button
               type="button"
+              onClick={handleMentorshipAction}
               className="text-heading bg-neutral-primary box-border border border-transparent hover:bg-neutral-secondary-medium focus:ring-4 focus:ring-neutral-tertiary-soft font-medium leading-5 rounded-full text-sm px-4 py-2.5 focus:outline-none cursor-pointer hover:shadow-[0_0_15px_#C27AFF] shadow-md transition"
             >
-              Join Session
+              {mentorshipSession ? 'Join Session' : 'Book Session'}
             </button>
           </div>
 
@@ -467,18 +504,24 @@ const Dashboard: React.FC = () => {
             </button>
           </div>
 
-          {/* Notifications */}
-          <div className="bg-gray-800 p-6 rounded-xl shadow-lg border border-gray-700 hover:shadow-red-400/30 transition">
+          {/* Business Idea Competition */}
+          <div className="bg-gray-800 p-6 rounded-xl shadow-lg border border-gray-700 hover:shadow-orange-500/30 transition">
             <div className="flex items-center gap-3 mb-4">
-              <FaBell className="text-red-400 w-6 h-6" />
-              <h2 className="text-xl font-bold text-white">Notifications</h2>
+              <FaLightbulb className="text-orange-400 w-6 h-6" />
+              <h2 className="text-xl font-bold text-white">Business Idea Competition</h2>
             </div>
-            <ul className="text-gray-300 space-y-2 text-sm">
-              <li>New vote on your project!</li>
-              <li>@Selam joined your team</li>
-              <li>Challenge deadline approaching</li>
-              <li>Mentor session starts in 1h</li>
-            </ul>
+            <p className="text-gray-400 mb-2">Submit your innovative startup idea</p>
+            <p className="text-gray-500 mb-4">Deadline: Dec 15, 2025</p>
+            <p className="text-orange-400 font-semibold mb-4">
+              Grand Prize: 5000 Birr + Mentorship
+            </p>
+            <button
+              type="button"
+              onClick={() => navigate('/business-competition')}
+              className="text-heading bg-neutral-primary box-border border border-transparent hover:bg-neutral-secondary-medium focus:ring-4 focus:ring-neutral-tertiary-soft font-medium leading-5 rounded-full text-sm px-4 py-2.5 focus:outline-none cursor-pointer hover:shadow-[0_0_15px_#FF8C00] shadow-md transition"
+            >
+              Submit Idea
+            </button>
           </div>
 
           {/* Earnings / Rewards */}

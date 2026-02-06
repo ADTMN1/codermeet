@@ -317,49 +317,150 @@ exports.getUserDailyStats = async (req, res) => {
 
 // Helper functions
 async function executeCode(code, testCases) {
-  // Mock code execution - replace with actual code runner
-  return testCases.map((testCase, index) => ({
-    testCaseIndex: index,
-    passed: Math.random() > 0.3, // Mock 70% pass rate
-    input: testCase.input,
-    expectedOutput: testCase.expectedOutput,
-    actualOutput: testCase.expectedOutput, // Mock correct output
-    executionTime: Math.random() * 100,
-    memoryUsage: Math.random() * 50
-  }));
+  const CodeExecutor = require('../services/codeExecutor');
+  const executor = new CodeExecutor();
+  
+  // Choose your execution method:
+  // 1. Judge0 CE (Free, 100 requests/hour)
+  // return await executor.executeWithJudge0(code, 'javascript', testCases);
+  
+  // 2. Docker Container (Self-hosted, Full control)
+  // return await executor.executeWithDocker(code, 'javascript', testCases);
+  
+  // 3. AI Evaluation (Advanced, requires OpenAI API key)
+  // return await executor.evaluateWithAI(code, challengeDescription, testCases);
+  
+  // For now, keep the mock implementation
+  return testCases.map((testCase, index) => {
+    // Simulate different execution scenarios based on code complexity
+    const codeComplexity = estimateCodeComplexity(code);
+    const baseTime = 50 + (codeComplexity * 10); // Base execution time
+    const baseMemory = 10 + (codeComplexity * 5); // Base memory usage
+    
+    // Add some randomness to simulate real execution variations
+    const timeVariation = Math.random() * 0.3 - 0.15; // ±15% variation
+    const memoryVariation = Math.random() * 0.2 - 0.1; // ±10% variation
+    
+    const executionTime = Math.max(1, baseTime * (1 + timeVariation));
+    const memoryUsage = Math.max(1, baseMemory * (1 + memoryVariation));
+    
+    // Simulate pass/fail based on code quality (mock logic)
+    const passProbability = Math.min(0.95, 0.7 + (code.length / 1000)); // Longer code = higher chance of passing
+    const passed = Math.random() < passProbability;
+    
+    return {
+      testCaseIndex: index,
+      input: testCase.input,
+      expectedOutput: testCase.expectedOutput,
+      actualOutput: passed ? testCase.expectedOutput : `Incorrect output for test ${index + 1}`,
+      passed,
+      executionTime: Math.round(executionTime),
+      memoryUsage: Math.round(memoryUsage),
+      error: passed ? null : `Test case ${index + 1} failed`,
+      timestamp: new Date().toISOString()
+    };
+  });
+}
+
+// Estimate code complexity (mock algorithm)
+function estimateCodeComplexity(code) {
+  if (!code) return 1;
+  
+  const complexityFactors = {
+    loops: (code.match(/\b(for|while|do)\b/g) || []).length * 2,
+    conditionals: (code.match(/\b(if|else|switch|case)\b/g) || []).length,
+    functions: (code.match(/\bfunction\b|\w+\s*\(/g) || []).length,
+    recursion: (code.match(/function.*\w+\s*\([^)]*\).*\1/g) || []).length * 3,
+    arrays: (code.match(/\[\]|\.push|\.pop|\.map|\.filter|\.reduce/g) || []).length
+  };
+  
+  const totalComplexity = Object.values(complexityFactors).reduce((sum, count) => sum + count, 0);
+  return Math.max(1, Math.min(10, totalComplexity / 3)); // Scale 1-10
 }
 
 function calculateScore(testResults, criteria) {
   const passedTests = testResults.filter(r => r.passed).length;
   const totalTests = testResults.length;
   
-  // Correctness score (0-100)
+  // 1. Correctness Score (0-100 points) - Most important
   const correctnessScore = (passedTests / totalTests) * 100;
   
-  // Speed bonus (faster execution = higher score)
-  const avgExecutionTime = testResults.reduce((sum, r) => sum + r.executionTime, 0) / totalTests;
-  const speedBonus = Math.max(0, 50 - avgExecutionTime / 2); // Max 50 points
+  // 2. Performance Metrics
+  const avgExecutionTime = testResults.reduce((sum, r) => sum + (r.executionTime || 0), 0) / totalTests;
+  const avgMemoryUsage = testResults.reduce((sum, r) => sum + (r.memoryUsage || 0), 0) / totalTests;
   
-  // Efficiency bonus (less memory = higher score)
-  const avgMemoryUsage = testResults.reduce((sum, r) => sum + r.memoryUsage, 0) / totalTests;
-  const efficiencyBonus = Math.max(0, 30 - avgMemoryUsage); // Max 30 points
+  // 3. Speed Score (0-50 points) - Faster is better
+  // Base time: 1000ms, Max bonus: 50 points
+  const speedScore = Math.max(0, Math.min(50, 50 * (1 - avgExecutionTime / 1000)));
   
-  // Weighted total score
-  const totalScore = (
-    correctnessScore * (criteria.correctness?.weight || 0.6) +
-    speedBonus * (criteria.speed?.weight || 0.2) +
-    efficiencyBonus * (criteria.efficiency?.weight || 0.2)
+  // 4. Efficiency Score (0-30 points) - Less memory is better
+  // Base memory: 100MB, Max bonus: 30 points
+  const efficiencyScore = Math.max(0, Math.min(30, 30 * (1 - avgMemoryUsage / 100)));
+  
+  // 5. Code Quality Bonus (0-20 points) - Based on test consistency
+  const allTestsPassed = passedTests === totalTests;
+  const consistencyBonus = allTestsPassed ? 20 : 0;
+  
+  // 6. Weighted Total Score using challenge criteria
+  const weights = {
+    correctness: criteria.correctness?.weight || 0.6,
+    speed: criteria.speed?.weight || 0.2,
+    efficiency: criteria.efficiency?.weight || 0.2
+  };
+  
+  // Normalize weights to ensure they sum to 1
+  const totalWeight = Object.values(weights).reduce((sum, w) => sum + w, 0);
+  const normalizedWeights = Object.fromEntries(
+    Object.entries(weights).map(([key, value]) => [key, value / totalWeight])
   );
-
+  
+  const weightedScore = (
+    correctnessScore * normalizedWeights.correctness +
+    speedScore * normalizedWeights.speed +
+    efficiencyScore * normalizedWeights.efficiency +
+    consistencyBonus * 0.1 // Small bonus for perfect solution
+  );
+  
+  // 7. Performance Rating
+  let rating = 'Beginner';
+  if (weightedScore >= 90) rating = 'Expert';
+  else if (weightedScore >= 80) rating = 'Advanced';
+  else if (weightedScore >= 70) rating = 'Intermediate';
+  else if (weightedScore >= 60) rating = 'Competent';
+  
   return {
-    total: Math.round(totalScore),
-    speed: Math.round(speedBonus),
-    efficiency: Math.round(efficiencyBonus),
-    correctness: Math.round(correctnessScore),
+    total: Math.round(Math.min(100, weightedScore)), // Cap at 100
     breakdown: {
-      timeBonus: Math.round(speedBonus),
-      efficiencyBonus: Math.round(efficiencyBonus),
-      correctnessScore: Math.round(correctnessScore)
+      correctness: {
+        score: Math.round(correctnessScore),
+        weight: normalizedWeights.correctness,
+        passed: passedTests,
+        total: totalTests
+      },
+      performance: {
+        speed: {
+          score: Math.round(speedScore),
+          weight: normalizedWeights.speed,
+          avgTime: Math.round(avgExecutionTime),
+          unit: 'ms'
+        },
+        efficiency: {
+          score: Math.round(efficiencyScore),
+          weight: normalizedWeights.efficiency,
+          avgMemory: Math.round(avgMemoryUsage),
+          unit: 'MB'
+        }
+      },
+      bonuses: {
+        consistency: consistencyBonus,
+        perfect: allTestsPassed
+      }
+    },
+    rating,
+    metrics: {
+      avgExecutionTime: Math.round(avgExecutionTime),
+      avgMemoryUsage: Math.round(avgMemoryUsage),
+      passRate: Math.round((passedTests / totalTests) * 100)
     }
   };
 }

@@ -14,6 +14,8 @@ import Community from './pages/Dashboard/Community';
 import Profile from './pages/profile/profile';
 import Resources from './pages/Resources';
 import DailyCoding from './pages/DailyCoding';
+import BusinessIdeaCompetition from './pages/Dashboard/BusinessIdeaCompetition';
+import MentorshipDashboard from './pages/MentorshipDashboard/MentorshipDashboard';
 import Pricing from './pages/Pricing';
 import PaymentSuccess from './pages/PaymentSuccess';
 import AdminLayout from './components/layout/Admin/AdminLayout';
@@ -24,10 +26,11 @@ import UserManagement from './pages/Admin/UserManagement';
 import ChallengesHub from './pages/Admin/ChallengesHub';
 import SubmissionsSimple from './pages/Admin/SubmissionsSimple';
 import SystemHealthSimple from './pages/Admin/SystemHealthSimple';
-import DailyChallengesSimple from './pages/Admin/DailyChallengesSimple';
+import AIDailyChallenges from './pages/Admin/AIDailyChallenges';
 import WeeklyContestsSimple from './pages/Admin/WeeklyContestsSimple';
 import AnalyticsSimple from './pages/Admin/AnalyticsSimple';
 import AdminSettingsSimple from './pages/Admin/AdminSettingsSimple';
+import BusinessIdeasManagement from './pages/Admin/BusinessIdeasManagement';
 import ChallengeDetail from './pages/Admin/ChallengeDetail';
 import SystemHealth from './pages/Admin/SystemHealth';
 
@@ -94,6 +97,8 @@ function App() {
             <Route path="community" element={<Community />} />
             <Route path="resources" element={<Resources />} />
             <Route path="daily-challenge" element={<DailyCoding />} />
+            <Route path="business-competition" element={<BusinessIdeaCompetition />} />
+            <Route path="mentorship-dashboard" element={<MentorshipDashboard />} />
             <Route path="profile" element={<Profile />} />
 
             {/* Optional: Redirect root to dashboard */}
@@ -115,10 +120,11 @@ function App() {
             <Route path="challenges/:id" element={<ChallengeDetail />} />
             <Route path="submissions" element={<SubmissionsSimple />} />
             <Route path="system" element={<SystemHealth />} />
-            <Route path="daily-challenges" element={<DailyChallengesSimple />} />
+            <Route path="daily-challenges" element={<AIDailyChallenges />} />
             <Route path="weekly-challenges" element={<WeeklyContestsSimple />} />
             <Route path="analytics" element={<AnalyticsSimple />} />
             <Route path="settings" element={<AdminSettingsSimple />} />
+            <Route path="business-ideas" element={<BusinessIdeasManagement />} />
           </Route>
         </Routes>
         <Toaster />

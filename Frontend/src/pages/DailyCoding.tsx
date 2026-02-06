@@ -162,8 +162,9 @@ export default function DailyCoding() {
       
       if (data.success) {
         const score = data.data.score;
+        const passed = data.data.passed;
         setUserScore(score);
-        setOutput(`Tests completed: ${data.data.testResults.passed}/${data.data.testResults.total} passed\nScore: ${score}\nTime: ${data.data.completionTime}ms`);
+        setOutput(`Status: ${passed ? 'PASSED' : 'FAILED'}\nScore: ${score}\nTime: ${data.data.completionTime || 'N/A'}`);
         
         // Refresh leaderboard
         const leaderboardResponse = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/daily-challenge/leaderboard`);

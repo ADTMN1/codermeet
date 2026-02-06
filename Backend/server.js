@@ -15,8 +15,11 @@ const challengeRoutes = require('./routes/challenges');
 const leaderboardRoutes = require('./routes/leaderboard');
 const paymentRoutes = require('./routes/payment');
 const resourceRoutes = require('./routes/resources');
+const businessIdeaRoutes = require('./routes/businessIdeas');
+const mentorshipRoutes = require('./routes/mentorship');
 const messageRoutes = require('./routes/messages');
 const dailyChallengeRoutes = require('./routes/dailyChallenge');
+const adminChallengeRoutes = require('./routes/adminChallenges');
 const twoFactorRoutes = require('./routes/twoFactor');
 const sessionRoutes = require('./routes/sessions');
 const { errorHandler } = require("./middlewares/errorHandler");
@@ -150,7 +153,7 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use("/api/auth", authLimiter, authRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/admin", adminRoutes);
-app.use("/api/admin/challenges", challengeRoutes); // Admin challenge routes
+app.use("/api/admin/challenges", adminChallengeRoutes); // AI Challenge Generation
 app.use("/api/challenges", challengeRoutes); // Public challenge routes
 app.use("/api/leaderboard", leaderboardRoutes);
 app.use("/api/payment", paymentLimiter, paymentRoutes);
@@ -158,6 +161,8 @@ app.use("/api/resources", resourceRoutes);
 app.use("/api/daily-challenge", dailyChallengeRoutes);
 app.use("/api/2fa", twoFactorRoutes); // 2FA routes
 app.use("/api/sessions", sessionRoutes); // Session management routes
+app.use("/api/business-ideas", businessIdeaRoutes);
+app.use("/api/mentorship", mentorshipRoutes);
 app.use("/api/messages", messageRoutes); // Message routes (mounted at /api to handle /api/challenges/:id/messages)
 
 // Error handler

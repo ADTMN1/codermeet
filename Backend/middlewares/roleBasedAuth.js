@@ -110,7 +110,12 @@ const requirePermission = (resource, action) => {
 // Role-based middleware
 const requireRole = (...allowedRoles) => {
   return (req, res, next) => {
+    console.log('👑 Debug - requireRole called');
+    console.log('👑 Debug - Allowed roles:', allowedRoles);
+    console.log('👑 Debug - Request user profile:', req.userProfile);
+    
     if (!req.userProfile) {
+      console.log('❌ Debug - No user profile in request');
       return res.status(401).json({ 
         success: false, 
         message: "Authentication required" 
@@ -118,13 +123,19 @@ const requireRole = (...allowedRoles) => {
     }
 
     const userRole = req.userProfile.role;
+    console.log('👑 Debug - User role:', userRole);
+    
     if (!allowedRoles.includes(userRole)) {
+      console.log('❌ Debug - Role not allowed');
+      console.log('❌ Debug - Required:', allowedRoles);
+      console.log('❌ Debug - User has:', userRole);
       return res.status(403).json({ 
         success: false, 
         message: `Access denied. Required role: ${allowedRoles.join(' or ')}` 
       });
     }
 
+    console.log('✅ Debug - Role check passed');
     next();
   };
 };
