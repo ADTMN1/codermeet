@@ -34,13 +34,57 @@ const checkUserLimiter = rateLimit({
   message: { success: false, message: "Too many requests, please try again later" },
 });
 
-// Routes
 
 // Get current logged-in user
 router.get("/me", authMiddleware, userController.me);
 
 // Get user's projects
 router.get("/projects", authMiddleware, userController.getUserProjects);
+
+// Get community projects (all users' projects)
+router.get("/community/projects", authMiddleware, userController.getCommunityProjects);
+
+// Get announcements
+router.get("/announcements", authMiddleware, userController.getAnnouncements);
+
+// Get community members
+router.get("/members", authMiddleware, userController.getMembers);
+
+// Send connection request
+router.post("/connect/:id", authMiddleware, userController.sendConnectionRequest);
+
+// Get user connections
+router.get("/connections", authMiddleware, userController.getConnections);
+
+// Send message
+router.post("/message/:id", authMiddleware, userController.sendMessage);
+
+// Get teams
+router.get("/teams", authMiddleware, userController.getTeams);
+
+// Create team
+router.post("/teams", authMiddleware, userController.createTeam);
+
+// Join team
+router.post("/teams/:id/join", authMiddleware, userController.joinTeam);
+
+// Post a new project
+router.post("/projects", authMiddleware, userController.createProject);
+
+// Like a project
+router.post("/projects/:id/like", authMiddleware, userController.likeProject);
+
+// Comment on a project
+router.post("/projects/:id/comment", authMiddleware, userController.commentProject);
+
+// Get announcement comments
+router.get("/announcements/:id/comments", authMiddleware, userController.getAnnouncementComments);
+
+// Like an announcement
+router.post("/announcements/:id/like", authMiddleware, userController.likeAnnouncement);
+
+// Comment on an announcement
+router.post("/announcements/:id/comment", authMiddleware, userController.commentAnnouncement);
 
 // Update full profile (with optional avatar)
 router.put(

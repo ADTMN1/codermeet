@@ -70,7 +70,15 @@ const submissionSchema = new mongoose.Schema({
   featured: {
     type: Boolean,
     default: false
-  }
+  },
+  likes: {
+    type: Number,
+    default: 0
+  },
+  likedBy: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  }]
 }, {
   timestamps: true
 });

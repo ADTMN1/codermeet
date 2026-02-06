@@ -22,6 +22,16 @@ const dailyChallengeRoutes = require('./routes/dailyChallenge');
 const adminChallengeRoutes = require('./routes/adminChallenges');
 const twoFactorRoutes = require('./routes/twoFactor');
 const sessionRoutes = require('./routes/sessions');
+
+// Import models
+const User = require('./models/user');
+const Submission = require('./models/submission');
+const DailySubmission = require('./models/dailySubmission');
+const BusinessIdea = require('./models/businessIdea');
+const Announcement = require('./models/announcement');
+const Comment = require('./models/comment');
+const Team = require('./models/team');
+
 const { errorHandler } = require("./middlewares/errorHandler");
 const socketHandler = require('./socket/socketHandler');
 const uploadSecurity = require('./middleware/uploadSecurity');
