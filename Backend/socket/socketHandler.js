@@ -3,6 +3,7 @@ const Message = require('../models/message');
 const Challenge = require('../models/challenge');
 const User = require('../models/user');
 const jwt = require('jsonwebtoken');
+const chatServer = require('./chatServer');
 
 // Authentication middleware for Socket.IO
 const authenticateSocket = async (socket, next) => {
@@ -24,6 +25,9 @@ const authenticateSocket = async (socket, next) => {
 };
 
 module.exports = (io) => {
+  // Initialize chat server
+  chatServer(io);
+  
   // Store online users per challenge
   const challengeUsers = new Map(); // challengeId -> Set of userIds
 

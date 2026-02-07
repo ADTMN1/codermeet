@@ -359,6 +359,40 @@ exports.joinTeam = async (req, res) => {
   }
 };
 
+// Leave team
+exports.leaveTeam = async (req, res) => {
+  try {
+    const { id: teamId } = req.params;
+    const currentUserId = req.user.id;
+
+    const team = await Team.findById(teamId);
+    if (!team) {
+      return res.status(404).json({ success: false, message: "Team not found" });
+    }
+
+    if (!team.members.includes(currentUserId)) {
+      return res.status(400).json({ success: false, message: "Not a member of this team" });
+    }
+
+    await Team.findByIdAndUpdate(teamId, {
+      $pull: { members: currentUserId }
+    });
+
+    // Update status if team is no longer full
+    if (team.status === 'active' && team.members.length - 1 < team.maxMembers) {
+      await Team.findByIdAndUpdate(teamId, { status: 'seeking-members' });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Left team successfully",
+      data: { isMember: false }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Server error", error: error.message });
+  }
+};
+
 // Get announcements
 exports.getAnnouncements = async (req, res) => {
   try {

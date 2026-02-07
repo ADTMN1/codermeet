@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { io, Socket } from 'socket.io-client';
 import {
   FaFolderOpen,
   FaCheckCircle,
@@ -26,7 +27,19 @@ import {
   FaRocket,
   FaChalkboardTeacher,
   FaCalendarAlt,
-  FaPlus
+  FaPlus,
+  FaPaperclip,
+  FaSmile,
+  FaPaperPlane,
+  FaCog,
+  FaSearch as FaSearchIcon,
+  FaBell
+} from 'react-icons/fa';
+import { 
+  FaCog as FaCogIcon,
+  FaPaperclip as FaPaperclipIcon,
+  FaSmile as FaSmileIcon,
+  FaPaperPlane as FaPaperPlaneIcon
 } from 'react-icons/fa';
 
 interface Project {
@@ -126,15 +139,13 @@ interface Team {
 interface ChatRoom {
   _id: string;
   name: string;
+  description?: string;
   type: 'public' | 'private' | 'team' | 'direct';
-  members: Member[];
-  isOnline: boolean;
+  members: any[];
+  maxMembers: number;
+  createdAt: string;
+  lastMessage?: any;
   unreadCount?: number;
-  lastMessage?: {
-    content: string;
-    sender: string;
-    timestamp: string;
-  };
 }
 
 const Community: React.FC = () => {
@@ -144,7 +155,6 @@ const Community: React.FC = () => {
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
-  const [chatRooms, setChatRooms] = useState<ChatRoom[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -173,6 +183,7 @@ const Community: React.FC = () => {
     status: 'completed' as 'completed' | 'in-progress' | 'planned'
   });
   const [currentUserId, setCurrentUserId] = useState<string>('');
+  const [currentUserAvatar, setCurrentUserAvatar] = useState<string>('');
   const [teamForm, setTeamForm] = useState({
     name: '',
     description: '',
@@ -196,6 +207,7 @@ const Community: React.FC = () => {
           if (response.ok) {
             const userData = await response.json();
             setCurrentUserId(userData.data._id || '');
+            setCurrentUserAvatar(userData.data.avatar || '');
           }
         }).catch((error) => {
           // Error fetching user data
@@ -390,35 +402,394 @@ const Community: React.FC = () => {
     }
   };
 
-  const fetchChatRooms = async () => {
-    const mockChatRooms: ChatRoom[] = [
-      {
-        _id: '1',
-        name: 'General Discussion',
-        type: 'public',
-        members: [],
-        isOnline: true,
-        unreadCount: 3,
-        lastMessage: {
-          content: 'Hey everyone! Check out my new project!',
-          sender: 'John Doe',
-          timestamp: new Date(Date.now() - 3600000).toISOString()
-        }
-      },
-      {
-        _id: '2',
-        name: 'React Help',
-        type: 'public',
-        members: [],
-        isOnline: true,
-        lastMessage: {
-          content: 'How do I handle state management in large apps?',
-          sender: 'Jane Smith',
-          timestamp: new Date(Date.now() - 7200000).toISOString()
+  // Chat states
+  const [chatRooms, setChatRooms] = useState<ChatRoom[]>([]);
+  const [selectedChatRoom, setSelectedChatRoom] = useState<ChatRoom | null>(null);
+  const [messageInput, setMessageInput] = useState('');
+  const [messages, setMessages] = useState<any[]>([]);
+  const [socket, setSocket] = useState<Socket | null>(null);
+  const [typingUsers, setTypingUsers] = useState<{[key: string]: string}>({});
+  const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set());
+  const [showCreateRoomModal, setShowCreateRoomModal] = useState(false);
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [activeEmojiCategory, setActiveEmojiCategory] = useState('smileys');
+  const [roomForm, setRoomForm] = useState({
+    name: '',
+    description: '',
+    type: 'public' as 'public' | 'private' | 'team' | 'direct',
+    maxMembers: 100
+  });
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Close emoji picker when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (showEmojiPicker) {
+        const target = event.target as HTMLElement;
+        if (!target.closest('.emoji-picker-container')) {
+          setShowEmojiPicker(false);
         }
       }
-    ];
-    setChatRooms(mockChatRooms);
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showEmojiPicker]);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  // Initialize Socket.IO
+  useEffect(() => {
+    const token = localStorage.getItem('auth_token');
+    if (token) {
+      const newSocket = io('http://localhost:5000', {
+        auth: { token }
+      });
+
+      newSocket.on('connect', () => {
+        console.log('Connected to chat server with socket ID:', newSocket.id);
+        fetchChatRooms();
+      });
+
+      newSocket.on('disconnect', (reason) => {
+        console.log('Disconnected from chat server:', reason);
+      });
+
+      newSocket.on('connect_error', (error) => {
+        console.error('Socket connection error:', error);
+      });
+
+      newSocket.on('roomsList', (rooms: ChatRoom[]) => {
+        setChatRooms(rooms);
+      });
+
+      newSocket.on('roomJoined', (room: ChatRoom) => {
+        setSelectedChatRoom(room);
+        fetchMessages(room._id);
+      });
+
+      newSocket.on('newMessage', (message: any) => {
+        console.log('📨 Received newMessage:', message);
+        if (selectedChatRoom && message.roomId === selectedChatRoom._id) {
+          setMessages(prev => [...prev, message]);
+          scrollToBottom();
+        }
+      });
+
+      newSocket.on('userTyping', (data: { userId: string; fullName: string; username: string; avatar: string; isTyping: boolean; roomId: string }) => {
+        if (selectedChatRoom && data.roomId === selectedChatRoom._id) {
+          if (data.isTyping) {
+            setTypingUsers(prev => ({ ...prev, [data.userId]: data.fullName }));
+          } else {
+            setTypingUsers(prev => {
+              const newTyping = { ...prev };
+              delete newTyping[data.userId];
+              return newTyping;
+            });
+          }
+        }
+      });
+
+      newSocket.on('userOnline', (userId: string) => {
+        setOnlineUsers(prev => new Set([...prev, userId]));
+      });
+
+      newSocket.on('userOffline', (userId: string) => {
+        setOnlineUsers(prev => {
+          const newOnline = new Set(prev);
+          newOnline.delete(userId);
+          return newOnline;
+        });
+      });
+
+      newSocket.on('reactionAdded', (data: any) => {
+        if (selectedChatRoom && data.roomId === selectedChatRoom._id) {
+          setMessages(prev => prev.map(msg => 
+            msg._id === data.messageId 
+              ? { ...msg, reactions: [...(msg.reactions || []), data] }
+              : msg
+          ));
+        }
+      });
+
+      newSocket.on('messagePinned', (data: any) => {
+        if (selectedChatRoom && data.roomId === selectedChatRoom._id) {
+          setMessages(prev => prev.map(msg => 
+            msg._id === data.messageId 
+              ? { ...msg, isPinned: true }
+              : msg
+          ));
+        }
+      });
+
+      newSocket.on('messageEdited', (data: any) => {
+        if (selectedChatRoom && data.roomId === selectedChatRoom._id) {
+          setMessages(prev => prev.map(msg => 
+            msg._id === data.messageId 
+              ? { ...msg, content: data.content, isEdited: true, editHistory: [...(msg.editHistory || []), data] }
+              : msg
+          ));
+        }
+      });
+
+      newSocket.on('messageDeleted', (data: any) => {
+        if (selectedChatRoom && data.roomId === selectedChatRoom._id) {
+          setMessages(prev => prev.filter(msg => msg._id !== data.messageId));
+        }
+      });
+
+      newSocket.on('error', (error: any) => {
+        console.error('Socket error:', error);
+      });
+
+      setSocket(newSocket);
+
+      return () => {
+        newSocket.close();
+      };
+    }
+  }, [selectedChatRoom]);
+
+  const fetchChatRooms = async () => {
+    try {
+      const token = localStorage.getItem('auth_token');
+      if (!token) {
+        console.error('No auth token found');
+        return;
+      }
+      
+      const response = await fetch('http://localhost:5000/api/chat/rooms', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setChatRooms(data.data || []);
+      } else {
+        console.error('Failed to fetch chat rooms:', response.status, response.statusText);
+        // Set empty array to prevent infinite loading
+        setChatRooms([]);
+      }
+    } catch (error) {
+      console.error('Error fetching chat rooms:', error);
+      setChatRooms([]);
+    }
+  };
+
+  const fetchMessages = async (roomId: string) => {
+    try {
+      const token = localStorage.getItem('auth_token');
+      if (!token) {
+        console.error('No auth token found');
+        return;
+      }
+      
+      const response = await fetch(`http://localhost:5000/api/chat/rooms/${roomId}/messages`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setMessages(data.data || []);
+        scrollToBottom();
+      } else {
+        console.error('Failed to fetch messages:', response.status, response.statusText);
+        setMessages([]);
+      }
+    } catch (error) {
+      console.error('Error fetching messages:', error);
+      setMessages([]);
+    }
+  };
+
+  const handleSelectRoom = (room: ChatRoom) => {
+    console.log('🏠 Selecting room:', room);
+    setSelectedChatRoom(room);
+    if (socket) {
+      console.log('📡 Emitting joinRoom for room:', room._id);
+      socket.emit('joinRoom', { roomId: room._id });
+    } else {
+      console.log('❌ No socket available for room join');
+    }
+  };
+
+  const handleSendMessage = () => {
+    if (messageInput.trim() || uploadedFile) {
+      if (socket && selectedChatRoom) {
+        const message = {
+          content: messageInput.trim(),
+          roomId: selectedChatRoom._id,
+          type: uploadedFile ? 'file' : 'text',
+          fileName: uploadedFile?.name,
+          fileSize: uploadedFile?.size
+        };
+
+        console.log('📤 Sending message:', message);
+        socket.emit('sendMessage', message);
+        setMessageInput('');
+        setUploadedFile(null);
+        
+        // Stop typing indicator
+        handleTypingStop();
+        
+        // Clear typing timeout
+        if (typingTimeout) {
+          clearTimeout(typingTimeout);
+          setTypingTimeout(null);
+        }
+      } else {
+        console.log('❌ Cannot send message:', {
+          hasMessage: !!messageInput.trim(),
+          hasFile: !!uploadedFile,
+          hasSocket: !!socket,
+          hasRoom: !!selectedChatRoom
+        });
+      }
+    }
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Check file size (max 10MB)
+      if (file.size > 10 * 1024 * 1024) {
+        alert('File size must be less than 10MB');
+        return;
+      }
+      setUploadedFile(file);
+    }
+  };
+
+  const handleEmojiSelect = (emoji: string) => {
+    setMessageInput(prev => prev + emoji);
+    setShowEmojiPicker(false);
+  };
+
+  const commonEmojis = [
+  '😀', '😃', '😄', '😁', '😆', '😅', '😂', '🤣', '😊', '😇',
+  '🙂', '🙃', '😉', '😌', '😍', '🥰', '😘', '😗', '😙', '😚',
+  '😋', '😛', '😜', '🤪', '😝', '🤑', '🤗', '🤭', '🤫', '🤔',
+  '🤐', '🤨', '😐', '😑', '😶', '😏', '😒', '🙄', '😬', '🤥',
+  '😔', '😪', '🤤', '😴', '😷', '🤒', '🤕', '🤢', '🤮', '🤧',
+  '🥵', '🥶', '🥴', '😵', '🤯', '🤠', '🥳', '😎', '🤓', '🧐',
+  '😕', '😟', '🙁', '☹️', '😮', '😯', '😲', '😳', '🥺', '😦',
+  '😨', '😰', '😱', '😥', '😢', '😭', '😱', '😖', '😣', '😞',
+  '😓', '😩', '😫', '🥱', '😤', '😡', '😠', '🤬', '😈', '👿',
+  '💀', '☠️', '💩', '🤡', '👹', '👺', '👻', '👽', '👾', '🤖',
+  '❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '🤍', '🤎', '💔',
+  '❣️', '💕', '💞', '💓', '💗', '💖', '💘', '💝', '💟', '☮️',
+  '👍', '👎', '👌', '✌️', '🤞', '🤟', '🤘', '🤙', '👈', '👉',
+  '👆', '👇', '☝️', '✋', '🤚', '🖐️', '🖖', '👋', '🤙', '💪',
+  '🙏', '🤝', '✍️', '💅', '🤳', '💃', '🕺', '🗣️', '👤', '👥',
+  '👣', '🚶', '🏃', '💃', '🕺', '👯', '🧖', '🗗️', '🏧', '🚻',
+  '🚹', '🚺', '🚻', '🚼', '🚾', '🛂', '🛃', '🛄', '🛅', '⚠️',
+  '🚸', '⛔', '🚫', '🚳', '🚭', '🚯', '🚱', '🚷', '📵', '🔞',
+  '☢️', '☣️', '⬆️', '↗️', '➡️', '↘️', '⬇️', '↙️', '⬅️', '↖️',
+  '↕️', '↔️', '↩️', '↪️', '⤴️', '⤵️', '🔃', '🔄', '🔂', '🔁',
+  '🔀', '🔁', '🔂', '🔃', '🔄', '🔀', '🔁', '🔂', '🔃', '🔄'
+];
+
+const emojiCategories = {
+  smileys: commonEmojis.slice(0, 64),
+  gestures: ['👋', '👌', '👏', '🙌', '👐', '🤲', '🙏', '✋', '🤝', '💪', '👍', '👎', '👌', '✌️', '🤞', '🤟', '🤘', '🤙', '👈', '👉', '👆', '👇', '☝️', '✋', '🤚', '🖐️', '🖖', '👋', '🤙', '💪', '🙏'],
+  hearts: ['❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '🤍', '🤎', '💔', '❣️', '💕', '💞', '💓', '💗', '💖', '💘', '💝', '💟', '☮️', '💛', '💚', '💙', '💜'],
+  symbols: ['⭐', '🌟', '✨', '💫', '🌠', '☄️', '🔥', '💥', '💢', '🌈', '🌩', '🌪', '🌫', '🌬', '🌭', '🌮', '🌯', '🌰', '🌱', '🌲', '🌳', '🌴', '🌵', '🌶', '🌷', '🌸', '🌹', '🌺', '🌻', '🌼', '🌽', '🌾', '🌿', '🍀', '🍁', '🍂', '🍃', '🍄', '🍅', '🍆', '🍇', '🍈', '🍉', '🍊', '🍋', '🍌', '🍍', '🍎', '🍏', '🍐', '🍑', '🍒', '🍓', '🍔', '🍕', '🍖', '🍗', '🍘', '🍙', '🍚', '🍛', '🍜', '🍝', '🍞', '🍟', '🍠', '🍡', '🍢', '🍣', '🍤', '🍥', '🍦', '🍧', '🍨', '🍩', '🍪', '🍫', '🍬', '🍭', '🍮', '🍯', '🍰', '🍱', '🍲', '🍳', '🍴', '🍵', '🍶', '🍷', '🍸', '🍹', '🍺', '🍻', '🍼', '🍽', '🍾', '🍿', '🎀', '🎁', '🎂', '🎃', '🎄', '🎅', '🎆', '🎇', '🎈', '🎉', '🎊', '🎋', '🎌', '🎍', '🎎', '🎏', '🎐', '🎑', '🎒', '🎓', '🎔', '🎕', '🎖', '🎗', '🎘', '🎙', '🎚', '🎛', '🎜', '🎝', '🎞', '🎟', '🎠', '🎡', '🎢', '🎣', '🎤', '🎥', '🎦', '🎧', '🎨', '🎩', '🎪', '🎭', '🎮', '🎯', '🎰', '🎱', '🎲', '🎳', '🎴', '🎵', '🎶', '🎷', '🎸', '🎹', '🎺', '🎻', '🎼', '🎽', '🎾', '🎿', '🏀', '🏁', '🏂', '🏃', '🏄', '🏅', '🏆', '🏇', '🏈', '🏉', '🏊', '🏋', '🏌', '🏍', '🏎', '🏏', '🏐', '🏑', '🏒', '🏓', '🏔', '🏕', '🏖', '🏗', '🏘', '🏙', '🏚', '🏛', '🏜', '🏝', '🏞', '🏟', '🏠', '🏡', '🏢', '🏣', '🏤', '🏥', '🏦', '🏧', '🏨', '🏩', '🏪', '🏫', '🏬', '🏭', '🏮', '🏯', '🏰', '🏱', '🏲', '🏳', '🏴', '🏵', '🏶', '🏷', '🏸', '🏹', '🏺', '🏻', '🏼', '🏽', '🏾', '🏿', '🐀', '🐁', '🐂', '🐃', '🐄', '🐅', '🐆', '🐇', '🐈', '🐉', '🐊', '🐋', '🐌', '🐍', '🐎', '🐏', '🐐', '🐑', '🐒', '🐓', '🐔', '🐕', '🐖', '🐗', '🐘', '🐙', '🐚', '🐛', '🐜', '🐝', '🐞', '🐟', '🐠', '🐡', '🐢', '🐣', '🐤', '🐥', '🐦', '🐧', '🐨', '🐩', '🐪', '🐫', '🐬', '🐭', '🐮', '🐯', '🐰', '🐱', '🐲', '🐳', '🐴', '🐵', '🐶', '🐷', '🐸', '🐹', '🐺', '🐻', '🐼', '🐽', '🐾', '🐿', '👀', '👁', '👂', '👃', '👄', '👅', '👆', '👇', '👈', '👉', '👊', '👋', '👌', '👍', '👎', '👏', '👐', '👑', '👒', '👓', '👔', '👕', '👖', '👗', '👘', '👙', '👚', '👛', '👜', '👝', '👞', '👟', '👠', '👡', '👢', '👣', '👤', '👥', '👦', '👧', '👨', '👩', '👪', '👫', '👬', '👭', '👮', '👯', '👰', '👱', '👲', '👳', '👴', '👵', '👶', '👷', '👸', '👹', '👺', '👻', '👽', '👾', '👿', '💀', '☠️', '💩', '🤡', '👹', '👺', '👻', '👽', '👾', '🤖', '💀', '☠️', '💩', '🤡', '👹', '👺', '👻', '👽', '👾', '🤖', '💀', '☠️', '💩', '🤡', '👹', '👺', '👻', '👽', '👾', '🤖', '💀', '☠️', '💩', '🤡', '👹', '👺', '👻', '👽', '👾', '🤖']
+};
+
+  const handleTypingStart = () => {
+    if (socket && selectedChatRoom) {
+      socket.emit('typing', { roomId: selectedChatRoom._id, isTyping: true });
+    }
+  };
+
+  const handleTypingStop = () => {
+    if (socket && selectedChatRoom) {
+      socket.emit('typing', { roomId: selectedChatRoom._id, isTyping: false });
+    }
+  };
+
+  // Debounced typing handlers
+  const [typingTimeout, setTypingTimeout] = useState<NodeJS.Timeout | null>(null);
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setMessageInput(e.target.value);
+    
+    // Clear existing timeout
+    if (typingTimeout) {
+      clearTimeout(typingTimeout);
+    }
+    
+    // Start typing
+    handleTypingStart();
+    
+    // Set timeout to stop typing after 1 second of inactivity
+    const newTimeout = setTimeout(() => {
+      handleTypingStop();
+    }, 1000);
+    
+    setTypingTimeout(newTimeout);
+  };
+
+  // Handle creating chat room
+  const handleCreateRoom = async () => {
+    if (!roomForm.name.trim()) {
+      showNotification('error', 'Room name is required');
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('auth_token');
+      if (!token) {
+        showNotification('error', 'Authentication required');
+        return;
+      }
+      
+      const response = await fetch('http://localhost:5000/api/chat/rooms', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(roomForm),
+      });
+
+      if (response.ok) {
+        const responseJson = await response.json();
+        const newRoom = responseJson.data;
+        
+        // Add to rooms list
+        setChatRooms(prev => [newRoom, ...prev]);
+        
+        // Reset form and close modal
+        setRoomForm({
+          name: '',
+          description: '',
+          type: 'public',
+          maxMembers: 100
+        });
+        setShowCreateRoomModal(false);
+        
+        showNotification('success', 'Chat room created successfully!');
+        
+        // Join the new room
+        handleSelectRoom(newRoom);
+      } else {
+        const errorData = await response.json();
+        showNotification('error', errorData.message || 'Failed to create room');
+      }
+    } catch (error) {
+      console.error('Error creating chat room:', error);
+      showNotification('error', 'Error creating chat room');
+    }
   };
 
   const handleLikeAnnouncement = async (announcementId: string) => {
@@ -660,7 +1031,7 @@ const Community: React.FC = () => {
     }
   };
 
-  const handleSendMessage = async () => {
+  const handleSendDirectMessage = async () => {
     if (!messageRecipient || !messageContent.trim()) return;
 
     try {
@@ -1561,6 +1932,420 @@ const Community: React.FC = () => {
           </div>
         )}
 
+        {/* Chat Tab */}
+        {activeTab === 'chat' && (
+          <div className="h-[calc(100vh-12rem)]">
+            <div className="flex h-full bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
+              {/* Chat Rooms Sidebar */}
+              <div className="w-80 bg-gray-900 border-r border-gray-700 flex flex-col">
+                <div className="p-4 border-b border-gray-700">
+                  <h3 className="text-lg font-semibold text-white mb-4">Chat Rooms</h3>
+                  <button 
+                    onClick={() => setShowCreateRoomModal(true)}
+                    className="w-full px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition flex items-center justify-center gap-2"
+                  >
+                    <FaPlus className="w-4 h-4" />
+                    Create Room
+                  </button>
+                </div>
+                
+                <div className="flex-1 overflow-y-auto p-4 space-y-2">
+                  {chatRooms.map((room) => (
+                    <div
+                      key={room._id}
+                      className={`p-3 rounded-lg cursor-pointer transition-all duration-200 ${
+                        selectedChatRoom?._id === room._id
+                          ? 'bg-purple-600/20 border border-purple-500/30'
+                          : 'hover:bg-gray-700 border border-transparent'
+                      }`}
+                      onClick={() => handleSelectRoom(room)}
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1 min-w-0">
+                          <h4 className="text-white font-medium truncate">{room.name}</h4>
+                          {room.description && (
+                            <p className="text-gray-400 text-sm truncate">{room.description}</p>
+                          )}
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="text-xs text-gray-500">
+                              {room.members?.length || 0}/{room.maxMembers || 100} members
+                            </span>
+                            <span className="text-xs text-gray-500">•</span>
+                            <span className="text-xs text-gray-500 capitalize">{room.type}</span>
+                          </div>
+                        </div>
+                        {room.unreadCount && room.unreadCount > 0 && (
+                          <div className="bg-purple-600 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                            {room.unreadCount}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Chat Messages Area */}
+              {selectedChatRoom ? (
+                <div className="flex-1 flex flex-col">
+                  {/* Chat Header */}
+                  <div className="p-4 border-b border-gray-700 bg-gray-800">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h2 className="text-lg font-semibold text-white">{selectedChatRoom.name}</h2>
+                        {selectedChatRoom.description && (
+                          <p className="text-gray-400 text-sm">{selectedChatRoom.description}</p>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button className="p-2 text-gray-400 hover:text-white transition">
+                          <FaSearchIcon className="w-5 h-5" />
+                        </button>
+                        <button className="p-2 text-gray-400 hover:text-white transition">
+                          <FaCogIcon className="w-5 h-5" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Messages */}
+                  <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                    {messages.map((message, index) => {
+                      const isCurrentUser = message.senderId?._id === currentUserId;
+                      const showDate = index === 0 || new Date(message.createdAt).toDateString() !== new Date(messages[index - 1]?.createdAt).toDateString();
+                      
+                      return (
+                        <div key={message._id}>
+                          {showDate && (
+                            <div className="text-center text-gray-500 text-xs my-4">
+                              {new Date(message.createdAt).toLocaleDateString('en-US', {
+                                weekday: 'long',
+                                year: 'numeric',
+                                month: 'long',
+                                day: 'numeric'
+                              })}
+                            </div>
+                          )}
+                          
+                          <div className={`flex items-start gap-3 ${isCurrentUser ? 'flex-row-reverse' : ''}`}>
+                            <div className="relative w-8 h-8 flex-shrink-0">
+                              {isCurrentUser && currentUserAvatar ? (
+                                <img
+                                  src={currentUserAvatar}
+                                  alt="You"
+                                  className="w-8 h-8 rounded-full object-cover"
+                                  onError={(e) => {
+                                    const target = e.target as HTMLImageElement;
+                                    target.style.display = 'none';
+                                    target.nextElementSibling?.classList.remove('hidden');
+                                  }}
+                                />
+                              ) : !isCurrentUser && message.senderId?.avatar ? (
+                                <img
+                                  src={message.senderId.avatar}
+                                  alt={message.senderId.fullName}
+                                  className="w-8 h-8 rounded-full object-cover"
+                                  onError={(e) => {
+                                    const target = e.target as HTMLImageElement;
+                                    target.style.display = 'none';
+                                    target.nextElementSibling?.classList.remove('hidden');
+                                  }}
+                                />
+                              ) : null}
+                              <div 
+                                className={`w-8 h-8 rounded-full bg-purple-600 flex items-center justify-center text-white text-sm font-medium ${
+                                  (isCurrentUser && currentUserAvatar) || (!isCurrentUser && message.senderId?.avatar) ? 'hidden' : ''
+                                }`}
+                              >
+                                {isCurrentUser ? 'You' : message.senderId?.fullName?.split(' ')?.map((n: string) => n[0])?.join('').toUpperCase().slice(0, 2)}
+                              </div>
+                            </div>
+                            <div className={`flex-1 ${isCurrentUser ? 'text-right' : ''}`}>
+                              <div className={`flex items-baseline gap-2 mb-1 ${isCurrentUser ? 'justify-end' : ''}`}>
+                                <span className="text-white font-medium">
+                                  {isCurrentUser ? 'You' : message.senderId?.fullName}
+                                </span>
+                                <span className="text-gray-500 text-xs">
+                                  {new Date(message.createdAt).toLocaleTimeString('en-US', {
+                                    hour: '2-digit',
+                                    minute: '2-digit'
+                                  })}
+                                </span>
+                              </div>
+                              <div className={`inline-block max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
+                                isCurrentUser 
+                                  ? 'bg-purple-600 text-white' 
+                                  : 'bg-gray-700 text-white'
+                              }`}>
+                                {message.type === 'file' ? (
+                                  <div className="flex items-center gap-3">
+                                    <FaPaperclipIcon className="w-5 h-5 text-current" />
+                                    <div>
+                                      <div className="font-medium">{message.fileName}</div>
+                                      {message.fileSize && (
+                                        <div className="text-xs opacity-75">
+                                          {(message.fileSize / 1024).toFixed(1)} KB
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                ) : (
+                                  message.content
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    
+                    {/* Typing Indicator */}
+                    {Object.keys(typingUsers).length > 0 && (
+                      <div className="flex items-center gap-2 text-gray-400 text-sm">
+                        <div className="flex gap-1">
+                          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                        </div>
+                        {Object.values(typingUsers).join(', ')} {Object.keys(typingUsers).length === 1 ? 'is' : 'are'} typing...
+                      </div>
+                    )}
+                    
+                    <div ref={messagesEndRef} />
+                  </div>
+
+                  {/* Message Input */}
+                  <div className="p-4 border-t border-gray-700 bg-gray-900">
+                    {uploadedFile && (
+                      <div className="mb-3 p-2 bg-gray-800 rounded-lg flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <FaPaperclipIcon className="w-4 h-4 text-purple-400" />
+                          <span className="text-white text-sm">{uploadedFile.name}</span>
+                          <span className="text-gray-400 text-xs">({(uploadedFile.size / 1024).toFixed(1)} KB)</span>
+                        </div>
+                        <button 
+                          onClick={() => setUploadedFile(null)}
+                          className="text-red-400 hover:text-red-300 transition"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    )}
+                    
+                    <div className="flex items-end gap-3">
+                      <div className="relative">
+                        <input
+                          type="file"
+                          id="file-upload"
+                          className="hidden"
+                          onChange={handleFileUpload}
+                          accept="image/*,video/*,.pdf,.doc,.docx,.txt"
+                        />
+                        <button 
+                          onClick={() => document.getElementById('file-upload')?.click()}
+                          className="p-2 text-gray-400 hover:text-white transition"
+                          title="Attach file"
+                        >
+                          <FaPaperclipIcon className="w-5 h-5" />
+                        </button>
+                      </div>
+                      
+                      <div className="flex-1">
+                        <textarea
+                          value={messageInput}
+                          onChange={handleInputChange}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && !e.shiftKey) {
+                              e.preventDefault();
+                              handleSendMessage();
+                            }
+                          }}
+                          placeholder="Type your message..."
+                          className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-purple-500 resize-none"
+                          rows={1}
+                          style={{minHeight: '40px', maxHeight: '120px'}}
+                        />
+                      </div>
+                      
+                      <div className="relative">
+                        <button 
+                          onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                          className="p-2 text-gray-400 hover:text-white transition"
+                          title="Add emoji"
+                        >
+                          <FaSmileIcon className="w-5 h-5" />
+                        </button>
+                        
+                        {showEmojiPicker && (
+                          <div className="emoji-picker-container absolute bottom-12 right-0 bg-gray-800 border border-gray-600 rounded-lg shadow-xl z-50 w-80">
+                            <div className="border-b border-gray-600 p-2">
+                              <div className="text-white text-sm font-medium mb-2">Emojis</div>
+                              <div className="flex gap-1 text-xs">
+                                <button 
+                                  onClick={() => setActiveEmojiCategory('smileys')}
+                                  className={`px-2 py-1 rounded transition ${
+                                    activeEmojiCategory === 'smileys' ? 'bg-purple-600 text-white' : 'hover:bg-gray-700 text-gray-300'
+                                  }`}
+                                >
+                                  Smileys
+                                </button>
+                                <button 
+                                  onClick={() => setActiveEmojiCategory('gestures')}
+                                  className={`px-2 py-1 rounded transition ${
+                                    activeEmojiCategory === 'gestures' ? 'bg-purple-600 text-white' : 'hover:bg-gray-700 text-gray-300'
+                                  }`}
+                                >
+                                  Gestures
+                                </button>
+                                <button 
+                                  onClick={() => setActiveEmojiCategory('hearts')}
+                                  className={`px-2 py-1 rounded transition ${
+                                    activeEmojiCategory === 'hearts' ? 'bg-purple-600 text-white' : 'hover:bg-gray-700 text-gray-300'
+                                  }`}
+                                >
+                                  Hearts
+                                </button>
+                                <button 
+                                  onClick={() => setActiveEmojiCategory('symbols')}
+                                  className={`px-2 py-1 rounded transition ${
+                                    activeEmojiCategory === 'symbols' ? 'bg-purple-600 text-white' : 'hover:bg-gray-700 text-gray-300'
+                                  }`}
+                                >
+                                  Symbols
+                                </button>
+                              </div>
+                            </div>
+                            <div className="p-3 max-h-60 overflow-y-auto">
+                              <div className="grid grid-cols-8 gap-1">
+                                {emojiCategories[activeEmojiCategory as keyof typeof emojiCategories]?.map((emoji, index) => (
+                                  <button
+                                    key={index}
+                                    onClick={() => handleEmojiSelect(emoji)}
+                                    className="text-2xl hover:bg-gray-700 rounded p-2 transition hover:scale-110 transform"
+                                    title={emoji}
+                                  >
+                                    {emoji}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                            <div className="border-t border-gray-600 p-2 text-center">
+                              <div className="text-xs text-gray-400">
+                                Click any emoji to add to message
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                      
+                      <button 
+                        onClick={handleSendMessage}
+                        disabled={(!messageInput.trim() && !uploadedFile) || !selectedChatRoom}
+                        className="px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg transition flex items-center gap-2"
+                      >
+                        <FaPaperPlaneIcon className="w-4 h-4" />
+                        Send
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex-1 flex items-center justify-center">
+                  <div className="text-center">
+                    <FaComments className="w-16 h-16 text-gray-600 mx-auto mb-4" />
+                    <h3 className="text-xl font-semibold text-gray-400 mb-2">Select a Chat Room</h3>
+                    <p className="text-gray-500">Choose a chat room from the sidebar to start messaging</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Create Chat Room Modal */}
+        {showCreateRoomModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-gray-800 rounded-xl p-6 w-full max-w-md">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold text-white">Create Chat Room</h2>
+                <button
+                  onClick={() => setShowCreateRoomModal(false)}
+                  className="text-gray-400 hover:text-white transition"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">Room Name</label>
+                  <input
+                    type="text"
+                    value={roomForm.name}
+                    onChange={(e) => setRoomForm({...roomForm, name: e.target.value})}
+                    className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-purple-500"
+                    placeholder="Enter room name"
+                    maxLength={100}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">Description</label>
+                  <textarea
+                    value={roomForm.description}
+                    onChange={(e) => setRoomForm({...roomForm, description: e.target.value})}
+                    className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-purple-500 h-24 resize-none"
+                    placeholder="Describe your room (optional)"
+                    maxLength={500}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">Room Type</label>
+                  <select
+                    value={roomForm.type}
+                    onChange={(e) => setRoomForm({...roomForm, type: e.target.value as any})}
+                    className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-purple-500"
+                  >
+                    <option value="public">Public</option>
+                    <option value="private">Private</option>
+                    <option value="team">Team</option>
+                    <option value="direct">Direct</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">Max Members</label>
+                  <input
+                    type="number"
+                    value={roomForm.maxMembers}
+                    onChange={(e) => setRoomForm({...roomForm, maxMembers: parseInt(e.target.value)})}
+                    className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-purple-500"
+                    min="2"
+                    max="1000"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-4 pt-4">
+                <button
+                  onClick={() => setShowCreateRoomModal(false)}
+                  className="px-6 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleCreateRoom}
+                  disabled={!roomForm.name.trim()}
+                  className="px-6 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg transition"
+                >
+                  Create Room
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Teams Tab */}
         {activeTab === 'teams' && (
           <div>
@@ -1979,7 +2764,7 @@ const Community: React.FC = () => {
                   Cancel
                 </button>
                 <button
-                  onClick={handleSendMessage}
+                  onClick={handleSendDirectMessage}
                   disabled={!messageContent.trim()}
                   className="px-6 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg transition"
                 >

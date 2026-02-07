@@ -68,6 +68,9 @@ router.post("/teams", authMiddleware, userController.createTeam);
 // Join team
 router.post("/teams/:id/join", authMiddleware, userController.joinTeam);
 
+// Leave team
+router.post("/teams/:id/leave", authMiddleware, userController.leaveTeam);
+
 // Post a new project
 router.post("/projects", authMiddleware, userController.createProject);
 

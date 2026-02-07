@@ -18,6 +18,7 @@ const resourceRoutes = require('./routes/resources');
 const businessIdeaRoutes = require('./routes/businessIdeas');
 const mentorshipRoutes = require('./routes/mentorship');
 const messageRoutes = require('./routes/messages');
+const chatRoutes = require('./routes/chat');
 const dailyChallengeRoutes = require('./routes/dailyChallenge');
 const adminChallengeRoutes = require('./routes/adminChallenges');
 const twoFactorRoutes = require('./routes/twoFactor');
@@ -171,6 +172,8 @@ app.use("/api/sessions", sessionRoutes); // Session management routes
 app.use("/api/business-ideas", businessIdeaRoutes);
 app.use("/api/mentorship", mentorshipRoutes);
 app.use("/api/messages", messageRoutes); // Message routes (mounted at /api to handle /api/challenges/:id/messages)
+app.use("/api/chat", chatRoutes); // Chat routes
+app.use("/api/daily-challenge", dailyChallengeRoutes);
 
 // Error handler
 app.use(errorHandler);
@@ -179,4 +182,6 @@ app.use(errorHandler);
 server.listen(PORT, () => {
   logger.info(`Server running on port ${PORT}`);
   logger.info(`Socket.IO server initialized`);
+  // Initialize socket handler
+  socketHandler(io);
 });
