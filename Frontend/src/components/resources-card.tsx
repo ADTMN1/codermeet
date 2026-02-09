@@ -4,6 +4,7 @@ import { Card } from './ui/card';
 import { Button } from './ui/button';
 import { resourceService, Resource } from '../services/resourceService';
 import { useNavigate } from 'react-router-dom';
+import LoadingSpinner from './ui/loading-spinner';
 
 export function ResourcesCard() {
   const [resources, setResources] = useState<Resource[]>([]);
@@ -70,8 +71,7 @@ export function ResourcesCard() {
         <div className="space-y-2">
           {loading ? (
             <div className="flex items-center justify-center py-8">
-              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-cyan-400"></div>
-              <span className="ml-3 text-cyan-400 text-sm">Loading resources...</span>
+              <LoadingSpinner size="sm" text="Loading resources..." />
             </div>
           ) : error ? (
             <div className="text-center py-8">

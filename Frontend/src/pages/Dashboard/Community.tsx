@@ -320,7 +320,7 @@ const Community: React.FC = () => {
       case 'completed':
         return <FaCheckCircle className="w-3 h-3" />;
       case 'in-progress':
-        return <FaSpinner className="w-3 h-3" />;
+        return <FaSpinner className="w-3 h-3 animate-spin" />;
       case 'planned':
         return <FaFolderOpen className="w-3 h-3" />;
       default:
@@ -1808,7 +1808,10 @@ const emojiCategories = {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-900 flex items-center justify-center">
-        <div className="text-white text-xl">Loading community data...</div>
+        <div className="text-center">
+          <FaSpinner className="animate-spin text-purple-400 w-8 h-8 mx-auto mb-4" />
+          <p className="text-gray-400">Loading community data...</p>
+        </div>
       </div>
     );
   }
@@ -2934,7 +2937,7 @@ const emojiCategories = {
                         <span className="flex items-center justify-center gap-2">
                           {joiningTeamId === team._id ? (
                             <>
-                              <FaSpinner className="w-4 h-4 animate-spin" />
+                              <FaSpinner className="animate-spin text-purple-400 w-4 h-4" />
                               Processing...
                             </>
                           ) : team.members?.some(member => member._id === currentUserId) ? (
@@ -3738,7 +3741,7 @@ const emojiCategories = {
                 >
                   {joiningTeamId === selectedTeam._id ? (
                     <span className="flex items-center justify-center gap-2">
-                      <FaSpinner className="w-5 h-5 animate-spin" />
+                      <FaSpinner className="animate-spin text-purple-400 w-5 h-5" />
                       Processing...
                     </span>
                   ) : selectedTeam.members?.some(member => member._id === currentUserId) ? (

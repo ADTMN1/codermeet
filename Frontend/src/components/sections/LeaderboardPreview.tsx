@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { FaCrown, FaCode, FaStar, FaTrophy, FaChartLine, FaUsers, FaSync } from 'react-icons/fa';
 import { leaderboardService, LeaderboardUser } from '../../services/leaderboardService';
+import LoadingSpinner from '../ui/loading-spinner';
 
 export default function LeaderboardPreview() {
   const [topUsers, setTopUsers] = useState<LeaderboardUser[]>([]);
@@ -152,8 +153,7 @@ export default function LeaderboardPreview() {
       <div className="bg-black/90 rounded-xl p-8 shadow-lg shadow-purple-500/30 font-mono text-left text-green-400 overflow-hidden">
         {loading ? (
           <div className="flex items-center justify-center py-12">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-400"></div>
-            <span className="ml-3 text-green-400">Loading leaderboard...</span>
+            <LoadingSpinner size="md" text="Loading leaderboard..." />
           </div>
         ) : error ? (
           <div className="text-center py-12">

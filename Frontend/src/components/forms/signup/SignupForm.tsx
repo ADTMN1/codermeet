@@ -5,6 +5,7 @@ import { IoMdCheckboxOutline } from 'react-icons/io';
 import axios from 'axios';
 import { useUser } from '../../../context/UserContext';
 import { useNavigate } from 'react-router-dom';
+import LoadingSpinner from '../../ui/loading-spinner';
 
 import { FormData } from './types';
 import {
@@ -478,7 +479,7 @@ const SignupForm: React.FC = () => {
             >
               {isLoading || isSubmitting ? (
                 <>
-                  <FaSpinner className="animate-spin mr-2" />
+                  <LoadingSpinner size="sm" className="mr-2" />
                   Processing...
                 </>
               ) : (
@@ -496,7 +497,7 @@ const SignupForm: React.FC = () => {
             >
               {isLoading || isSubmitting ? (
                 <>
-                  <FaSpinner className="animate-spin" />
+                  <LoadingSpinner size="sm" className="mr-2" />
                   Creating Account...
                 </>
               ) : (

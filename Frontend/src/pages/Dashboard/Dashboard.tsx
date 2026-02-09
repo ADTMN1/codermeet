@@ -19,6 +19,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useUser } from '../../context/UserContext';
 import { authService } from '../../services/auth';
 import axios from 'axios';
+import LoadingSpinner from '../../components/ui/loading-spinner';
 
 interface DashboardLeaderboardUser {
   name: string;
@@ -207,7 +208,7 @@ const Dashboard: React.FC = () => {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-900">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-purple-500"></div>
+        <LoadingSpinner size="lg" text="Loading dashboard..." />
       </div>
     );
   }
@@ -380,32 +381,7 @@ const Dashboard: React.FC = () => {
             </button>
           </div>
 
-          {/* Leaderboard */}
-          <div className="bg-gray-800 p-6 rounded-xl shadow-lg border border-gray-700 hover:shadow-purple-500/30 transition">
-            <div className="flex items-center gap-3 mb-4">
-              <FaTrophy className="text-purple-400 w-6 h-6" />
-              <h2 className="text-xl font-bold text-white">Top Developers</h2>
-            </div>
-            <ul className="space-y-2">
-              {/* All users in the leaderboard */}
-              {leaderboard.map((user, i) => (
-                <li
-                  key={i}
-                  className="flex justify-between bg-gray-800 p-1 rounded-lg text-gray-300 border-l-4 border-purple-400 font-medium"
-                >
-                  <span>{user.rank}</span>
-                  <span>{user.name}</span>
-                  <span>{user.points} pts</span>
-                </li>
-              ))}
 
-              {/* Your own rank and points at the bottom */}
-              <li className="flex flex-col space-y-1 justify-between  p-1 rounded-lg text-white font-semibold  mt-4">
-                <span>Your Rank: 25</span>
-                <span>Total Points: 40</span>
-              </li>
-            </ul>
-          </div>
 
           {/* project submitted*/}
           <div className="bg-gray-800 p-6 rounded-xl shadow-lg border border-gray-700 hover:shadow-purple-500/30 transition">

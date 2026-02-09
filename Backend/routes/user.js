@@ -110,6 +110,9 @@ router.put(
   userController.updateProfilePicture
 );
 
+// Get user statistics
+router.get("/:id/stats", authMiddleware, userController.getUserStats);
+
 // Check if email or username exists
 router.get("/check-user", checkUserLimiter, userController.checkUser);
 

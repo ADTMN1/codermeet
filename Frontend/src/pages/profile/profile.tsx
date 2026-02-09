@@ -21,6 +21,7 @@ import { useNavigate } from 'react-router-dom';
 import { apiService } from '../../services/api';
 import { useUser, User } from '../../context/UserContext';
 import { toast } from 'sonner';
+import LoadingSpinner from '../../components/ui/loading-spinner';
 
 /* ----------------------------- Schema ----------------------------- */
 
@@ -418,7 +419,7 @@ const onSubmit: SubmitHandler<ProfileFormData> = async (formData) => {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-900">
-        <Loader2 className="h-10 w-10 animate-spin text-white" />
+        <LoadingSpinner size="lg" text="Loading profile..." />
       </div>
     );
   }
@@ -622,7 +623,7 @@ const onSubmit: SubmitHandler<ProfileFormData> = async (formData) => {
       >
         {uploadingImage ? (
           <>
-            <Loader2 className="animate-spin -ml-1 mr-2 h-4 w-4" />
+            <LoadingSpinner size="sm" className="mr-2" />
             Uploading...
           </>
         ) : (
@@ -662,7 +663,7 @@ const onSubmit: SubmitHandler<ProfileFormData> = async (formData) => {
                 >
                   {isSubmitting ? (
                     <>
-                      <Loader2 className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" />
+                      <LoadingSpinner size="sm" className="mr-2" />
                       Saving...
                     </>
                   ) : (

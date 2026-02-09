@@ -1,8 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import axios from 'axios';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useUser } from '../../context/UserContext';
 import { authService } from '../../services/auth';
+import LoadingSpinner from '../ui/loading-spinner';
 import { apiService } from '../../services/api';
 import { toast } from 'sonner';
 
@@ -237,7 +238,14 @@ const userData = response.data.data; // <--- user info is here
           transition-all duration-300 transform hover:scale-105 hover:shadow-[0_0_25px_#C27AFF] shadow-md cursor-pointer
           ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
         >
-          {isLoading ? 'Signing In...' : 'Sign In'}
+          {isLoading ? (
+            <>
+              <LoadingSpinner size="sm" className="mr-2" />
+              Signing In...
+            </>
+          ) : (
+            'Sign In'
+          )}
         </button>
 
         {/* Sign Up Link */}

@@ -15,6 +15,7 @@ import { Input } from './ui/input';
 import { Label } from '../components/ui/label';
 import { toast } from 'sonner';
 import { submissionService, SubmissionData } from '../services/submissionService';
+import LoadingSpinner from './ui/loading-spinner';
 
 interface UploadSectionProps {
   registrationMode: 'solo' | 'team';
@@ -239,7 +240,7 @@ export function UploadSection({ registrationMode, challengeId }: UploadSectionPr
             >
               {loading ? (
                 <>
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                  <LoadingSpinner size="sm" className="mr-2" />
                   Submitting...
                 </>
               ) : (

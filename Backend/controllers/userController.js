@@ -743,6 +743,55 @@ exports.likeAnnouncement = async (req, res) => {
   }
 };
 
+// Get user statistics
+exports.getUserStats = async (req, res) => {
+  try {
+    const { id: userId } = req.params;
+    const currentUserId = req.user.id;
+
+    // Users can only get their own stats
+    if (userId !== currentUserId) {
+      return res.status(403).json({ success: false, message: "Access denied" });
+    }
+
+    // Get user's submissions and calculate stats
+    const [submissions, dailySubmissions, businessIdeas, totalUsers] = await Promise.all([
+      Submission.countDocuments({ userId }),
+      DailySubmission.countDocuments({ userId }),
+      BusinessIdea.countDocuments({ userId }),
+      User.countDocuments()
+    ]);
+
+    const totalChallenges = submissions + dailySubmissions + businessIdeas;
+    
+    // Calculate completed challenges (those with score > 0 or status indicating completion)
+    const [completedSubmissions, completedDaily, completedBusiness] = await Promise.all([
+      Submission.countDocuments({ userId, score: { $gt: 0 } }),
+      DailySubmission.countDocuments({ userId, 'score.total': { $gt: 0 } }),
+      BusinessIdea.countDocuments({ userId, score: { $gt: 0 } })
+    ]);
+
+    const completedChallenges = completedSubmissions + completedDaily + completedBusiness;
+
+    // Get user's rank based on points
+    const user = await User.findById(userId).select('points');
+    const usersWithMorePoints = await User.countDocuments({ points: { $gt: user?.points || 0 } });
+    const rank = usersWithMorePoints + 1;
+
+    res.status(200).json({
+      success: true,
+      data: {
+        totalChallenges,
+        completedChallenges,
+        rank,
+        totalUsers
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Server error", error: error.message });
+  }
+};
+
 // Comment on an announcement
 exports.commentAnnouncement = async (req, res) => {
   try {
