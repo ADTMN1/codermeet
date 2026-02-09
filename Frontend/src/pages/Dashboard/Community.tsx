@@ -8,6 +8,7 @@ import {
   FaTrophy,
   FaSearch,
   FaUser,
+  FaUsers,
   FaGithub,
   FaExternalLinkAlt,
   FaHeart,
@@ -35,6 +36,7 @@ import {
   FaSearch as FaSearchIcon,
   FaBell
 } from 'react-icons/fa';
+import JobTab from '../../components/community/JobTab';
 import { 
   FaCog as FaCogIcon,
   FaPaperclip as FaPaperclipIcon,
@@ -136,6 +138,53 @@ interface Team {
   createdAt: string;
 }
 
+interface Job {
+  _id: string;
+  title: string;
+  description: string;
+  company: string;
+  location: string;
+  type: 'full-time' | 'part-time' | 'contract' | 'internship' | 'remote' | 'freelance';
+  experience: 'entry-level' | 'junior' | 'mid-level' | 'senior' | 'lead' | 'executive';
+  salary?: {
+    min?: number;
+    max?: number;
+    currency: string;
+    period: 'hourly' | 'monthly' | 'yearly';
+  };
+  skills: string[];
+  requirements: string[];
+  responsibilities: string[];
+  benefits?: string[];
+  applicationDeadline?: string;
+  isActive: boolean;
+  isFeatured: boolean;
+  postedBy: {
+    _id: string;
+    fullName: string;
+    username: string;
+    avatar?: string;
+  };
+  applicants: Array<{
+    user: {
+      _id: string;
+      fullName: string;
+      username: string;
+      avatar?: string;
+    };
+    appliedAt: string;
+    status: 'pending' | 'reviewing' | 'accepted' | 'rejected';
+    coverLetter?: string;
+    resumeUrl?: string;
+  }>;
+  views: number;
+  likes: number;
+  tags: string[];
+  createdAt: string;
+  updatedAt: string;
+  isLiked?: boolean;
+}
+
 interface ChatRoom {
   _id: string;
   name: string;
@@ -155,6 +204,7 @@ const Community: React.FC = () => {
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
+  const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -191,6 +241,35 @@ const Community: React.FC = () => {
     skillsNeeded: '',
     expiresIn: 7 // default 7 days
   });
+  const [showJobModal, setShowJobModal] = useState(false);
+  const [showJobDetailsModal, setShowJobDetailsModal] = useState(false);
+  const [selectedJob, setSelectedJob] = useState<Job | null>(null);
+  const [showApplyModal, setShowApplyModal] = useState(false);
+  const [showApplicantsModal, setShowApplicantsModal] = useState(false);
+  const [selectedJobApplicants, setSelectedJobApplicants] = useState<any[]>([]);
+  const [jobForm, setJobForm] = useState({
+    title: '',
+    description: '',
+    company: '',
+    location: '',
+    type: 'full-time' as 'full-time' | 'part-time' | 'contract' | 'internship' | 'remote' | 'freelance',
+    experience: 'entry-level' as 'entry-level' | 'junior' | 'mid-level' | 'senior' | 'lead' | 'executive',
+    salaryMin: '',
+    salaryMax: '',
+    skills: '',
+    requirements: '',
+    responsibilities: '',
+    benefits: '',
+    applicationDeadline: '',
+    tags: ''
+  });
+  const [applyForm, setApplyForm] = useState({
+    coverLetter: '',
+    resumeUrl: ''
+  });
+  const [jobTypeFilter, setJobTypeFilter] = useState('all');
+  const [jobExperienceFilter, setJobExperienceFilter] = useState('all');
+  const [jobLocationFilter, setJobLocationFilter] = useState('');
 
   // Get current user ID on mount
   useEffect(() => {
@@ -402,6 +481,79 @@ const Community: React.FC = () => {
     }
   };
 
+  const fetchJobs = async () => {
+    try {
+      const token = localStorage.getItem('auth_token');
+      const params = new URLSearchParams();
+      
+      if (jobTypeFilter !== 'all') params.append('type', jobTypeFilter);
+      if (jobExperienceFilter !== 'all') params.append('experience', jobExperienceFilter);
+      if (jobLocationFilter) params.append('location', jobLocationFilter);
+      if (searchTerm) params.append('search', searchTerm);
+      
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/jobs?${params}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (response.ok) {
+        const responseJson = await response.json();
+        const jobs = responseJson.data || [];
+        
+        
+        // Also fetch user's liked jobs to determine isLiked status
+        try {
+          const userResponse = await fetch(`${import.meta.env.VITE_API_URL}/api/users/profile`, {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+            },
+          });
+          
+          
+          if (userResponse.ok) {
+            const userData = await userResponse.json();
+            const likedJobIds = userData.data?.likedJobs || [];
+            
+            // Add isLiked property to each job
+            const jobsWithLikeStatus = jobs.map(job => ({
+              ...job,
+              likes: Math.max(0, job.likes || 0), // Reset negative likes to 0
+              isLiked: likedJobIds.includes(job._id)
+            }));
+            
+            
+            setJobs(jobsWithLikeStatus);
+          } else {
+            // Also fix likes in fallback case
+            const jobsFixedLikes = jobs.map(job => ({
+              ...job,
+              likes: Math.max(0, job.likes || 0), // Reset negative likes to 0
+              isLiked: false
+            }));
+            setJobs(jobsFixedLikes);
+          }
+        } catch (error) {
+          // Also fix likes in error case
+          const jobsFixedLikes = jobs.map(job => ({
+            ...job,
+            likes: Math.max(0, job.likes || 0), // Reset negative likes to 0
+            isLiked: false
+          }));
+          setJobs(jobsFixedLikes);
+        }
+      } else {
+        // Failed to fetch jobs
+        // Fallback to empty array if backend fails
+        setJobs([]);
+      }
+    } catch (error) {
+      // Error fetching jobs
+      // Fallback to empty array on error
+      setJobs([]);
+    }
+  };
+
   // Chat states
   const [chatRooms, setChatRooms] = useState<ChatRoom[]>([]);
   const [selectedChatRoom, setSelectedChatRoom] = useState<ChatRoom | null>(null);
@@ -414,6 +566,8 @@ const Community: React.FC = () => {
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [activeEmojiCategory, setActiveEmojiCategory] = useState('smileys');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filteredMessages, setFilteredMessages] = useState<any[]>([]);
   const [roomForm, setRoomForm] = useState({
     name: '',
     description: '',
@@ -421,6 +575,13 @@ const Community: React.FC = () => {
     maxMembers: 100
   });
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Fetch messages when selected room changes
+  useEffect(() => {
+    if (selectedChatRoom) {
+      fetchMessages(selectedChatRoom._id);
+    }
+  }, [selectedChatRoom]);
 
   // Close emoji picker when clicking outside
   useEffect(() => {
@@ -450,16 +611,15 @@ const Community: React.FC = () => {
       });
 
       newSocket.on('connect', () => {
-        console.log('Connected to chat server with socket ID:', newSocket.id);
         fetchChatRooms();
       });
 
       newSocket.on('disconnect', (reason) => {
-        console.log('Disconnected from chat server:', reason);
+        // Handle disconnect
       });
 
       newSocket.on('connect_error', (error) => {
-        console.error('Socket connection error:', error);
+        // Handle connection error
       });
 
       newSocket.on('roomsList', (rooms: ChatRoom[]) => {
@@ -472,9 +632,22 @@ const Community: React.FC = () => {
       });
 
       newSocket.on('newMessage', (message: any) => {
-        console.log('📨 Received newMessage:', message);
         if (selectedChatRoom && message.roomId === selectedChatRoom._id) {
           setMessages(prev => [...prev, message]);
+          // Also update filteredMessages to include the new message
+          setFilteredMessages(prev => {
+            const updated = [...prev, message];
+            // Apply current search filter
+            if (!searchQuery.trim()) {
+              return updated;
+            } else {
+              return updated.filter(msg => 
+                msg.content?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                msg.senderId?.fullName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                msg.fileName?.toLowerCase().includes(searchQuery.toLowerCase())
+              );
+            }
+          });
           scrollToBottom();
         }
       });
@@ -586,7 +759,6 @@ const Community: React.FC = () => {
     try {
       const token = localStorage.getItem('auth_token');
       if (!token) {
-        console.error('No auth token found');
         return;
       }
       
@@ -600,25 +772,21 @@ const Community: React.FC = () => {
       if (response.ok) {
         const data = await response.json();
         setMessages(data.data || []);
+        setSearchQuery(''); // Clear search when loading new messages
         scrollToBottom();
       } else {
-        console.error('Failed to fetch messages:', response.status, response.statusText);
         setMessages([]);
       }
     } catch (error) {
-      console.error('Error fetching messages:', error);
       setMessages([]);
     }
   };
 
   const handleSelectRoom = (room: ChatRoom) => {
-    console.log('🏠 Selecting room:', room);
     setSelectedChatRoom(room);
+    setSearchQuery(''); // Clear search when switching rooms
     if (socket) {
-      console.log('📡 Emitting joinRoom for room:', room._id);
       socket.emit('joinRoom', { roomId: room._id });
-    } else {
-      console.log('❌ No socket available for room join');
     }
   };
 
@@ -633,7 +801,6 @@ const Community: React.FC = () => {
           fileSize: uploadedFile?.size
         };
 
-        console.log('📤 Sending message:', message);
         socket.emit('sendMessage', message);
         setMessageInput('');
         setUploadedFile(null);
@@ -646,13 +813,6 @@ const Community: React.FC = () => {
           clearTimeout(typingTimeout);
           setTypingTimeout(null);
         }
-      } else {
-        console.log('❌ Cannot send message:', {
-          hasMessage: !!messageInput.trim(),
-          hasFile: !!uploadedFile,
-          hasSocket: !!socket,
-          hasRoom: !!selectedChatRoom
-        });
       }
     }
   };
@@ -668,6 +828,20 @@ const Community: React.FC = () => {
       setUploadedFile(file);
     }
   };
+
+  // Filter messages based on search query
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      setFilteredMessages(messages);
+    } else {
+      const filtered = messages.filter(message => 
+        message.content?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        message.senderId?.fullName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        message.fileName?.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+      setFilteredMessages(filtered);
+    }
+  }, [messages, searchQuery]);
 
   const handleEmojiSelect = (emoji: string) => {
     setMessageInput(prev => prev + emoji);
@@ -726,10 +900,8 @@ const emojiCategories = {
     // Clear existing timeout
     if (typingTimeout) {
       clearTimeout(typingTimeout);
+      setTypingTimeout(null);
     }
-    
-    // Start typing
-    handleTypingStart();
     
     // Set timeout to stop typing after 1 second of inactivity
     const newTimeout = setTimeout(() => {
@@ -895,6 +1067,274 @@ const emojiCategories = {
       }
     } catch (error) {
       // Error commenting on project
+    }
+  };
+
+  // Job handlers
+  const handleCreateJob = async () => {
+    if (!jobForm.title.trim() || !jobForm.description.trim() || !jobForm.company.trim()) {
+      showNotification('error', 'Title, description, and company are required');
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('auth_token');
+      const jobData = {
+        title: jobForm.title,
+        description: jobForm.description,
+        company: jobForm.company,
+        location: jobForm.location,
+        type: jobForm.type,
+        experience: jobForm.experience,
+        skills: jobForm.skills.split(',').map(skill => skill.trim()).filter(Boolean),
+        requirements: jobForm.requirements.split('\n').filter(Boolean),
+        responsibilities: jobForm.responsibilities.split('\n').filter(Boolean),
+        benefits: jobForm.benefits ? jobForm.benefits.split('\n').filter(Boolean) : [],
+        applicationDeadline: jobForm.applicationDeadline || null,
+        tags: jobForm.tags.split(',').map(tag => tag.trim()).filter(Boolean),
+        salary: jobForm.salaryMin || jobForm.salaryMax ? {
+          min: jobForm.salaryMin ? parseInt(jobForm.salaryMin) : undefined,
+          max: jobForm.salaryMax ? parseInt(jobForm.salaryMax) : undefined,
+          currency: 'USD',
+          period: 'yearly'
+        } : undefined
+      };
+
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/jobs`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(jobData),
+      });
+
+      if (response.ok) {
+        const responseJson = await response.json();
+        const newJob = responseJson.data;
+        
+        setJobs(prev => [newJob, ...prev]);
+        setShowJobModal(false);
+        setJobForm({
+          title: '',
+          description: '',
+          company: '',
+          location: '',
+          type: 'full-time',
+          experience: 'entry-level',
+          salaryMin: '',
+          salaryMax: '',
+          skills: '',
+          requirements: '',
+          responsibilities: '',
+          benefits: '',
+          applicationDeadline: '',
+          tags: ''
+        });
+        showNotification('success', 'Job posted successfully!');
+      } else {
+        const errorData = await response.json();
+        showNotification('error', errorData.message || 'Failed to post job');
+      }
+    } catch (error) {
+      console.error('Error creating job:', error);
+      showNotification('error', 'Error creating job');
+    }
+  };
+
+  const handleLikeJob = async (jobId: string) => {
+    try {
+      const token = localStorage.getItem('auth_token');
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/jobs/${jobId}/like`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        const responseJson = await response.json();
+        const { likes, isLiked } = responseJson.data;
+        
+        setJobs(prev => prev.map(job => 
+          job._id === jobId 
+            ? { ...job, likes, isLiked }
+            : job
+        ));
+        
+      } else {
+      }
+    } catch (error) {
+      console.error('Error liking job:', error);
+    }
+  };
+
+  const hasUserApplied = (job: Job): boolean => {
+    if (!currentUserId || !job.applicants) return false;
+    return job.applicants.some(applicant => {
+      const userId = typeof applicant.user === 'string' ? applicant.user : applicant.user._id;
+      return userId === currentUserId;
+    });
+  };
+
+  const getApplicationStatus = (job: Job): string => {
+    if (!currentUserId || !job.applicants) return '';
+    const application = job.applicants.find(applicant => {
+      const userId = typeof applicant.user === 'string' ? applicant.user : applicant.user._id;
+      return userId === currentUserId;
+    });
+    return application?.status || '';
+  };
+
+  const handleApplyForJob = async (jobId: string) => {
+    // Check if user has already applied
+    const job = jobs.find(j => j._id === jobId);
+    if (hasUserApplied(job!)) {
+      showNotification('error', 'You have already applied for this job');
+      return;
+    }
+
+    if (!applyForm.coverLetter.trim()) {
+      showNotification('error', 'Cover letter is required');
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('auth_token');
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/jobs/${jobId}/apply`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          coverLetter: applyForm.coverLetter,
+          resumeUrl: applyForm.resumeUrl
+        }),
+      });
+
+      if (response.ok) {
+        const responseJson = await response.json();
+        const updatedJob = responseJson.data;
+        
+        setJobs(prev => prev.map(job => 
+          job._id === jobId ? updatedJob : job
+        ));
+        
+        setShowApplyModal(false);
+        setApplyForm({ coverLetter: '', resumeUrl: '' });
+        showNotification('success', 'Application submitted successfully!');
+      } else {
+        const errorData = await response.json();
+        showNotification('error', errorData.message || 'Failed to submit application');
+      }
+    } catch (error) {
+      console.error('Error applying for job:', error);
+      showNotification('error', 'Error submitting application');
+    }
+  };
+
+  const handleViewJob = async (jobId: string) => {
+    try {
+      const token = localStorage.getItem('auth_token');
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/jobs/${jobId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (response.ok) {
+        const responseJson = await response.json();
+        const job = responseJson.data;
+        setSelectedJob(job);
+        setShowJobDetailsModal(true);
+      } else {
+        showNotification('error', 'Failed to fetch job details');
+      }
+    } catch (error) {
+      console.error('Error fetching job details:', error);
+      showNotification('error', 'Error fetching job details');
+    }
+  };
+
+  const handleViewApplicants = async (jobId: string) => {
+    try {
+      const token = localStorage.getItem('auth_token');
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/jobs/${jobId}/applicants`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (response.ok) {
+        const responseJson = await response.json();
+        const applicants = responseJson.data || [];
+        setSelectedJobApplicants(applicants);
+        setShowApplicantsModal(true);
+      } else {
+        const errorData = await response.json();
+        showNotification('error', errorData.message || 'Failed to fetch applicants');
+      }
+    } catch (error) {
+      console.error('Error fetching applicants:', error);
+      showNotification('error', 'Error fetching applicants');
+    }
+  };
+
+  const handleAcceptApplicant = async (jobId: string, applicantId: string) => {
+    try {
+      const token = localStorage.getItem('auth_token');
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/jobs/${jobId}/accept-applicant`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ applicantId }),
+      });
+
+      if (response.ok) {
+        const responseJson = await response.json();
+        showNotification('success', 'Applicant accepted successfully!');
+        
+        // Refresh applicants list to get updated data
+        await handleViewApplicants(jobId);
+      } else {
+        const errorData = await response.json();
+        showNotification('error', errorData.message || 'Failed to accept applicant');
+      }
+    } catch (error) {
+      console.error('Error accepting applicant:', error);
+      showNotification('error', 'Error accepting applicant');
+    }
+  };
+
+  const handleRejectApplicant = async (jobId: string, applicantId: string) => {
+    try {
+      const token = localStorage.getItem('auth_token');
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/jobs/${jobId}/reject-applicant`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ applicantId }),
+      });
+
+      if (response.ok) {
+        const responseJson = await response.json();
+        showNotification('success', 'Applicant rejected successfully!');
+        
+        // Refresh applicants list to get updated data
+        await handleViewApplicants(jobId);
+      } else {
+        const errorData = await response.json();
+        showNotification('error', errorData.message || 'Failed to reject applicant');
+      }
+    } catch (error) {
+      console.error('Error rejecting applicant:', error);
+      showNotification('error', 'Error rejecting applicant');
     }
   };
 
@@ -1292,6 +1732,7 @@ const emojiCategories = {
         fetchAnnouncements(),
         fetchMembers(),
         fetchTeams(),
+        fetchJobs(),
         fetchChatRooms()
       ]);
     } catch (error) {
@@ -1304,6 +1745,13 @@ const emojiCategories = {
   useEffect(() => {
     fetchAllCommunityData();
   }, []);
+
+  // Refetch jobs when filters change
+  useEffect(() => {
+    if (activeTab === 'professional') {
+      fetchJobs();
+    }
+  }, [jobTypeFilter, jobExperienceFilter, jobLocationFilter, searchTerm, activeTab]);
 
 
   const isTeamExpired = (expiresAt: string) => {
@@ -1932,6 +2380,13 @@ const emojiCategories = {
           </div>
         )}
 
+        {/* Jobs / Professional Tab */}
+        {activeTab === 'professional' && (
+          <div>
+            <JobTab onApplied={() => showNotification('success', 'Application submitted')} />
+          </div>
+        )}
+
         {/* Chat Tab */}
         {activeTab === 'chat' && (
           <div className="h-[calc(100vh-12rem)]">
@@ -1991,16 +2446,29 @@ const emojiCategories = {
                   {/* Chat Header */}
                   <div className="p-4 border-b border-gray-700 bg-gray-800">
                     <div className="flex items-center justify-between">
-                      <div>
-                        <h2 className="text-lg font-semibold text-white">{selectedChatRoom.name}</h2>
-                        {selectedChatRoom.description && (
-                          <p className="text-gray-400 text-sm">{selectedChatRoom.description}</p>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <button className="p-2 text-gray-400 hover:text-white transition">
-                          <FaSearchIcon className="w-5 h-5" />
-                        </button>
+                      <h2 className="text-xl font-bold text-white flex items-center gap-3">
+                        <FaComments className="w-5 h-5 text-purple-400" />
+                        {selectedChatRoom?.name || 'Chat Room'}
+                      </h2>
+                      <div className="flex items-center gap-3">
+                        <div className="relative">
+                          <input
+                            type="text"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            placeholder="Search messages..."
+                            className="pl-10 pr-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-purple-500 w-64"
+                          />
+                          <FaSearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                          {searchQuery && (
+                            <button
+                              onClick={() => setSearchQuery('')}
+                              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white transition"
+                            >
+                              ✕
+                            </button>
+                          )}
+                        </div>
                         <button className="p-2 text-gray-400 hover:text-white transition">
                           <FaCogIcon className="w-5 h-5" />
                         </button>
@@ -2010,7 +2478,7 @@ const emojiCategories = {
 
                   {/* Messages */}
                   <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                    {messages.map((message, index) => {
+                    {filteredMessages.map((message, index) => {
                       const isCurrentUser = message.senderId?._id === currentUserId;
                       const showDate = index === 0 || new Date(message.createdAt).toDateString() !== new Date(messages[index - 1]?.createdAt).toDateString();
                       
@@ -2518,6 +2986,213 @@ const emojiCategories = {
                 <FaHandshake className="w-16 h-16 text-gray-600 mx-auto mb-4" />
                 <h3 className="text-xl font-semibold text-white mb-2">No teams found</h3>
                 <p className="text-gray-400">Create your first team to get started!</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Jobs Tab */}
+        {activeTab === 'professional' && (
+          <div>
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold text-white flex items-center gap-3">
+                <FaBriefcase className="w-6 h-6 text-purple-400" />
+                Jobs
+              </h2>
+              <div className="flex items-center gap-4">
+                <span className="text-gray-400">
+                  {jobs.length} jobs
+                </span>
+                <button
+                  onClick={() => setShowJobModal(true)}
+                  className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition flex items-center gap-2"
+                >
+                  <FaPlus className="w-4 h-4" />
+                  Post Job
+                </button>
+              </div>
+            </div>
+
+            {/* Job Filters */}
+            <div className="bg-gray-800 rounded-xl p-4 mb-6 border border-gray-700">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">Job Type</label>
+                  <select
+                    value={jobTypeFilter}
+                    onChange={(e) => setJobTypeFilter(e.target.value)}
+                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-purple-500"
+                  >
+                    <option value="all">All Types</option>
+                    <option value="full-time">Full Time</option>
+                    <option value="part-time">Part Time</option>
+                    <option value="contract">Contract</option>
+                    <option value="internship">Internship</option>
+                    <option value="remote">Remote</option>
+                    <option value="freelance">Freelance</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">Experience Level</label>
+                  <select
+                    value={jobExperienceFilter}
+                    onChange={(e) => setJobExperienceFilter(e.target.value)}
+                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-purple-500"
+                  >
+                    <option value="all">All Levels</option>
+                    <option value="entry-level">Entry Level</option>
+                    <option value="junior">Junior</option>
+                    <option value="mid-level">Mid Level</option>
+                    <option value="senior">Senior</option>
+                    <option value="lead">Lead</option>
+                    <option value="executive">Executive</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">Location</label>
+                  <input
+                    type="text"
+                    value={jobLocationFilter}
+                    onChange={(e) => setJobLocationFilter(e.target.value)}
+                    placeholder="Filter by location..."
+                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-purple-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">Search</label>
+                  <input
+                    type="text"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    placeholder="Search jobs..."
+                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-purple-500"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Jobs Grid */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+              {jobs.map((job) => (
+                <div key={job._id} className="bg-gradient-to-br from-slate-800 via-slate-900 to-slate-800 rounded-xl border border-slate-700 overflow-hidden hover:border-purple-500/40 transition-all duration-300 hover:shadow-xl hover:shadow-purple-500/20 hover:scale-[1.03]">
+                  {/* Header */}
+                  <div className="bg-gradient-to-r from-purple-600/15 via-blue-600/15 to-transparent px-6 py-6 border-b border-slate-700">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1 min-w-0">
+                        <h3 className="text-lg font-bold text-white truncate">{job.title}</h3>
+                        <p className="text-purple-300 font-medium mt-1">{job.company}</p>
+                        <div className="flex items-center gap-3 mt-2">
+                          <span className="flex items-center gap-2 text-sm text-gray-400">
+                            <FaMapMarkerAlt className="w-4 h-4" />
+                            {job.location}
+                          </span>
+                          {job.isFeatured && (
+                            <span className="px-2 py-1 bg-amber-500/20 text-amber-300 text-xs rounded-lg border border-amber-500/20">
+                              FEATURED
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Body */}
+                  <div className="p-6">
+                    {/* Description */}
+                    <p className="text-gray-300 text-sm mb-4 line-clamp-3 leading-relaxed">
+                      {job.description}
+                    </p>
+
+                    {/* Job Details */}
+                    <div className="mb-4 space-y-2">
+                      <div className="flex items-center gap-2 text-sm">
+                        <span className="text-gray-400">Type:</span>
+                        <span className="text-purple-300 capitalize">{job.type.replace('-', ' ')}</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-sm">
+                        <span className="text-gray-400">Experience:</span>
+                        <span className="text-purple-300 capitalize">{job.experience.replace('-', ' ')}</span>
+                      </div>
+                      {job.salary && (
+                        <div className="flex items-center gap-2 text-sm">
+                          <span className="text-gray-400">Salary:</span>
+                          <span className="text-green-300">
+                            ${job.salary.min?.toLocaleString()} - ${job.salary.max?.toLocaleString()}/{job.salary.period}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Skills */}
+                    {job.skills && job.skills.length > 0 && (
+                      <div className="mb-4">
+                        <div className="flex flex-wrap gap-2">
+                          {job.skills.slice(0, 3).map((skill, index) => (
+                            <span key={index} className="px-3 py-1 bg-purple-500/15 text-purple-300 text-xs rounded-lg border border-purple-500/20">
+                              {skill}
+                            </span>
+                          ))}
+                          {job.skills.length > 3 && (
+                            <span className="px-3 py-1 bg-gray-600/20 text-gray-400 text-xs rounded-lg">
+                              +{job.skills.length - 3}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Footer */}
+                    <div className="flex items-center justify-between text-sm text-gray-400 mb-4">
+                      <span>Posted by {job.postedBy?.fullName}</span>
+                      <span>{new Date(job.createdAt).toLocaleDateString()}</span>
+                    </div>
+
+                    {/* Actions */}
+                    <div className="flex gap-3">
+                      <button
+                        onClick={() => handleViewJob(job._id)}
+                        className="flex-1 px-4 py-2.5 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg hover:from-purple-700 hover:to-blue-700 transition-all duration-200 text-sm font-medium transform hover:scale-105 shadow-lg shadow-purple-500/25"
+                      >
+                        <span className="flex items-center justify-center gap-2">
+                          <FaEye className="w-4 h-4" />
+                          View Details
+                        </span>
+                      </button>
+                      {job.postedBy._id === currentUserId && (
+                        <button
+                          onClick={() => handleViewApplicants(job._id)}
+                          className="px-4 py-2.5 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-all duration-200 text-sm font-medium transform hover:scale-105 shadow-lg shadow-amber-500/25"
+                        >
+                          <span className="flex items-center justify-center gap-2">
+                            <FaUsers className="w-4 h-4" />
+                            Applicants ({job.applicants?.length || 0})
+                          </span>
+                        </button>
+                      )}
+                      <button
+                        onClick={() => handleLikeJob(job._id)}
+                        className={`px-4 py-2.5 rounded-lg transition-all duration-200 text-sm font-medium transform hover:scale-105 ${
+                          job.isLiked
+                            ? 'bg-red-600 text-white shadow-lg shadow-red-500/25'
+                            : 'bg-slate-700 text-slate-300 hover:bg-slate-600 shadow-md'
+                        }`}
+                      >
+                        <span className="flex items-center gap-2">
+                          <FaHeart className="w-4 h-4" />
+                          {job.likes}
+                        </span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {jobs.length === 0 && (
+              <div className="text-center py-12">
+                <FaBriefcase className="w-16 h-16 text-gray-600 mx-auto mb-4" />
+                <h3 className="text-xl font-semibold text-white mb-2">No jobs found</h3>
+                <p className="text-gray-400">Be the first to post a job opportunity!</p>
               </div>
             )}
           </div>
@@ -3097,6 +3772,594 @@ const emojiCategories = {
           </div>
         </div>
       )}
+
+      {/* Job Post Modal */}
+      {showJobModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-800 rounded-xl p-6 w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold text-white">Post a Job</h2>
+              <button
+                onClick={() => setShowJobModal(false)}
+                className="text-gray-400 hover:text-white transition"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">Job Title *</label>
+                  <input
+                    type="text"
+                    value={jobForm.title}
+                    onChange={(e) => setJobForm({...jobForm, title: e.target.value})}
+                    className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-purple-500"
+                    placeholder="e.g. Senior React Developer"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">Company *</label>
+                  <input
+                    type="text"
+                    value={jobForm.company}
+                    onChange={(e) => setJobForm({...jobForm, company: e.target.value})}
+                    className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-purple-500"
+                    placeholder="Company name"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">Location</label>
+                  <input
+                    type="text"
+                    value={jobForm.location}
+                    onChange={(e) => setJobForm({...jobForm, location: e.target.value})}
+                    className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-purple-500"
+                    placeholder="e.g. New York, NY or Remote"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">Job Type</label>
+                  <select
+                    value={jobForm.type}
+                    onChange={(e) => setJobForm({...jobForm, type: e.target.value as any})}
+                    className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-purple-500"
+                  >
+                    <option value="full-time">Full Time</option>
+                    <option value="part-time">Part Time</option>
+                    <option value="contract">Contract</option>
+                    <option value="internship">Internship</option>
+                    <option value="remote">Remote</option>
+                    <option value="freelance">Freelance</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">Experience Level</label>
+                  <select
+                    value={jobForm.experience}
+                    onChange={(e) => setJobForm({...jobForm, experience: e.target.value as any})}
+                    className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-purple-500"
+                  >
+                    <option value="entry-level">Entry Level</option>
+                    <option value="junior">Junior</option>
+                    <option value="mid-level">Mid Level</option>
+                    <option value="senior">Senior</option>
+                    <option value="lead">Lead</option>
+                    <option value="executive">Executive</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">Application Deadline</label>
+                  <input
+                    type="date"
+                    value={jobForm.applicationDeadline}
+                    onChange={(e) => setJobForm({...jobForm, applicationDeadline: e.target.value})}
+                    className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-purple-500"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">Salary Min (USD)</label>
+                  <input
+                    type="number"
+                    value={jobForm.salaryMin}
+                    onChange={(e) => setJobForm({...jobForm, salaryMin: e.target.value})}
+                    className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-purple-500"
+                    placeholder="e.g. 50000"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">Salary Max (USD)</label>
+                  <input
+                    type="number"
+                    value={jobForm.salaryMax}
+                    onChange={(e) => setJobForm({...jobForm, salaryMax: e.target.value})}
+                    className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-purple-500"
+                    placeholder="e.g. 80000"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">Description *</label>
+                <textarea
+                  value={jobForm.description}
+                  onChange={(e) => setJobForm({...jobForm, description: e.target.value})}
+                  className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-purple-500 h-32 resize-none"
+                  placeholder="Describe the role, company culture, and what you're looking for..."
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">Responsibilities *</label>
+                <textarea
+                  value={jobForm.responsibilities}
+                  onChange={(e) => setJobForm({...jobForm, responsibilities: e.target.value})}
+                  className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-purple-500 h-24 resize-none"
+                  placeholder="List key responsibilities (one per line)"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">Requirements *</label>
+                <textarea
+                  value={jobForm.requirements}
+                  onChange={(e) => setJobForm({...jobForm, requirements: e.target.value})}
+                  className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-purple-500 h-24 resize-none"
+                  placeholder="List required skills and qualifications (one per line)"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">Benefits</label>
+                <textarea
+                  value={jobForm.benefits}
+                  onChange={(e) => setJobForm({...jobForm, benefits: e.target.value})}
+                  className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-purple-500 h-20 resize-none"
+                  placeholder="List benefits and perks (one per line, optional)"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">Skills *</label>
+                <input
+                  type="text"
+                  value={jobForm.skills}
+                  onChange={(e) => setJobForm({...jobForm, skills: e.target.value})}
+                  className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-purple-500"
+                  placeholder="e.g. React, Node.js, MongoDB (comma-separated)"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">Tags</label>
+                <input
+                  type="text"
+                  value={jobForm.tags}
+                  onChange={(e) => setJobForm({...jobForm, tags: e.target.value})}
+                  className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-purple-500"
+                  placeholder="e.g. frontend, backend, fullstack (comma-separated, optional)"
+                />
+              </div>
+
+              <div className="flex gap-4 pt-4">
+                <button
+                  onClick={handleCreateJob}
+                  className="flex-1 px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition font-medium"
+                >
+                  Post Job
+                </button>
+                <button
+                  onClick={() => setShowJobModal(false)}
+                  className="px-6 py-3 bg-gray-700 text-gray-300 rounded-lg hover:bg-gray-600 transition"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Job Details Modal */}
+      {showJobDetailsModal && selectedJob && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-800 rounded-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+            <div className="bg-gradient-to-r from-purple-600/20 to-blue-600/20 px-8 py-6 border-b border-gray-700">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-2xl font-bold text-white">{selectedJob.title}</h2>
+                  <p className="text-purple-300 text-lg mt-1">{selectedJob.company}</p>
+                  <div className="flex items-center gap-4 mt-3">
+                    <span className="flex items-center gap-2 text-gray-300">
+                      <FaMapMarkerAlt className="w-4 h-4" />
+                      {selectedJob.location}
+                    </span>
+                    <span className="px-3 py-1 bg-purple-500/20 text-purple-300 rounded-lg text-sm capitalize">
+                      {selectedJob.type.replace('-', ' ')}
+                    </span>
+                    <span className="px-3 py-1 bg-blue-500/20 text-blue-300 rounded-lg text-sm capitalize">
+                      {selectedJob.experience.replace('-', ' ')}
+                    </span>
+                    {selectedJob.isFeatured && (
+                      <span className="px-3 py-1 bg-amber-500/20 text-amber-300 rounded-lg text-sm">
+                        FEATURED
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowJobDetailsModal(false);
+                    setSelectedJob(null);
+                  }}
+                  className="text-gray-400 hover:text-white transition text-2xl"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+
+            <div className="p-8">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <div className="lg:col-span-2 space-y-6">
+                  <div>
+                    <h3 className="text-lg font-semibold text-white mb-3">Job Description</h3>
+                    <p className="text-gray-300 leading-relaxed">{selectedJob.description}</p>
+                  </div>
+
+                  <div>
+                    <h3 className="text-lg font-semibold text-white mb-3">Responsibilities</h3>
+                    <ul className="space-y-2">
+                      {selectedJob.responsibilities.map((resp, index) => (
+                        <li key={index} className="text-gray-300 flex items-start gap-2">
+                          <span className="text-purple-400 mt-1">•</span>
+                          {resp}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  <div>
+                    <h3 className="text-lg font-semibold text-white mb-3">Requirements</h3>
+                    <ul className="space-y-2">
+                      {selectedJob.requirements.map((req, index) => (
+                        <li key={index} className="text-gray-300 flex items-start gap-2">
+                          <span className="text-purple-400 mt-1">•</span>
+                          {req}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  {selectedJob.benefits && selectedJob.benefits.length > 0 && (
+                    <div>
+                      <h3 className="text-lg font-semibold text-white mb-3">Benefits</h3>
+                      <ul className="space-y-2">
+                        {selectedJob.benefits.map((benefit, index) => (
+                          <li key={index} className="text-gray-300 flex items-start gap-2">
+                            <span className="text-green-400 mt-1">✓</span>
+                            {benefit}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-6">
+                  <div className="bg-gray-700/50 rounded-xl p-6">
+                    <h3 className="text-lg font-semibold text-white mb-4">Job Details</h3>
+                    <div className="space-y-3">
+                      {selectedJob.salary && (
+                        <div>
+                          <span className="text-gray-400 text-sm">Salary:</span>
+                          <p className="text-green-300 font-semibold">
+                            ${selectedJob.salary.min?.toLocaleString()} - ${selectedJob.salary.max?.toLocaleString()}/{selectedJob.salary.period}
+                          </p>
+                        </div>
+                      )}
+                      {selectedJob.applicationDeadline && (
+                        <div>
+                          <span className="text-gray-400 text-sm">Application Deadline:</span>
+                          <p className="text-white">{new Date(selectedJob.applicationDeadline).toLocaleDateString()}</p>
+                        </div>
+                      )}
+                      <div>
+                        <span className="text-gray-400 text-sm">Posted:</span>
+                        <p className="text-white">{new Date(selectedJob.createdAt).toLocaleDateString()}</p>
+                      </div>
+                      <div>
+                        <span className="text-gray-400 text-sm">Views:</span>
+                        <p className="text-white">{selectedJob.views}</p>
+                      </div>
+                      <div>
+                        <span className="text-gray-400 text-sm">Applicants:</span>
+                        <p className="text-white">{selectedJob.applicants?.length || 0}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-gray-700/50 rounded-xl p-6">
+                    <h3 className="text-lg font-semibold text-white mb-4">Skills Required</h3>
+                    <div className="flex flex-wrap gap-2">
+                      {selectedJob.skills.map((skill, index) => (
+                        <span key={index} className="px-3 py-1 bg-purple-500/20 text-purple-300 text-sm rounded-lg">
+                          {skill}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="bg-gray-700/50 rounded-xl p-6">
+                    <h3 className="text-lg font-semibold text-white mb-4">Posted By</h3>
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center">
+                        <span className="text-white font-bold">
+                          {selectedJob.postedBy?.fullName ? selectedJob.postedBy.fullName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : 'U'}
+                        </span>
+                      </div>
+                      <div>
+                        <p className="text-white font-medium">{selectedJob.postedBy?.fullName}</p>
+                        <p className="text-gray-400 text-sm">@{selectedJob.postedBy?.username}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    {hasUserApplied(selectedJob) ? (
+                      <div className="w-full px-6 py-3 bg-gray-600 text-gray-300 rounded-lg cursor-not-allowed text-center font-medium">
+                        Applied
+                        {getApplicationStatus(selectedJob) && (
+                          <span className="block text-sm mt-1">
+                            Status: {getApplicationStatus(selectedJob)}
+                          </span>
+                        )}
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => {
+                          // Check if user has already applied before opening modal
+                          if (hasUserApplied(selectedJob)) {
+                            showNotification('error', 'You have already applied for this job');
+                            return;
+                          }
+                          setShowJobDetailsModal(false);
+                          setShowApplyModal(true);
+                        }}
+                        className="w-full px-6 py-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg hover:from-purple-700 hover:to-blue-700 transition font-medium"
+                      >
+                        Apply Now
+                      </button>
+                    )}
+                    <button
+                      onClick={() => handleLikeJob(selectedJob._id)}
+                      className={`w-full px-6 py-3 rounded-lg transition font-medium ${
+                        selectedJob.isLiked
+                          ? 'bg-red-600 text-white hover:bg-red-700'
+                          : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                      }`}
+                    >
+                      {selectedJob.isLiked ? '❤️ Liked' : '🤍 Like Job'} ({selectedJob.likes})
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Apply for Job Modal */}
+      {showApplyModal && selectedJob && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-800 rounded-xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h2 className="text-2xl font-bold text-white">Apply for Job</h2>
+                <p className="text-purple-300 mt-1">{selectedJob.title} at {selectedJob.company}</p>
+              </div>
+              <button
+                onClick={() => {
+                  setShowApplyModal(false);
+                  setApplyForm({ coverLetter: '', resumeUrl: '' });
+                }}
+                className="text-gray-400 hover:text-white transition text-2xl"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">Cover Letter *</label>
+                <textarea
+                  value={applyForm.coverLetter}
+                  onChange={(e) => setApplyForm({...applyForm, coverLetter: e.target.value})}
+                  className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-purple-500 h-40 resize-none"
+                  placeholder="Introduce yourself and explain why you're a great fit for this position..."
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">Resume URL</label>
+                <input
+                  type="url"
+                  value={applyForm.resumeUrl}
+                  onChange={(e) => setApplyForm({...applyForm, resumeUrl: e.target.value})}
+                  className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-purple-500"
+                  placeholder="https://example.com/resume.pdf (optional)"
+                />
+              </div>
+
+              <div className="flex gap-4 pt-4">
+                <button
+                  onClick={() => handleApplyForJob(selectedJob._id)}
+                  className="flex-1 px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition font-medium"
+                >
+                  Submit Application
+                </button>
+                <button
+                  onClick={() => {
+                    setShowApplyModal(false);
+                    setApplyForm({ coverLetter: '', resumeUrl: '' });
+                  }}
+                  className="px-6 py-3 bg-gray-700 text-gray-300 rounded-lg hover:bg-gray-600 transition"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Applicants Modal */}
+      {showApplicantsModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-800 rounded-xl p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h2 className="text-2xl font-bold text-white">Job Applicants</h2>
+                <p className="text-purple-300 mt-1">Manage applications for your job posting</p>
+              </div>
+              <button
+                onClick={() => {
+                  setShowApplicantsModal(false);
+                  setSelectedJobApplicants([]);
+                }}
+                className="text-gray-400 hover:text-white transition text-2xl"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              {selectedJobApplicants.length === 0 ? (
+                <div className="text-center py-12">
+                  <div className="w-16 h-16 rounded-full bg-gray-700 flex items-center justify-center mx-auto mb-4">
+                    <FaUsers className="w-8 h-8 text-gray-400" />
+                  </div>
+                  <p className="text-gray-400 text-lg">No applicants yet</p>
+                  <p className="text-gray-500 text-sm mt-2">Applications will appear here when candidates apply</p>
+                </div>
+              ) : (
+                selectedJobApplicants.map((applicant, index) => (
+                  <div key={index} className="bg-gray-700/50 rounded-xl p-6 border border-gray-600">
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center">
+                          <span className="text-white font-bold text-lg">
+                            {applicant.user.fullName ? applicant.user.fullName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : 'U'}
+                          </span>
+                        </div>
+                        <div>
+                          <h3 className="text-lg font-semibold text-white">{applicant.user.fullName}</h3>
+                          <p className="text-gray-400 text-sm">@{applicant.user.username}</p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                              applicant.status === 'accepted' ? 'bg-green-500/20 text-green-300' :
+                              applicant.status === 'rejected' ? 'bg-red-500/20 text-red-300' :
+                              'bg-amber-500/20 text-amber-300'
+                            }`}>
+                              {applicant.status || 'pending'}
+                            </span>
+                            <span className="text-gray-400 text-xs">
+                              Applied {new Date(applicant.appliedAt).toLocaleDateString()}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {applicant.status !== 'accepted' && applicant.status !== 'rejected' && (
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => selectedJob && handleAcceptApplicant(selectedJob._id, applicant.user._id)}
+                            className="px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition text-sm font-medium"
+                          >
+                            Accept
+                          </button>
+                          <button
+                            onClick={() => selectedJob && handleRejectApplicant(selectedJob._id, applicant.user._id)}
+                            className="px-3 py-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition text-sm font-medium"
+                          >
+                            Reject
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                      <div>
+                        <h4 className="text-sm font-medium text-gray-400 mb-1">Contact Information</h4>
+                        <div className="space-y-1">
+                          <p className="text-white text-sm flex items-center gap-2">
+                            <FaEnvelope className="w-3 h-3 text-gray-400" />
+                            {applicant.user.email}
+                          </p>
+                        </div>
+                      </div>
+                      
+                      <div>
+                        <h4 className="text-sm font-medium text-gray-400 mb-1">Experience</h4>
+                        <p className="text-white text-sm">{applicant.user.experience || 'Not specified'}</p>
+                      </div>
+                    </div>
+
+                    {applicant.user.skills && applicant.user.skills.length > 0 && (
+                      <div className="mb-4">
+                        <h4 className="text-sm font-medium text-gray-400 mb-2">Skills</h4>
+                        <div className="flex flex-wrap gap-2">
+                          {applicant.user.skills.map((skill: string, skillIndex: number) => (
+                            <span key={skillIndex} className="px-2 py-1 bg-purple-500/20 text-purple-300 text-xs rounded-lg">
+                              {skill}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {applicant.coverLetter && (
+                      <div className="mb-4">
+                        <h4 className="text-sm font-medium text-gray-400 mb-2">Cover Letter</h4>
+                        <div className="bg-gray-600/30 rounded-lg p-3">
+                          <p className="text-gray-300 text-sm leading-relaxed">{applicant.coverLetter}</p>
+                        </div>
+                      </div>
+                    )}
+
+                    {applicant.resumeUrl && (
+                      <div>
+                        <h4 className="text-sm font-medium text-gray-400 mb-2">Resume</h4>
+                        <a
+                          href={applicant.resumeUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-2 text-purple-400 hover:text-purple-300 text-sm transition"
+                        >
+                          <FaExternalLinkAlt className="w-3 h-3" />
+                          View Resume
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      
     </div>
   );
 };

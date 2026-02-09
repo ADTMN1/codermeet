@@ -38,6 +38,9 @@ const checkUserLimiter = rateLimit({
 // Get current logged-in user
 router.get("/me", authMiddleware, userController.me);
 
+// Get user profile (including liked jobs)
+router.get("/profile", authMiddleware, userController.me);
+
 // Get user's projects
 router.get("/projects", authMiddleware, userController.getUserProjects);
 

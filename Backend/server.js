@@ -23,6 +23,7 @@ const dailyChallengeRoutes = require('./routes/dailyChallenge');
 const adminChallengeRoutes = require('./routes/adminChallenges');
 const twoFactorRoutes = require('./routes/twoFactor');
 const sessionRoutes = require('./routes/sessions');
+const jobRoutes = require('./routes/job');
 
 // Import models
 const User = require('./models/user');
@@ -174,6 +175,7 @@ app.use("/api/mentorship", mentorshipRoutes);
 app.use("/api/messages", messageRoutes); // Message routes (mounted at /api to handle /api/challenges/:id/messages)
 app.use("/api/chat", chatRoutes); // Chat routes
 app.use("/api/daily-challenge", dailyChallengeRoutes);
+app.use("/api/jobs", jobRoutes); // Job routes
 
 // Error handler
 app.use(errorHandler);

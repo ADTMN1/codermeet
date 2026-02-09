@@ -9,7 +9,10 @@ const Team = require("../models/team");
 // Get current logged-in user
 exports.me = async (req, res) => {
   try {
-    const user = await User.findById(req.user.id).select("-password");
+    const user = await User.findById(req.user.id)
+      .select("-password")
+      .populate('likedJobs', 'title company');
+    
     if (!user) {
       return res.status(404).json({ success: false, message: "User not found" });
     }
