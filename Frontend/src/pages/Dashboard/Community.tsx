@@ -320,7 +320,7 @@ const Community: React.FC = () => {
       case 'completed':
         return <FaCheckCircle className="w-3 h-3" />;
       case 'in-progress':
-        return <FaSpinner className="w-3 h-3 animate-spin" />;
+        return <FaSpinner className="w-3 h-3" />;
       case 'planned':
         return <FaFolderOpen className="w-3 h-3" />;
       default:
@@ -501,6 +501,9 @@ const Community: React.FC = () => {
         const responseJson = await response.json();
         const jobs = responseJson.data || [];
         
+        // Debug: log job data structure
+        console.log('Fetched jobs:', jobs);
+        console.log('Job likes data BEFORE fix:', jobs.map(job => ({ id: job._id, likes: job.likes, isLiked: job.isLiked })));
         
         // Also fetch user's liked jobs to determine isLiked status
         try {
@@ -510,10 +513,13 @@ const Community: React.FC = () => {
             },
           });
           
+          console.log('User profile response status:', userResponse.status);
           
           if (userResponse.ok) {
             const userData = await userResponse.json();
+            console.log('User profile data:', userData);
             const likedJobIds = userData.data?.likedJobs || [];
+            console.log('Liked job IDs:', likedJobIds);
             
             // Add isLiked property to each job
             const jobsWithLikeStatus = jobs.map(job => ({
@@ -522,24 +528,29 @@ const Community: React.FC = () => {
               isLiked: likedJobIds.includes(job._id)
             }));
             
+            console.log('Jobs with like status AFTER fix:', jobsWithLikeStatus.map(job => ({ id: job._id, likes: job.likes, isLiked: job.isLiked })));
             
             setJobs(jobsWithLikeStatus);
           } else {
+            console.log('User profile fetch failed, setting jobs without isLiked');
             // Also fix likes in fallback case
             const jobsFixedLikes = jobs.map(job => ({
               ...job,
               likes: Math.max(0, job.likes || 0), // Reset negative likes to 0
               isLiked: false
             }));
+            console.log('Jobs with likes fixed in fallback:', jobsFixedLikes.map(job => ({ id: job._id, likes: job.likes })));
             setJobs(jobsFixedLikes);
           }
         } catch (error) {
+          console.log('Error fetching user profile:', error);
           // Also fix likes in error case
           const jobsFixedLikes = jobs.map(job => ({
             ...job,
             likes: Math.max(0, job.likes || 0), // Reset negative likes to 0
             isLiked: false
           }));
+          console.log('Jobs with likes fixed in error case:', jobsFixedLikes.map(job => ({ id: job._id, likes: job.likes })));
           setJobs(jobsFixedLikes);
         }
       } else {
@@ -1155,7 +1166,10 @@ const emojiCategories = {
 
       if (response.ok) {
         const responseJson = await response.json();
+        console.log('Like response from backend:', responseJson);
         const { likes, isLiked } = responseJson.data;
+        
+        console.log('Updating job with:', { likes, isLiked });
         
         setJobs(prev => prev.map(job => 
           job._id === jobId 
@@ -1163,7 +1177,13 @@ const emojiCategories = {
             : job
         ));
         
+        console.log('Jobs after like update:', prev => prev.map(job => 
+          job._id === jobId 
+            ? { ...job, likes, isLiked }
+            : job
+        ));
       } else {
+        console.log('Like request failed:', response.status);
       }
     } catch (error) {
       console.error('Error liking job:', error);
@@ -1178,25 +1198,16 @@ const emojiCategories = {
     });
   };
 
-  const getApplicationStatus = (job: Job): string => {
-    if (!currentUserId || !job.applicants) return '';
-    const application = job.applicants.find(applicant => {
-      const userId = typeof applicant.user === 'string' ? applicant.user : applicant.user._id;
-      return userId === currentUserId;
-    });
-    return application?.status || '';
-  };
-
   const handleApplyForJob = async (jobId: string) => {
-    // Check if user has already applied
-    const job = jobs.find(j => j._id === jobId);
-    if (hasUserApplied(job!)) {
-      showNotification('error', 'You have already applied for this job');
+    if (!applyForm.coverLetter.trim()) {
+      showNotification('error', 'Cover letter is required');
       return;
     }
 
-    if (!applyForm.coverLetter.trim()) {
-      showNotification('error', 'Cover letter is required');
+    // Check if user has already applied for this job
+    const job = jobs.find(j => j._id === jobId);
+    if (job && hasUserApplied(job)) {
+      showNotification('error', 'You have already applied for this job');
       return;
     }
 
@@ -1808,10 +1819,7 @@ const emojiCategories = {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-900 flex items-center justify-center">
-        <div className="text-center">
-          <FaSpinner className="animate-spin text-purple-400 w-8 h-8 mx-auto mb-4" />
-          <p className="text-gray-400">Loading community data...</p>
-        </div>
+        <div className="text-white text-xl">Loading community data...</div>
       </div>
     );
   }
@@ -2937,7 +2945,7 @@ const emojiCategories = {
                         <span className="flex items-center justify-center gap-2">
                           {joiningTeamId === team._id ? (
                             <>
-                              <FaSpinner className="animate-spin text-purple-400 w-4 h-4" />
+                              <FaSpinner className="w-4 h-4 animate-spin" />
                               Processing...
                             </>
                           ) : team.members?.some(member => member._id === currentUserId) ? (
@@ -3741,7 +3749,7 @@ const emojiCategories = {
                 >
                   {joiningTeamId === selectedTeam._id ? (
                     <span className="flex items-center justify-center gap-2">
-                      <FaSpinner className="animate-spin text-purple-400 w-5 h-5" />
+                      <FaSpinner className="w-5 h-5 animate-spin" />
                       Processing...
                     </span>
                   ) : selectedTeam.members?.some(member => member._id === currentUserId) ? (
@@ -4119,31 +4127,20 @@ const emojiCategories = {
                   </div>
 
                   <div className="space-y-3">
-                    {hasUserApplied(selectedJob) ? (
-                      <div className="w-full px-6 py-3 bg-gray-600 text-gray-300 rounded-lg cursor-not-allowed text-center font-medium">
-                        Applied
-                        {getApplicationStatus(selectedJob) && (
-                          <span className="block text-sm mt-1">
-                            Status: {getApplicationStatus(selectedJob)}
-                          </span>
-                        )}
-                      </div>
-                    ) : (
-                      <button
-                        onClick={() => {
-                          // Check if user has already applied before opening modal
-                          if (hasUserApplied(selectedJob)) {
-                            showNotification('error', 'You have already applied for this job');
-                            return;
-                          }
-                          setShowJobDetailsModal(false);
-                          setShowApplyModal(true);
-                        }}
-                        className="w-full px-6 py-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg hover:from-purple-700 hover:to-blue-700 transition font-medium"
-                      >
-                        Apply Now
-                      </button>
-                    )}
+                    <button
+                      onClick={() => {
+                        setShowJobDetailsModal(false);
+                        setShowApplyModal(true);
+                      }}
+                      disabled={selectedJob && hasUserApplied(selectedJob)}
+                      className={`w-full px-6 py-3 rounded-lg transition font-medium ${
+                        selectedJob && hasUserApplied(selectedJob)
+                          ? 'bg-gray-600 text-gray-300 cursor-not-allowed'
+                          : 'bg-gradient-to-r from-purple-600 to-blue-600 text-white hover:from-purple-700 hover:to-blue-700'
+                      }`}
+                    >
+                      {selectedJob && hasUserApplied(selectedJob) ? 'Already Applied' : 'Apply Now'}
+                    </button>
                     <button
                       onClick={() => handleLikeJob(selectedJob._id)}
                       className={`w-full px-6 py-3 rounded-lg transition font-medium ${
@@ -4207,9 +4204,14 @@ const emojiCategories = {
               <div className="flex gap-4 pt-4">
                 <button
                   onClick={() => handleApplyForJob(selectedJob._id)}
-                  className="flex-1 px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition font-medium"
+                  disabled={selectedJob && hasUserApplied(selectedJob)}
+                  className={`flex-1 px-6 py-3 rounded-lg transition font-medium ${
+                    selectedJob && hasUserApplied(selectedJob)
+                      ? 'bg-gray-600 text-gray-300 cursor-not-allowed'
+                      : 'bg-purple-600 hover:bg-purple-700 text-white'
+                  }`}
                 >
-                  Submit Application
+                  {selectedJob && hasUserApplied(selectedJob) ? 'Already Applied' : 'Submit Application'}
                 </button>
                 <button
                   onClick={() => {

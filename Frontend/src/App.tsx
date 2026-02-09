@@ -11,6 +11,8 @@ import DashboardLayout from './components/layout/Private/DashboardLayout';
 import Dashboard from './pages/Dashboard/Dashboard';
 import WeeklyChallenge from './pages/Dashboard/WeeklyChallenge';
 import Community from './pages/Dashboard/Community';
+import Developers from './pages/Dashboard/Developers';
+import Notifications from './pages/Dashboard/Notifications';
 import Profile from './pages/profile/profile';
 import Resources from './pages/Resources';
 import DailyCoding from './pages/DailyCoding';
@@ -96,6 +98,8 @@ function App() {
             <Route path="dashboard" element={<Dashboard />} />
             <Route path="weeklyChallenge" element={<WeeklyChallenge />} />
             <Route path="community" element={<Community />} />
+            <Route path="developers" element={<Developers />} />
+            <Route path="notifications" element={<Notifications />} />
             <Route path="resources" element={<Resources />} />
             <Route path="daily-challenge" element={<DailyCoding />} />
             <Route path="business-competition" element={<BusinessIdeaCompetition />} />

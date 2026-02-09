@@ -113,6 +113,12 @@ router.put(
 // Get user statistics
 router.get("/:id/stats", authMiddleware, userController.getUserStats);
 
+// Notification routes
+router.get("/notifications", authMiddleware, userController.getNotifications);
+router.patch("/notifications/:id/read", authMiddleware, userController.markNotificationAsRead);
+router.patch("/notifications/read-all", authMiddleware, userController.markAllNotificationsAsRead);
+router.delete("/notifications/:id", authMiddleware, userController.deleteNotification);
+
 // Check if email or username exists
 router.get("/check-user", checkUserLimiter, userController.checkUser);
 

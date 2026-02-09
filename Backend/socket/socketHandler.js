@@ -2,6 +2,7 @@
 const Message = require('../models/message');
 const Challenge = require('../models/challenge');
 const User = require('../models/user');
+const Notification = require('../models/notification');
 const jwt = require('jsonwebtoken');
 const chatServer = require('./chatServer');
 
@@ -210,6 +211,15 @@ module.exports = (io) => {
         userId,
         isTyping: false
       });
+    });
+
+    // Join notification room
+    socket.on('join-notifications', () => {
+      const userId = socket.userId;
+      if (userId) {
+        socket.join(`user_${userId}`);
+        console.log(`User ${userId} joined notification room`);
+      }
     });
 
     // Handle disconnect

@@ -12,7 +12,8 @@ import {
   FaMedal,
   FaAward,
   FaCheckCircle,
-  FaLightbulb
+  FaLightbulb,
+  FaCrown
 } from 'react-icons/fa';
 
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -380,7 +381,6 @@ const Dashboard: React.FC = () => {
               {user?.plan?.toLowerCase() === 'trial' ? 'Upgrade Required' : 'Solve Now'}
             </button>
           </div>
-
 
 
           {/* project submitted*/}
