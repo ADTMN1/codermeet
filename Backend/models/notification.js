@@ -88,7 +88,7 @@ notificationSchema.statics.markAsRead = function(notificationId, userId) {
 notificationSchema.statics.markAllAsRead = function(userId) {
   return this.updateMany(
     { recipient: userId, read: false },
-    { read: true }
+    { read: true, $unset: { metadata: "" } }
   ).exec();
 };
 

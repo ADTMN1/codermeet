@@ -45,6 +45,7 @@ const Dashboard: React.FC = () => {
     totalUsers: 0,
   });
   const [mentorshipSession, setMentorshipSession] = useState<any>(null);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   // Check for payment success in URL and recent payment completion
   useEffect(() => {
@@ -154,8 +155,51 @@ const Dashboard: React.FC = () => {
     { name: 'Team Beta', project: 'Portfolio Builder', progress: 45 },
   ];
 
-  const unreadCount = 3;
   const onprogress = 45;
+
+  // Fetch unread notification count
+  const fetchUnreadCount = async () => {
+    try {
+      const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      const token = localStorage.getItem('auth_token');
+      
+      if (!token) return;
+
+      const response = await axios.get(`${API_BASE_URL}/api/users/notifications/count`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      if (response.data?.success) {
+        setUnreadCount(response.data.count || 0);
+      }
+    } catch (error) {
+      console.error('Error fetching unread count:', error);
+    }
+  };
+
+  // Listen for new notifications
+  useEffect(() => {
+    if (user?._id) {
+      fetchUnreadCount();
+      
+      const handleNewNotification = () => {
+        setUnreadCount(prev => prev + 1);
+        fetchUnreadCount(); // Refresh count from server
+      };
+
+      const handleNotificationUpdate = () => {
+        fetchUnreadCount(); // Refresh count from server
+      };
+
+      window.addEventListener('new-notification', handleNewNotification);
+      window.addEventListener('notification-updated', handleNotificationUpdate);
+      
+      return () => {
+        window.removeEventListener('new-notification', handleNewNotification);
+        window.removeEventListener('notification-updated', handleNotificationUpdate);
+      };
+    }
+  }, [user?._id]);
 
   const handleJoin = () => {
     if (user?.plan?.toLowerCase() === 'trial') {
@@ -183,6 +227,11 @@ const Dashboard: React.FC = () => {
       // Navigate to mentorship dashboard
       navigate('/mentorship-dashboard');
     }
+  };
+
+  const handleNotificationClick = () => {
+    navigate('/notifications');
+    setUnreadCount(0); // Reset count when clicked
   };
 
   const getPlanBadge = (plan?: string) => {
@@ -277,11 +326,15 @@ const Dashboard: React.FC = () => {
                 <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-gray-800"></span>
               </div>
               <div className="flex items-center space-x-2">
-                <button className="relative p-2 rounded-full hover:bg-gray-700 transition">
+                <button 
+                  onClick={handleNotificationClick}
+                  className="relative p-2 rounded-full hover:bg-gray-700 transition"
+                  title="Notifications"
+                >
                   <FaBell className="w-6 h-6 text-white" />
                   {unreadCount > 0 && (
                     <span className="absolute top-0 right-0 inline-flex items-center justify-center px-1.5 py-0.5 text-xs font-bold leading-none text-white bg-red-500 rounded-full transform translate-x-1/2 -translate-y-1/2">
-                      {unreadCount}
+                      {unreadCount > 99 ? '99+' : unreadCount}
                     </span>
                   )}
                 </button>
