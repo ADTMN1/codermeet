@@ -177,6 +177,12 @@ app.use("/api/chat", chatRoutes); // Chat routes
 app.use("/api/daily-challenge", dailyChallengeRoutes);
 app.use("/api/jobs", jobRoutes); // Job routes
 
+// Make io available to routes
+app.use((req, res, next) => {
+  req.io = io;
+  next();
+});
+
 // Error handler
 app.use(errorHandler);
 

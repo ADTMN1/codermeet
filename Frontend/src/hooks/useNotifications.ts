@@ -25,9 +25,8 @@ export const useNotifications = () => {
     if (!user?._id) return;
 
     // Initialize socket connection
-    const token = localStorage.getItem('auth_token');
     const socket = io(import.meta.env.VITE_API_URL || 'http://localhost:5000', {
-      auth: { token },
+      auth: { token: localStorage.getItem('auth_token') },
       transports: ['websocket', 'polling']
     });
 

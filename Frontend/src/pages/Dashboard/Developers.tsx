@@ -234,12 +234,19 @@ const Developers: React.FC = () => {
 
     try {
       setSendingMessage(true);
-      // Here you would typically send the message to your backend
-      console.log('Sending message:', {
-        to: messagePopup.developer._id,
-        from: user._id,
-        message: messageText
-      });
+      
+      // Send message to backend API
+      const response = await axios.post(
+        `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/users/message/${messagePopup.developer._id}`,
+        {
+          message: messageText.trim()
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem('auth_token')}`
+          }
+        }
+      );
       
       // Send message and show success toast
       showSuccessToast(`Message sent to ${messagePopup.developer.fullName} successfully!`);

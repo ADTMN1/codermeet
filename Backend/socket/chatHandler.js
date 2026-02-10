@@ -1,6 +1,7 @@
 const ChatRoom = require('../models/chatRoom');
 const ChatMessage = require('../models/chatMessage');
 const User = require('../models/user');
+const Notification = require('../models/notification');
 const jwt = require('jsonwebtoken');
 
 // Store connected users and their rooms
@@ -9,36 +10,37 @@ const userRooms = new Map(); // userId -> Set of roomIds
 
 // Authentication middleware for Socket.IO
 const authenticateSocket = async (socket, next) => {
-  try {
-    console.log('🔐 Socket handshake auth:', socket.handshake.auth);
-    console.log('🔐 Socket handshake headers:', socket.handshake.headers);
-    
-    const token = socket.handshake.auth.token;
-    
-    if (!token) {
-      console.log('❌ No token found in socket auth');
-      return next(new Error('Authentication required'));
-    }
+  socket.on('authenticate', async (data, callback) => {
+    try {
+      const { token } = data;
+      if (!token) {
+        return next(new Error('Authentication required'));
+      }
 
-    console.log('🔑 Verifying token...');
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    console.log('🔑 Token decoded:', decoded);
-    
-    const user = await User.findById(decoded.id).select('fullName username avatar');
-    
-    if (!user) {
-      console.log('❌ User not found for ID:', decoded.id);
-      return next(new Error('User not found'));
-    }
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      
+      const user = await User.findById(decoded.id).select('fullName username avatar');
+      if (!user) {
+        return next(new Error('User not found'));
+      }
 
-    console.log('✅ User authenticated:', user.fullName);
-    socket.userId = user._id;
-    socket.user = user;
-    next();
-  } catch (error) {
-    console.error('❌ Socket authentication error:', error);
-    next(new Error('Authentication failed'));
-  }
+      socket.userId = decoded.id;
+      socket.user = user;
+      socket.username = user.username;
+
+      // Join notification room for real-time notifications
+      socket.join(`user_${decoded.id}`);
+      
+      // Track connected users
+      connectedUsers.set(decoded.id, socket);
+      
+      callback({ success: true, user: { id: user._id, fullName: user.fullName, username: user.username } });
+      next();
+    } catch (error) {
+      callback({ success: false, message: 'Authentication failed' });
+      next(new Error('Authentication failed'));
+    }
+  });
 };
 
 // Helper functions
@@ -89,14 +91,11 @@ const sendSystemMessage = (io, roomId, content, type = 'system') => {
 
 // Main chat handler
 const handleChatConnection = (io) => {
-  console.log('🚀 Initializing chat handler...');
   io.use(authenticateSocket);
 
   // Handle connection after authentication
   io.on('connection', async (socket) => {
     try {
-      console.log(`🔌 User ${socket.user?.fullName} connected to chat with socket ID: ${socket.id}`);
-      
       // Add to connected users
       connectedUsers.set(socket.userId, socket);
       
@@ -187,8 +186,6 @@ const handleChatConnection = (io) => {
             userRole: room.ownerId.toString() === socket.userId ? 'owner' : 'member'
           });
           
-          console.log(`User ${socket.user.fullName} joined room ${room.name}`);
-          
         } catch (error) {
           socket.emit('error', { message: 'Error joining room' });
           console.error('Join room error:', error);
@@ -225,8 +222,6 @@ const handleChatConnection = (io) => {
             roomUsers
           });
           
-          console.log(`User ${socket.user.fullName} left room ${room.name}`);
-          
         } catch (error) {
           socket.emit('error', { message: 'Error leaving room' });
           console.error('Leave room error:', error);
@@ -235,7 +230,6 @@ const handleChatConnection = (io) => {
       
       socket.on('sendMessage', async (data) => {
         try {
-          console.log('📨 Received sendMessage event:', data);
           const { roomId, content, type = 'text', replyTo, mentions, fileName, fileSize } = data;
           
           // Verify user has access to room
@@ -272,6 +266,45 @@ const handleChatConnection = (io) => {
             .populate('replyTo')
             .populate('mentions.userId', 'fullName username');
           
+          // Create notifications for room members (except sender)
+          const notificationPromises = [];
+          room.members.forEach(member => {
+            const memberId = member.userId.toString();
+            if (memberId !== socket.userId) {
+              const notificationData = {
+                recipient: memberId,
+                sender: socket.userId,
+                title: 'New Message',
+                message: `${socket.user.fullName} sent a message in ${room.name}: ${content.substring(0, 50)}${content.length > 50 ? '...' : ''}`,
+                type: 'message',
+                metadata: {
+                  roomId: roomId,
+                  messageId: savedMessage._id,
+                  roomName: room.name
+                }
+              };
+              
+              notificationPromises.push(
+                Notification.createNotification(notificationData).then(notification => {
+                  // Emit real-time notification to user
+                  const recipientSocket = connectedUsers.get(memberId);
+                  if (recipientSocket) {
+                    Notification.findById(notification._id)
+                      .populate('sender', 'fullName username avatar')
+                      .populate('recipient', 'fullName username avatar')
+                      .then(populatedNotification => {
+                        recipientSocket.emit('new-notification', populatedNotification.toJSON());
+                      });
+                  }
+                  return notification;
+                })
+              );
+            }
+          });
+          
+          // Create all notifications in parallel
+          await Promise.all(notificationPromises);
+          
           // Broadcast to room
           broadcastToRoom(io, roomId, 'newMessage', populatedMessage.toJSON());
           
@@ -293,8 +326,6 @@ const handleChatConnection = (io) => {
             });
           }
           
-          console.log(`Message sent in room ${room.name} by ${socket.user.fullName}`);
-          
         } catch (error) {
           socket.emit('error', { message: 'Error sending message' });
           console.error('Send message error:', error);
@@ -303,7 +334,6 @@ const handleChatConnection = (io) => {
       
       socket.on('typing', async (data) => {
         try {
-          console.log('⌨️ Received typing event:', data);
           const { roomId, isTyping } = data;
           
           // Verify user has access to room
@@ -380,8 +410,6 @@ const handleChatConnection = (io) => {
           
           broadcastToRoom(io, roomId, 'reactionAdded', reactionData);
           
-          console.log(`Reaction ${emoji} added to message by ${socket.user.fullName}`);
-          
         } catch (error) {
           socket.emit('error', { message: 'Error adding reaction' });
           console.error('Reaction error:', error);
@@ -438,8 +466,6 @@ const handleChatConnection = (io) => {
           };
           
           broadcastToRoom(io, roomId, 'messagePinned', pinData);
-          
-          console.log(`Message pinned by ${socket.user.fullName}`);
           
         } catch (error) {
           socket.emit('error', { message: 'Error pinning message' });
@@ -499,8 +525,6 @@ const handleChatConnection = (io) => {
           
           broadcastToRoom(io, roomId, 'messageEdited', editData);
           
-          console.log(`Message edited by ${socket.user.fullName}`);
-          
         } catch (error) {
           socket.emit('error', { message: 'Error editing message' });
           console.error('Edit message error:', error);
@@ -552,8 +576,6 @@ const handleChatConnection = (io) => {
           
           broadcastToRoom(io, roomId, 'messageDeleted', deleteData);
           
-          console.log(`Message deleted by ${socket.user.fullName}`);
-          
         } catch (error) {
           socket.emit('error', { message: 'Error deleting message' });
           console.error('Delete message error:', error);
@@ -562,8 +584,6 @@ const handleChatConnection = (io) => {
       
       socket.on('disconnect', async () => {
         try {
-          console.log(`User ${socket.user.fullName} disconnected`);
-          
           // Remove from connected users
           connectedUsers.delete(socket.userId);
           

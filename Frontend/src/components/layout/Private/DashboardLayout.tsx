@@ -2,11 +2,15 @@ import React, { useEffect } from 'react';
 import { Outlet, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import { authService } from '../../../services/auth';
+import { useNotifications } from '../../../hooks/useNotifications';
 
 const DashboardLayout: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  
+  // Initialize notifications for real-time updates
+  useNotifications();
 
   // Check authentication on mount and route change
   useEffect(() => {

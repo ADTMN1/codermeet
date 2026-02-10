@@ -1,5 +1,5 @@
 // Sidebar.tsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import {
   FaHome,
@@ -11,23 +11,71 @@ import {
   FaSignOutAlt,
   FaUser,
   FaBars,
+  FaBell
 } from 'react-icons/fa';
 import { TbArrowLeft } from 'react-icons/tb';
 import { Avatar, AvatarImage, AvatarFallback } from '../../ui/avatar';
 import { useUser } from '../../../context/UserContext';
+import axios from 'axios';
 
 export default function Sidebar() {
   const { user, logout } = useUser(); // Use logout from context
   const [collapsed, setCollapsed] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
   const navigate = useNavigate();
   const location = useLocation();
+  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+
+  // Fetch unread notification count
+  const fetchUnreadCount = async () => {
+    try {
+      const token = localStorage.getItem('auth_token');
+      if (!token) return;
+
+      const response = await axios.get(`${API_URL}/api/users/notifications/count`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      if (response.data?.success) {
+        setUnreadCount(response.data.count || 0);
+      }
+    } catch (error) {
+      console.error('Error fetching unread count:', error);
+    }
+  };
+
+  // Listen for new notifications and fetch initial count
+  useEffect(() => {
+    if (user?._id) {
+      fetchUnreadCount();
+      
+      // Listen for new notifications
+      const handleNewNotification = () => {
+        setUnreadCount(prev => prev + 1);
+        fetchUnreadCount(); // Refresh count from server
+      };
+
+      // Listen for notification deletions/reads
+      const handleNotificationUpdate = () => {
+        fetchUnreadCount(); // Refresh count from server
+      };
+
+      window.addEventListener('new-notification', handleNewNotification);
+      window.addEventListener('notification-updated', handleNotificationUpdate);
+      
+      return () => {
+        window.removeEventListener('new-notification', handleNewNotification);
+        window.removeEventListener('notification-updated', handleNotificationUpdate);
+      };
+    }
+  }, [user?._id]);
 
   const links = [
     { to: '/dashboard', label: 'Dashboard', icon: <FaHome /> },
     { to: '/community', label: 'Community', icon: <FaUsers /> },
     { to: '/developers', label: 'Find Developers', icon: <FaCode /> },
     { to: '/projects', label: 'Projects', icon: <FaProjectDiagram /> },
-    { to: '/messages', label: 'Messages', icon: <FaComments /> },
+    { to: '/notifications', label: 'Notifications', icon: <FaBell />, badge: unreadCount > 0 ? unreadCount : null },
     { to: '/settings', label: 'Settings', icon: <FaCog /> },
   ];
 
@@ -137,8 +185,22 @@ export default function Sidebar() {
                 {link.icon}
               </span>
               {!collapsed && (
-                <span className="font-medium whitespace-nowrap">
-                  {link.label}
+                <div className="flex items-center gap-2">
+                  <span className="font-medium whitespace-nowrap">
+                    {link.label}
+                  </span>
+                  {link.badge && (
+                    <span className="bg-red-500 text-white text-xs px-2 py-1 rounded-full min-w-[20px] text-center">
+                      {link.badge > 99 ? '99+' : link.badge}
+                    </span>
+                  )}
+                </div>
+              )}
+
+              {/* Badge for collapsed state */}
+              {collapsed && link.badge && (
+                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center">
+                  {link.badge > 99 ? '9+' : link.badge}
                 </span>
               )}
 

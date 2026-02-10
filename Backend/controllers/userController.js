@@ -161,6 +161,8 @@ exports.sendConnectionRequest = async (req, res) => {
     const { id: targetUserId } = req.params;
     const currentUserId = req.user.id;
 
+    console.log('🔗 Connection request:', { currentUserId, targetUserId });
+
     // Check if user exists
     const targetUser = await User.findById(targetUserId);
     if (!targetUser) {
@@ -169,6 +171,15 @@ exports.sendConnectionRequest = async (req, res) => {
 
     // Check if already connected
     const currentUser = await User.findById(currentUserId);
+    if (!currentUser) {
+      return res.status(404).json({ success: false, message: "Current user not found" });
+    }
+
+    console.log('👤 Users:', { 
+      currentUser: currentUser.fullName, 
+      targetUser: targetUser.fullName 
+    });
+
     const isConnected = currentUser.connections?.includes(targetUserId);
 
     if (isConnected) {
@@ -179,6 +190,29 @@ exports.sendConnectionRequest = async (req, res) => {
       await User.findByIdAndUpdate(targetUserId, {
         $pull: { connections: currentUserId }
       });
+
+      // Create notification for connection removal
+      const notificationData = {
+        recipient: targetUserId,
+        sender: currentUserId,
+        title: 'Connection Removed',
+        message: `${currentUser.fullName || 'Someone'} removed you from connections`,
+        type: 'connection_request'
+      };
+
+      // Create notification (this will trigger real-time notification)
+      // Get Socket.IO instance (passed from app.js)
+      const io = req.app.get('io');
+      const notification = await exports.createNotification(notificationData, io);
+      
+      // Emit real-time notification to target user
+      if (io) {
+        const populatedNotification = await Notification.findById(notification._id)
+          .populate('sender', 'fullName username avatar')
+          .populate('recipient', 'fullName username avatar');
+        
+        io.to(`user_${targetUserId}`).emit('new-notification', populatedNotification);
+      }
 
       res.status(200).json({
         success: true,
@@ -194,6 +228,29 @@ exports.sendConnectionRequest = async (req, res) => {
         $addToSet: { connections: currentUserId }
       });
 
+      // Create notification for new connection request
+      const notificationData = {
+        recipient: targetUserId,
+        sender: currentUserId,
+        title: 'New Connection Request',
+        message: `${currentUser.fullName || 'Someone'} wants to connect with you`,
+        type: 'connection_request'
+      };
+
+      // Create notification (this will trigger real-time notification)
+      // Get Socket.IO instance (passed from app.js)
+      const io = req.app.get('io');
+      const notification = await exports.createNotification(notificationData, io);
+      
+      // Emit real-time notification to target user
+      if (io) {
+        const populatedNotification = await Notification.findById(notification._id)
+          .populate('sender', 'fullName username avatar')
+          .populate('recipient', 'fullName username avatar');
+        
+        io.to(`user_${targetUserId}`).emit('new-notification', populatedNotification);
+      }
+
       res.status(200).json({
         success: true,
         message: "Connection request sent",
@@ -201,6 +258,7 @@ exports.sendConnectionRequest = async (req, res) => {
       });
     }
   } catch (error) {
+    console.error('❌ Connection request error:', error);
     res.status(500).json({ success: false, message: "Server error", error: error.message });
   }
 };
@@ -240,22 +298,54 @@ exports.sendMessage = async (req, res) => {
       return res.status(404).json({ success: false, message: "User not found" });
     }
 
-    // Create message (in a real app, you'd save to a Messages collection)
-    const messageData = {
-      senderId,
-      recipientId,
-      message: message.trim(),
-      createdAt: new Date(),
-      read: false
+    // Get sender details for professional notification
+    const sender = await User.findById(senderId).select('fullName username avatar role');
+    
+    // Create notification for the message
+    const notificationData = {
+      recipient: recipientId,
+      sender: senderId,
+      title: 'New Message',
+      message: `You have a new message from ${sender?.fullName || 'A developer'}: ${message.trim()}`,
+      type: 'message',
+      metadata: {
+        senderName: sender?.fullName || 'A developer',
+        senderUsername: sender?.username || 'developer',
+        senderRole: sender?.role || 'developer',
+        senderAvatar: sender?.avatar || null,
+        originalMessage: message.trim()
+      }
     };
+
+    // Create notification (this will trigger real-time notification)
+    const notification = await exports.createNotification(notificationData);
+    
+    // Get Socket.IO instance (passed from app.js)
+    const io = req.io; // Use req.io instead of req.app.get('io')
+    
+    // Emit real-time notification to recipient
+    if (io) {
+      const populatedNotification = await Notification.findById(notification._id)
+        .populate('sender', 'fullName username avatar')
+        .populate('recipient', 'fullName username avatar');
+      
+      io.to(`user_${recipientId}`).emit('new-notification', populatedNotification);
+    }
 
     // For now, just return success (in production, save to database)
     res.status(200).json({
       success: true,
       message: "Message sent successfully",
-      data: messageData
+      data: {
+        senderId,
+        recipientId,
+        message: message.trim(),
+        createdAt: new Date(),
+        read: false
+      }
     });
   } catch (error) {
+    console.log(' [DEBUG] Error in sendMessage:', error.message);
     res.status(500).json({ success: false, message: "Server error", error: error.message });
   }
 };
@@ -914,23 +1004,43 @@ exports.deleteNotification = async (req, res) => {
   }
 };
 
+// Get unread notification count
+exports.getUnreadNotificationCount = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    
+    const count = await Notification.getUnreadCount(userId);
+    
+    res.status(200).json({
+      success: true,
+      count: count
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      success: false, 
+      message: "Server error", 
+      error: error.message 
+    });
+  }
+};
+
 // Create notification (helper function)
 exports.createNotification = async (data, io = null) => {
   try {
     const notification = await Notification.createNotification(data);
     
     // Emit real-time notification if Socket.IO instance is provided
-    if (io && notification.type === 'message' || notification.type === 'connection_request') {
+    if (io && (notification.type === 'message' || notification.type === 'connection_request')) {
       const populatedNotification = await Notification.findById(notification._id)
         .populate('sender', 'fullName username avatar')
         .populate('recipient', 'fullName username avatar');
       
-      io.to(`user_${notification.recipient._id}`).emit('new-notification', populatedNotification);
+      io.to(`user_${notification.recipient}`).emit('new-notification', populatedNotification);
     }
     
     return notification;
   } catch (error) {
-    console.error('Error creating notification:', error);
+    console.error('❌ Error creating notification:', error);
     throw error;
   }
 };

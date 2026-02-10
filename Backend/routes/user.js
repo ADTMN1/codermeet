@@ -115,6 +115,7 @@ router.get("/:id/stats", authMiddleware, userController.getUserStats);
 
 // Notification routes
 router.get("/notifications", authMiddleware, userController.getNotifications);
+router.get("/notifications/count", authMiddleware, userController.getUnreadNotificationCount);
 router.patch("/notifications/:id/read", authMiddleware, userController.markNotificationAsRead);
 router.patch("/notifications/read-all", authMiddleware, userController.markAllNotificationsAsRead);
 router.delete("/notifications/:id", authMiddleware, userController.deleteNotification);
