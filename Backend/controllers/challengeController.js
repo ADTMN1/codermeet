@@ -1,6 +1,7 @@
 // controllers/challengeController.js
 const Challenge = require('../models/challenge');
 const User = require('../models/user');
+const pointsService = require('../services/pointsService');
 
 // Create new challenge
 exports.createChallenge = async (req, res) => {
@@ -356,6 +357,20 @@ exports.submitProject = async (req, res) => {
     challenge.submissions.push(submissionData);
 
     await challenge.save();
+
+    // Award points for challenge completion
+    try {
+      const pointsResult = await pointsService.awardChallengePoints({
+        userId,
+        challengeId: id,
+        submissionId: challenge.submissions[challenge.submissions.length - 1]._id
+      });
+      
+      console.log(`Awarded ${pointsResult.pointsAwarded} points to user ${userId} for challenge ${id}`);
+    } catch (pointsError) {
+      console.error('Error awarding points:', pointsError);
+      // Continue with submission response even if points awarding fails
+    }
 
     // Populate submission data for response
     await Challenge.populate(challenge, {

@@ -11,7 +11,9 @@ import {
   FaSignOutAlt,
   FaUser,
   FaBars,
-  FaBell
+  FaBell,
+  FaTrophy,
+  FaChartLine
 } from 'react-icons/fa';
 import { TbArrowLeft } from 'react-icons/tb';
 import { Avatar, AvatarImage, AvatarFallback } from '../../ui/avatar';
@@ -75,6 +77,8 @@ export default function Sidebar() {
     { to: '/community', label: 'Community', icon: <FaUsers /> },
     { to: '/developers', label: 'Find Developers', icon: <FaCode /> },
     { to: '/projects', label: 'Projects', icon: <FaProjectDiagram /> },
+    { to: '/leaderboard', label: 'Leaderboard', icon: <FaChartLine /> },
+    { to: '/rewards', label: 'Rewards', icon: <FaTrophy /> },
     { to: '/notifications', label: 'Notifications', icon: <FaBell />, badge: unreadCount > 0 ? unreadCount : null },
     { to: '/settings', label: 'Settings', icon: <FaCog /> },
   ];

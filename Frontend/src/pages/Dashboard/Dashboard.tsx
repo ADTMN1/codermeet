@@ -129,7 +129,7 @@ const Dashboard: React.FC = () => {
           })
         ]);
         
-        setLeaderboard(leaderboardRes.data);
+        setLeaderboard(leaderboardRes.data.users || []);
         setStats(statsRes.data);
         if (mentorshipRes.data.success) {
           setMentorshipSession(mentorshipRes.data.data);
@@ -531,15 +531,10 @@ const Dashboard: React.FC = () => {
               onClick={() => navigate('/community')}
               className="text-heading bg-neutral-primary box-border border border-transparent hover:bg-neutral-secondary-medium focus:ring-4 focus:ring-neutral-tertiary-soft font-medium leading-5 rounded-full text-sm px-4 py-2.5 focus:outline-none cursor-pointer hover:shadow-[0_0_15px_#C27AFF] shadow-md transition"
             >
-              View Community Projects
+              View Community 
             </button>
 
-            <button
-              type="button"
-              className="text-heading bg-neutral-primary box-border border border-transparent hover:bg-neutral-secondary-medium focus:ring-4 focus:ring-neutral-tertiary-soft font-medium leading-5 rounded-full text-sm px-4 py-2.5 focus:outline-none cursor-pointer hover:shadow-[0_0_15px_#C27AFF] shadow-md transition"
-            >
-              View Discussions
-            </button>
+           
           </div>
 
           {/* Business Idea Competition */}

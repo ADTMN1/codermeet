@@ -38,6 +38,8 @@ import BusinessIdeasManagement from './pages/Admin/BusinessIdeasManagement';
 import ChallengeDetail from './pages/Admin/ChallengeDetail';
 import SystemHealth from './pages/Admin/SystemHealth';
 import Settings from './pages/Dashboard/Settings';
+import Rewards from './pages/Dashboard/Rewards';
+import Leaderboard from './pages/Dashboard/Leaderboard';
 
 function App() {
   // Apply theme globally on app load
@@ -112,6 +114,8 @@ function App() {
             <Route path="profile" element={<Profile />} />
             <Route path="projects" element={<ViewProjects />} />
             <Route path="settings" element={<Settings />} />
+            <Route path="rewards" element={<Rewards />} />
+            <Route path="leaderboard" element={<Leaderboard />} />
 
             {/* Optional: Redirect root to dashboard */}
             <Route path="" element={<Dashboard />} />

@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const DailyChallenge = require('../models/dailyChallenge');
 const DailySubmission = require('../models/dailySubmission');
 const User = require('../models/user');
+const pointsService = require('../services/pointsService');
 
 // Helper function to get next challenge time
 function getNextChallengeTime() {
@@ -152,6 +153,30 @@ exports.submitSolution = async (req, res) => {
     });
 
     await submission.save();
+
+    // Award points for daily challenge completion
+    try {
+      // Calculate rank based on today's submissions
+      const todaySubmissions = await DailySubmission.find({
+        challengeId,
+        status: 'passed'
+      }).sort({ 'score.total': -1 });
+      
+      const userRank = todaySubmissions.findIndex(s => s.userId.toString() === userId) + 1;
+      
+      const pointsResult = await pointsService.awardDailyChallengePoints({
+        userId,
+        dailyChallengeId: challengeId,
+        rank: userRank,
+        score: score.total,
+        maxScore: challenge.maxPoints
+      });
+      
+      console.log(`Awarded ${pointsResult.pointsAwarded} points to user ${userId} for daily challenge rank ${userRank}`);
+    } catch (pointsError) {
+      console.error('Error awarding daily challenge points:', pointsError);
+      // Continue with submission response even if points awarding fails
+    }
 
     // Update user's daily progress
     await updateUserDailyProgress(userId, score.total);

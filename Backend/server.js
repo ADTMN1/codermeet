@@ -13,7 +13,9 @@ const userRoutes = require('./routes/user');
 const adminRoutes = require('./routes/admin');
 const challengeRoutes = require('./routes/challenges');
 const leaderboardRoutes = require('./routes/leaderboard');
+const pointsRoutes = require('./routes/points');
 const paymentRoutes = require('./routes/payment');
+
 const resourceRoutes = require('./routes/resources');
 const businessIdeaRoutes = require('./routes/businessIdeas');
 const mentorshipRoutes = require('./routes/mentorship');
@@ -165,6 +167,7 @@ app.use("/api/admin", adminRoutes);
 app.use("/api/admin/challenges", adminChallengeRoutes); // AI Challenge Generation
 app.use("/api/challenges", challengeRoutes); // Public challenge routes
 app.use("/api/leaderboard", leaderboardRoutes);
+app.use("/api/points", pointsRoutes); // Points awarding system
 app.use("/api/payment", paymentLimiter, paymentRoutes);
 app.use("/api/resources", resourceRoutes);
 app.use("/api/daily-challenge", dailyChallengeRoutes);

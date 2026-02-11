@@ -123,6 +123,16 @@ const userSchema = new mongoose.Schema(
       type: Date,
       default: Date.now,
     },
+    pointsAwarded: [{
+      submissionId: { type: mongoose.Schema.Types.ObjectId },
+      challengeId: { type: mongoose.Schema.Types.ObjectId },
+      dailyChallengeId: { type: mongoose.Schema.Types.ObjectId },
+      points: { type: Number, required: true },
+      reason: { type: String, required: true },
+      rank: Number,
+      score: Number,
+      awardedAt: { type: Date, default: Date.now }
+    }],
     connections: [{
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User'
