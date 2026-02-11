@@ -20,7 +20,6 @@ const DashboardLayout: React.FC = () => {
       const txRef = searchParams.get('tx_ref');
       
       if (paymentSuccess === 'success' && txRef) {
-        console.log('Payment success detected, allowing access to dashboard');
         // Allow access to dashboard after payment success
         // The PaymentSuccess page will handle authentication
         return true;

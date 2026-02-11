@@ -89,8 +89,8 @@ export function LiveStats({ challengeId }: { challengeId?: string }) {
           setLastUpdate(new Date());
         }
       } catch (error) {
-        console.log('Could not fetch initial stats, will wait for WebSocket');
-      }
+      // Could not fetch initial stats, will wait for WebSocket
+    }
     };
 
     // Listen for live stats updates

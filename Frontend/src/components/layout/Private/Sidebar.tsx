@@ -42,7 +42,7 @@ export default function Sidebar() {
         setUnreadCount(response.data.count || 0);
       }
     } catch (error) {
-      console.error('Error fetching unread count:', error);
+      // Error fetching unread count
     }
   };
 

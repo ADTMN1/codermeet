@@ -243,4 +243,27 @@ router.delete("/notifications/:id", authMiddleware, userController.deleteNotific
 // Check if email or username exists
 router.get("/check-user", checkUserLimiter, userController.checkUser);
 
+// Get user's exact rank in leaderboard
+router.get('/rank', authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    
+    // Get all users sorted by points
+    const allUsers = await User.find({})
+      .select('username fullName points')
+      .sort({ points: -1 });
+    
+    // Find user's rank
+    const userRank = allUsers.findIndex(user => user._id.toString() === userId) + 1;
+    
+    res.json({
+      success: true,
+      rank: userRank > 0 ? userRank : null,
+      totalUsers: allUsers.length
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to get user rank' });
+  }
+});
+
 module.exports = router;

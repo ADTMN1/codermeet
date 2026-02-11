@@ -182,9 +182,9 @@ const userData = response.data.data; // <--- user info is here
         existingSessions.push(sessionData);
         localStorage.setItem('user_sessions', JSON.stringify(existingSessions));
         
-        console.log('Created new session:', sessionData);
+        // Created new session
       } catch (sessionError) {
-        console.log('Session creation failed:', sessionError);
+        // Session creation failed
       }
 
         // Fetch fresh user data from server to ensure latest profile picture

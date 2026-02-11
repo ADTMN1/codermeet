@@ -30,7 +30,6 @@ async function calculateCommunityScore(userId, challengesCompleted, projectsSubm
     const normalizedScore = Math.min(score / 10, 10);
     return normalizedScore.toFixed(1);
   } catch (error) {
-    console.error('Error calculating community score:', error);
     return '5.0'; // Default score on error
   }
 }
@@ -198,7 +197,6 @@ router.get('/', async (req, res) => {
       updated: new Date().toISOString()
     });
   } catch (error) {
-    console.error('Error fetching leaderboard:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });

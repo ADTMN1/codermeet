@@ -16,14 +16,11 @@ export default function LeaderboardPreview() {
     try {
       setLoading(true);
       setError(null);
-      console.log('Fetching leaderboard data...');
       const users = await leaderboardService.getTopUsers(3);
-      console.log('Received users:', users);
       setTopUsers(users);
       setAnimatedPoints(users.map(() => 0));
       setLastUpdated(new Date());
     } catch (err: any) {
-      console.error('Error fetching leaderboard:', err);
       setError(err.message || 'Failed to load leaderboard');
       setTopUsers([]);
       setAnimatedPoints([]);
