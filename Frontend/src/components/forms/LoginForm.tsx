@@ -7,6 +7,40 @@ import LoadingSpinner from '../ui/loading-spinner';
 import { apiService } from '../../services/api';
 import { toast } from 'sonner';
 
+// Helper functions for session management
+const generateSessionId = () => {
+  return 'session_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now();
+};
+
+const getDeviceInfo = () => {
+  const ua = navigator.userAgent;
+  if (ua.includes('Chrome')) return 'Chrome';
+  if (ua.includes('Firefox')) return 'Firefox';
+  if (ua.includes('Safari')) return 'Safari';
+  if (ua.includes('Edge')) return 'Edge';
+  return 'Unknown Browser';
+};
+
+const getClientIP = async () => {
+  try {
+    const response = await fetch('https://api.ipify.org?format=json');
+    const data = await response.json();
+    return data.ip;
+  } catch {
+    return 'Unknown IP';
+  }
+};
+
+const getAccurateLocation = async () => {
+  try {
+    const response = await fetch('https://ipapi.co/json/');
+    const data = await response.json();
+    return `${data.city}, ${data.country_name}`;
+  } catch {
+    return 'Unknown Location';
+  }
+};
+
 const LoginForm: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [email, setEmail] = useState('');
@@ -129,6 +163,29 @@ const userData = response.data.data; // <--- user info is here
 
         // Save user data to localStorage
       localStorage.setItem('user_data', JSON.stringify(userData));
+
+      // Create session record for session management
+      try {
+        const sessionId = generateSessionId();
+        const sessionData = {
+          sessionId: sessionId,
+          device: getDeviceInfo(),
+          ip: await getClientIP(),
+          location: await getAccurateLocation(),
+          lastActive: new Date().toISOString(),
+          current: true,
+          isActive: true
+        };
+        
+        // Store session for session management
+        const existingSessions = JSON.parse(localStorage.getItem('user_sessions') || '[]');
+        existingSessions.push(sessionData);
+        localStorage.setItem('user_sessions', JSON.stringify(existingSessions));
+        
+        console.log('Created new session:', sessionData);
+      } catch (sessionError) {
+        console.log('Session creation failed:', sessionError);
+      }
 
         // Fetch fresh user data from server to ensure latest profile picture
         try {

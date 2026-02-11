@@ -1,20 +1,153 @@
 @import 'tailwindcss';
 
+:root {
+  --primary-color: #8b5cf6;
+  --accent-color: #3b82f6;
+  --font-size-base: 16px;
+  --font-family: 'Inter', system-ui, sans-serif;
+  --transition-duration: 200ms;
+}
+
+/* Light theme variables */
+.light {
+  --bg-primary: #ffffff;
+  --bg-secondary: #f8fafc;
+  --bg-tertiary: #f1f5f9;
+  --text-primary: #1e293b;
+  --text-secondary: #64748b;
+  --text-tertiary: #94a3b8;
+  --border-primary: #e2e8f0;
+  --border-secondary: #cbd5e1;
+  --card-bg: #ffffff;
+  --input-bg: #ffffff;
+}
+
+/* Dark theme variables */
+.dark {
+  --bg-primary: #0f172a;
+  --bg-secondary: #1e293b;
+  --bg-tertiary: #334155;
+  --text-primary: #f8fafc;
+  --text-secondary: #cbd5e1;
+  --text-tertiary: #94a3b8;
+  --border-primary: #334155;
+  --border-secondary: #475569;
+  --card-bg: #1e293b;
+  --input-bg: #0f172a;
+}
+
+/* High contrast mode */
+.high-contrast {
+  --text-primary: #ffffff;
+  --text-secondary: #e2e8f0;
+  --border-primary: #60a5fa;
+  --border-secondary: #3b82f6;
+}
+
 body {
   margin: 0;
-  font-family:
-    -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+  font-family: var(--font-family);
+  font-size: var(--font-size-base);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-color: #1a202c; /* Dark background color */
-  color: #e2e8f0; /* Light text color */
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
   min-height: 100vh;
+  transition: background-color var(--transition-duration) ease,
+              color var(--transition-duration) ease,
+              border-color var(--transition-duration) ease;
+}
+
+/* Apply theme to common elements */
+.bg-gray-900 { background-color: var(--card-bg) !important; }
+.bg-gray-800 { background-color: var(--bg-secondary) !important; }
+.bg-gray-700 { background-color: var(--bg-tertiary) !important; }
+.bg-gray-600 { background-color: var(--bg-tertiary) !important; }
+.bg-gray-500 { background-color: var(--bg-tertiary) !important; }
+
+.text-white { color: var(--text-primary) !important; }
+.text-gray-100 { color: var(--text-primary) !important; }
+.text-gray-200 { color: var(--text-primary) !important; }
+.text-gray-300 { color: var(--text-secondary) !important; }
+.text-gray-400 { color: var(--text-tertiary) !important; }
+.text-gray-500 { color: var(--text-tertiary) !important; }
+.text-gray-600 { color: var(--text-tertiary) !important; }
+
+.border-gray-800 { border-color: var(--border-primary) !important; }
+.border-gray-700 { border-color: var(--border-secondary) !important; }
+.border-gray-600 { border-color: var(--border-secondary) !important; }
+
+/* Hover states */
+.hover\:bg-gray-800:hover { background-color: var(--bg-secondary) !important; }
+.hover\:bg-gray-700:hover { background-color: var(--bg-tertiary) !important; }
+.hover\:bg-gray-600:hover { background-color: var(--bg-tertiary) !important; }
+.hover\:text-gray-200:hover { color: var(--text-primary) !important; }
+.hover\:text-gray-300:hover { color: var(--text-secondary) !important; }
+
+/* Focus states */
+.focus\:border-purple-500:focus { border-color: var(--primary-color) !important; }
+.focus\:outline-none:focus { outline: none !important; }
+
+/* Override button backgrounds with primary color */
+.bg-purple-600 { background-color: var(--primary-color) !important; }
+.bg-purple-700 { background-color: color-mix(in srgb, var(--primary-color) 80%, black) !important; }
+.hover\:bg-purple-700:hover { background-color: color-mix(in srgb, var(--primary-color) 80%, black) !important; }
+.hover\:bg-purple-600\/10:hover { background-color: color-mix(in srgb, var(--primary-color) 10%, transparent) !important; }
+.border-purple-500 { border-color: var(--primary-color) !important; }
+.text-purple-400 { color: var(--primary-color) !important; }
+.text-purple-500 { color: var(--primary-color) !important; }
+.shadow-purple-500\/20 { box-shadow: 0 0 20px color-mix(in srgb, var(--primary-color) 20%, transparent) !important; }
+
+/* Input backgrounds */
+input, textarea, select {
+  background-color: var(--input-bg) !important;
+  color: var(--text-primary) !important;
+  border-color: var(--border-primary) !important;
+}
+
+/* Card backgrounds */
+.card {
+  background-color: var(--card-bg) !important;
+  border-color: var(--border-primary) !important;
+}
+
+/* Density adjustments */
+[data-density="compact"] * {
+  --spacing-multiplier: 0.75;
+}
+
+[data-density="spacious"] * {
+  --spacing-multiplier: 1.25;
+}
+
+[data-compact="true"] .p-6 { padding: 1rem !important; }
+[data-compact="true"] .p-4 { padding: 0.75rem !important; }
+[data-compact="true"] .p-3 { padding: 0.5rem !important; }
+[data-compact="true"] .space-y-6 > * + * { margin-top: 1rem !important; }
+[data-compact="true"] .space-y-4 > * + * { margin-top: 0.75rem !important; }
+[data-compact="true"] .space-y-3 > * + * { margin-top: 0.5rem !important; }
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* When reduced motion is enabled via settings */
+body[data-reduced-motion="true"] * {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
 }
 
 /* 🔮 Gradient text helper */
 .custom-gradient-text {
   background: linear-gradient(to right, #60a5fa, #c084fc, #f472b6);
   -webkit-background-clip: text;
+  background-clip: text;
   color: transparent;
 }
 

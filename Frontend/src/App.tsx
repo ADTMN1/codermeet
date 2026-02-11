@@ -1,6 +1,7 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { Toaster } from './components/ui/sonner';
+import { useTheme } from './hooks/useTheme';
 
 import Navbar from './components/layout/Public/Navbar';
 import Home from './pages/Home';
@@ -36,8 +37,12 @@ import AdminSettingsSimple from './pages/Admin/AdminSettingsSimple';
 import BusinessIdeasManagement from './pages/Admin/BusinessIdeasManagement';
 import ChallengeDetail from './pages/Admin/ChallengeDetail';
 import SystemHealth from './pages/Admin/SystemHealth';
+import Settings from './pages/Dashboard/Settings';
 
 function App() {
+  // Apply theme globally on app load
+  useTheme();
+  
   return (
     <BrowserRouter>
       <div className="min-h-screen bg-black text-gray-300 font-serif">
@@ -106,6 +111,7 @@ function App() {
             <Route path="mentorship-dashboard" element={<MentorshipDashboard />} />
             <Route path="profile" element={<Profile />} />
             <Route path="projects" element={<ViewProjects />} />
+            <Route path="settings" element={<Settings />} />
 
             {/* Optional: Redirect root to dashboard */}
             <Route path="" element={<Dashboard />} />
