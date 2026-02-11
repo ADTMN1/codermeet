@@ -213,24 +213,24 @@ export default function Sidebar() {
             </NavLink>
           );
         })}
+
+        {/* Logout Button - Integrated with navigation */}
+        <button
+          onClick={handleLogout}
+          className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-red-500/20 text-red-400 hover:text-red-300 transition-all duration-200 group mt-2"
+          title={collapsed ? 'Logout' : undefined}
+        >
+          <FaSignOutAlt className={`text-lg ${collapsed ? 'mx-auto' : ''}`} />
+          {!collapsed && <span className="font-medium">Logout</span>}
+
+          {/* Tooltip for collapsed state */}
+          {collapsed && (
+            <div className="absolute left-full ml-2 px-2 py-1 bg-gray-900 text-white text-sm rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-50 pointer-events-none">
+              Logout
+            </div>
+          )}
+        </button>
       </nav>
-
-      {/* Logout Button */}
-      <button
-        onClick={handleLogout}
-        className="mt-6 flex items-center gap-3 p-3 rounded-lg hover:bg-red-500/20 text-red-400 hover:text-red-300 transition-all duration-200 group"
-        title={collapsed ? 'Logout' : undefined}
-      >
-        <FaSignOutAlt className={`text-lg ${collapsed ? 'mx-auto' : ''}`} />
-        {!collapsed && <span className="font-medium">Logout</span>}
-
-        {/* Tooltip for collapsed state */}
-        {collapsed && (
-          <div className="absolute left-full ml-2 px-2 py-1 bg-gray-900 text-white text-sm rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-50 pointer-events-none">
-            Logout
-          </div>
-        )}
-      </button>
     </aside>
   );
 }
