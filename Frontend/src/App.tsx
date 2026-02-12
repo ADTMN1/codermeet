@@ -4,7 +4,9 @@ import { Toaster } from './components/ui/sonner';
 import { useTheme } from './hooks/useTheme';
 
 import Navbar from './components/layout/Public/Navbar';
+import Footer from './components/layout/Public/Footer';
 import Home from './pages/Home';
+import About from './pages/About';
 import MentorshipPreview from './components/sections/MentorshipPreview';
 import Login from './pages/Login';
 import SignUp from './pages/SignUp';
@@ -56,6 +58,7 @@ function App() {
               <>
                 <Navbar />
                 <Home />
+                <Footer />
               </>
             }
           />
@@ -66,6 +69,7 @@ function App() {
               <>
                 <Navbar />
                 <Login />
+                <Footer />
               </>
             }
           />
@@ -75,6 +79,7 @@ function App() {
               <>
                 <Navbar />
                 <SignUp />
+                <Footer />
               </>
             }
           />
@@ -84,6 +89,17 @@ function App() {
               <>
                 <Navbar />
                 <MentorshipPreview />
+                <Footer />
+              </>
+            }
+          />
+          <Route
+            path="/about"
+            element={
+              <>
+                <Navbar />
+                <About />
+                <Footer />
               </>
             }
           />
@@ -91,13 +107,25 @@ function App() {
           {/* Pricing Page - Public but shows user's current plan */}
           <Route
             path="/pricing"
-            element={<Pricing />}
+            element={
+              <>
+                <Navbar />
+                <Pricing />
+                <Footer />
+              </>
+            }
           />
 
           {/* Payment Success Page - After payment */}
           <Route
             path="/payment-success"
-            element={<PaymentSuccess />}
+            element={
+              <>
+                <Navbar />
+                <PaymentSuccess />
+                <Footer />
+              </>
+            }
           />
 
           {/* Dashboard Layout Routes - including profile */}

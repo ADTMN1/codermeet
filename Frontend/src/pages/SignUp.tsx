@@ -3,7 +3,7 @@ import SignUpForm from '../components/forms/signup/SignupForm';
 
 const signup: React.FC = () => {
   return (
-    <main>
+    <main className="pt-16">
       <SignUpForm />
     </main>
   );

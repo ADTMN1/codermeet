@@ -4,7 +4,7 @@ import { FaChalkboardTeacher } from 'react-icons/fa';
 
 export default function MentorshipPreview() {
   return (
-    <section className="max-w-6xl mx-auto py-20 text-center px-6">
+    <section className="max-w-6xl mx-auto pt-20 pb-20 text-center px-6">
       <h2 className="text-3xl font-bold mb-6 text-green-400">
         <div className="flex items-center justify-center gap-3">
           <FaChalkboardTeacher />

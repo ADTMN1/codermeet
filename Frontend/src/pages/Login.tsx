@@ -4,7 +4,7 @@ import Footer from '../components/layout/Public/Footer';
 
 const Login: React.FC = () => {
   return (
-    <main>
+    <main className="pt-16">
       <LoginForm />
 
       <Footer />
