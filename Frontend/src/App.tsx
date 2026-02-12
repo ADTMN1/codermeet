@@ -22,6 +22,7 @@ import DailyCoding from './pages/DailyCoding';
 import BusinessIdeaCompetition from './pages/Dashboard/BusinessIdeaCompetition';
 import MentorshipDashboard from './pages/MentorshipDashboard/MentorshipDashboard';
 import Pricing from './pages/Pricing';
+import PricingInfo from './pages/PricingInfo';
 import PaymentSuccess from './pages/PaymentSuccess';
 import ViewProjects from './pages/Projects/ViewProjects';
 import AdminLayout from './components/layout/Admin/AdminLayout';
@@ -111,6 +112,18 @@ function App() {
               <>
                 <Navbar />
                 <Pricing />
+                <Footer />
+              </>
+            }
+          />
+
+          {/* Pricing Info Page - New pricing information */}
+          <Route
+            path="/pricing-info"
+            element={
+              <>
+                <Navbar />
+                <PricingInfo />
                 <Footer />
               </>
             }

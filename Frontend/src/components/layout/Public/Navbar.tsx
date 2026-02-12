@@ -72,13 +72,13 @@ const Navbar: React.FC = () => {
 
             <a
 
-              href="/community"
+              href="/pricing-info"
 
               className="text-gray-300 hover:text-blue-400 px-3 py-2 rounded-md text-md font-mono font-semibold transition duration-200 hover:underline underline-offset-4"
 
             >
 
-              Community
+              Pricing
 
             </a>
 
