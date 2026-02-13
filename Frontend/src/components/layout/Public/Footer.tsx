@@ -45,7 +45,7 @@ const Footer: React.FC = () => {
 
       {/* Bottom Text */}
       <div className="mt-6 text-center text-sm text-gray-500">
-        © 2025 CoderMeet. Built with by the dev community.
+        © 2025 CoderMeet. Built by idea2code.
       </div>
     </footer>
   );

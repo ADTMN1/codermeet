@@ -2,7 +2,7 @@ import React from 'react';
 
 import Hero from '../components/sections/Hero';
 
-import Features from '../components/sections/Features';
+import HomeFeatures from '../components/sections/HomeFeatures';
 
 import LeaderboardPreview from '../components/sections/LeaderboardPreview';
 
@@ -18,7 +18,7 @@ const Home: React.FC = () => {
 
       <Hero />
 
-      <Features />
+      <HomeFeatures />
 
       <LeaderboardPreview />
 

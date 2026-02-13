@@ -24,6 +24,7 @@ import MentorshipDashboard from './pages/MentorshipDashboard/MentorshipDashboard
 import Pricing from './pages/Pricing';
 import PricingInfo from './pages/PricingInfo';
 import PaymentSuccess from './pages/PaymentSuccess';
+import Features from './components/sections/Features';
 import ViewProjects from './pages/Projects/ViewProjects';
 import AdminLayout from './components/layout/Admin/AdminLayout';
 import AdminRoute from './components/AdminRoute';
@@ -100,6 +101,18 @@ function App() {
               <>
                 <Navbar />
                 <About />
+                <Footer />
+              </>
+            }
+          />
+
+          {/* Features Page - Show platform capabilities */}
+          <Route
+            path="/features"
+            element={
+              <>
+                <Navbar />
+                <Features />
                 <Footer />
               </>
             }

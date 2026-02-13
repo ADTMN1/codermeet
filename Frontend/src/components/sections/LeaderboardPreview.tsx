@@ -16,11 +16,14 @@ export default function LeaderboardPreview() {
     try {
       setLoading(true);
       setError(null);
+      console.log('Fetching leaderboard data...');
       const users = await leaderboardService.getTopUsers(3);
+      console.log('Leaderboard data received:', users);
       setTopUsers(users);
       setAnimatedPoints(users.map(() => 0));
       setLastUpdated(new Date());
     } catch (err: any) {
+      console.error('Leaderboard fetch error:', err);
       setError(err.message || 'Failed to load leaderboard');
       setTopUsers([]);
       setAnimatedPoints([]);
@@ -223,8 +226,8 @@ export default function LeaderboardPreview() {
       {/* View Full Leaderboard Button */}
       <div className="mt-8 text-center">
         <button
-          onClick={() => window.location.href = '/dashboard'}
-          className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold rounded-lg hover:from-purple-700 hover:to-pink-700 transition-all transform hover:scale-105"
+          onClick={() => window.location.href = '/login'}
+          className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold rounded-lg hover:from-purple-700 hover:to-pink-700 transition-all transform hover:scale-105 cursor-pointer"
         >
           <FaTrophy className="w-5 h-5" />
           View Full Leaderboard

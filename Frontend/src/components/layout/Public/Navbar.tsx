@@ -48,25 +48,13 @@ const Navbar: React.FC = () => {
 
             <a
 
-              href="/mentorship"
+              href="/features"
 
               className="text-gray-300 hover:text-blue-400 px-3 py-2 rounded-md text-md font-mono font-semibold transition duration-200 hover:underline underline-offset-4"
 
             >
 
-              Mentorship
-
-            </a>
-
-            <a
-
-              href="/projects"
-
-              className="text-gray-300 hover:text-blue-400 px-3 py-2 rounded-md text-md font-mono font-semibold transition duration-200 hover:underline underline-offset-4"
-
-            >
-
-              Projects
+              Features
 
             </a>
 

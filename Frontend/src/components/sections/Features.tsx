@@ -56,7 +56,87 @@ const Features: React.FC = () => {
           Why Join CoderMeet?
         </h2>
 
-        <Card />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          {/* Community Growth */}
+          <div className="bg-white/10 backdrop-blur-md border border-white/10 rounded-xl p-6 hover:bg-white/20 transition duration-300 transform hover:-translate-y-2 hover:scale-105 shadow-lg">
+            <div className="flex items-center mb-4">
+              <div className="w-12 h-12 bg-blue-500/20 rounded-lg flex items-center justify-center mr-4">
+                <span className="text-blue-400 text-2xl">👥</span>
+              </div>
+              <h3 className="text-xl font-bold text-white">Community Growth</h3>
+            </div>
+            <p className="text-gray-300 leading-relaxed">
+              Connect with thousands of developers worldwide. Share knowledge, get feedback, and grow together in a supportive environment designed for coders at every level.
+            </p>
+          </div>
+
+          {/* Skill Development */}
+          <div className="bg-white/10 backdrop-blur-md border border-white/10 rounded-xl p-6 hover:bg-white/20 transition duration-300 transform hover:-translate-y-2 hover:scale-105 shadow-lg">
+            <div className="flex items-center mb-4">
+              <div className="w-12 h-12 bg-green-500/20 rounded-lg flex items-center justify-center mr-4">
+                <span className="text-green-400 text-2xl">🧠</span>
+              </div>
+              <h3 className="text-xl font-bold text-white">Skill Development</h3>
+            </div>
+            <p className="text-gray-300 leading-relaxed">
+              Access daily challenges, weekly contests, and mentorship programs. Sharpen your coding skills with real-world projects and expert guidance.
+            </p>
+          </div>
+
+          {/* Career Opportunities */}
+          <div className="bg-white/10 backdrop-blur-md border border-white/10 rounded-xl p-6 hover:bg-white/20 transition duration-300 transform hover:-translate-y-2 hover:scale-105 shadow-lg">
+            <div className="flex items-center mb-4">
+              <div className="w-12 h-12 bg-purple-500/20 rounded-lg flex items-center justify-center mr-4">
+                <span className="text-purple-400 text-2xl">💼</span>
+              </div>
+              <h3 className="text-xl font-bold text-white">Career Opportunities</h3>
+            </div>
+            <p className="text-gray-300 leading-relaxed">
+              Showcase your projects to potential employers. Get discovered by companies looking for talented developers and advance your career.
+            </p>
+          </div>
+
+          {/* Learning Resources */}
+          <div className="bg-white/10 backdrop-blur-md border border-white/10 rounded-xl p-6 hover:bg-white/20 transition duration-300 transform hover:-translate-y-2 hover:scale-105 shadow-lg">
+            <div className="flex items-center mb-4">
+              <div className="w-12 h-12 bg-yellow-500/20 rounded-lg flex items-center justify-center mr-4">
+                <span className="text-yellow-400 text-2xl">📖</span>
+              </div>
+              <h3 className="text-xl font-bold text-white">Learning Resources</h3>
+            </div>
+            <p className="text-gray-300 leading-relaxed">
+              Access comprehensive learning materials, tutorials, and documentation. Stay updated with the latest technologies and best practices.
+            </p>
+          </div>
+
+          {/* Collaboration Tools */}
+          <div className="bg-white/10 backdrop-blur-md border border-white/10 rounded-xl p-6 hover:bg-white/20 transition duration-300 transform hover:-translate-y-2 hover:scale-105 shadow-lg">
+            <div className="flex items-center mb-4">
+              <div className="w-12 h-12 bg-red-500/20 rounded-lg flex items-center justify-center mr-4">
+                <span className="text-red-400 text-2xl">🤝</span>
+              </div>
+              <h3 className="text-xl font-bold text-white">Collaboration Tools</h3>
+            </div>
+            <p className="text-gray-300 leading-relaxed">
+              Work on projects together, share code, and collaborate seamlessly. Built-in tools make team development efficient and enjoyable.
+            </p>
+          </div>
+
+          {/* Recognition & Rewards */}
+          <div className="bg-white/10 backdrop-blur-md border border-white/10 rounded-xl p-6 hover:bg-white/20 transition duration-300 transform hover:-translate-y-2 hover:scale-105 shadow-lg">
+            <div className="flex items-center mb-4">
+              <div className="w-12 h-12 bg-cyan-500/20 rounded-lg flex items-center justify-center mr-4">
+                <span className="text-cyan-400 text-2xl">🏆</span>
+              </div>
+              <h3 className="text-xl font-bold text-white">Recognition & Rewards</h3>
+            </div>
+            <p className="text-gray-300 leading-relaxed">
+              Earn badges, climb the leaderboard, and get recognized for your contributions. Celebrate your achievements and inspire others.
+            </p>
+          </div>
+        </div>
+
+       
       </div>
       {/* {final section} */}
     </section>

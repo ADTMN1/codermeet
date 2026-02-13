@@ -48,11 +48,16 @@ class LeaderboardService {
     timeRange?: string;
   } = {}): Promise<LeaderboardUser[]> {
     try {
+      console.log('Making API call to:', `${API_CONFIG.BASE_URL}/leaderboard`);
+      console.log('With params:', params);
+      
       const response = await axios.get(`${API_CONFIG.BASE_URL}/leaderboard`, { params });
+      
+      console.log('Raw API response:', response.data);
       
       // Handle the mock data format from backend
       if (Array.isArray(response.data)) {
-        return response.data.map((user: any, index: number) => ({
+        const processedUsers = response.data.map((user: any, index: number) => ({
           _id: user._id,
           username: user.username,
           fullName: user.fullName,
@@ -65,11 +70,34 @@ class LeaderboardService {
           lastPointsUpdate: new Date().toISOString(),
           isCurrentUser: false
         }));
+        console.log('Processed users:', processedUsers);
+        return processedUsers;
       }
       
+      // Handle the case where response.data.users exists (from the backend route)
+      if (response.data.users && Array.isArray(response.data.users)) {
+        const processedUsers = response.data.users.map((user: any, index: number) => ({
+          _id: user._id,
+          username: user.username,
+          fullName: user.fullName,
+          points: user.points,
+          rank: user.rank || index + 1,
+          avatar: user.avatar || user.profileImage,
+          profileImage: user.profileImage || user.avatar,
+          plan: user.plan || 'Trial',
+          role: user.role || 'user',
+          lastPointsUpdate: new Date().toISOString(),
+          isCurrentUser: false
+        }));
+        console.log('Processed users from response.data.users:', processedUsers);
+        return processedUsers;
+      }
+      
+      console.log('No valid user data found in response');
       return [];
     } catch (error: any) {
       console.error('Error fetching leaderboard:', error);
+      console.error('Error details:', error.response?.data);
       throw new Error(error.response?.data?.message || 'Failed to fetch leaderboard');
     }
   }
@@ -77,7 +105,9 @@ class LeaderboardService {
   // Get top users for preview
   async getTopUsers(limit: number = 5): Promise<LeaderboardUser[]> {
     try {
+      console.log(`Fetching top ${limit} users from ${API_CONFIG.BASE_URL}/leaderboard`);
       const users = await this.getLeaderboard({ limit, sortBy: 'points', sortOrder: 'desc' });
+      console.log('Processed users for leaderboard:', users);
       return users.slice(0, limit);
     } catch (error) {
       console.error('Error fetching top users:', error);
