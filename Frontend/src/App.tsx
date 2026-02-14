@@ -1,7 +1,8 @@
-import React from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import React, { useEffect } from 'react';
+import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { Toaster } from './components/ui/sonner';
 import { useTheme } from './hooks/useTheme';
+import { sessionManager } from './services/sessionManager';
 
 import Navbar from './components/layout/Public/Navbar';
 import Footer from './components/layout/Public/Footer';
@@ -51,7 +52,39 @@ function App() {
   
   return (
     <BrowserRouter>
-      <div className="min-h-screen bg-black text-gray-300 font-serif">
+      <AppContent />
+    </BrowserRouter>
+  );
+}
+
+
+function AppContent() {
+  const location = useLocation();
+  
+  // Professional session and data cleanup
+  useEffect(() => {
+    // Perform comprehensive cleanup
+    const cleanup = sessionManager.performCleanup();
+    
+    // Validate session state and log issues
+    const validation = sessionManager.validateSessionState();
+    if (!validation.isValid) {
+      console.warn('Session validation issues:', validation.issues);
+      // Clear invalid session data
+      if (validation.issues.length > 0) {
+        sessionManager.clearSessions();
+        sessionManager.clearPendingUpgrade();
+      }
+    }
+
+    // Log cleanup actions for debugging
+    if (cleanup.sessionsCleared || cleanup.upgradeCleared) {
+      console.log('Session cleanup completed:', cleanup);
+    }
+  }, [location.pathname]);
+  
+  return (
+    <div className="min-h-screen bg-black text-gray-300 font-serif">
         <Routes>
           {/* Public Routes */}
           <Route
@@ -199,8 +232,7 @@ function App() {
         </Routes>
         <Toaster />
       </div>
-    </BrowserRouter>
-  );
+    );
 }
 
 export default App;

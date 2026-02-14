@@ -1,30 +1,12 @@
 import { useEffect } from 'react';
-
-interface AppearanceSettings {
-  theme?: 'light' | 'dark' | 'auto';
-  customTheme?: boolean;
-  primaryColor?: string;
-  accentColor?: string;
-  fontSize?: number;
-  fontFamily?: string;
-  reducedMotion?: boolean;
-  highContrast?: boolean;
-  density?: 'compact' | 'comfortable' | 'spacious';
-  compactMode?: boolean;
-  customCSS?: string;
-  animationsEnabled?: boolean;
-  sidebarCollapsed?: boolean;
-  showStatusIndicators?: boolean;
-  customPresets?: Array<{name: string, colors: any}>;
-  activePreset?: string | null;
-}
+import { userPreferencesService, AppearanceSettings } from '../services/userPreferences';
 
 const applyThemeSettings = (settings?: AppearanceSettings) => {
   const root = document.documentElement;
   const body = document.body;
   
-  // Get settings from parameter or localStorage
-  const themeSettings = settings || JSON.parse(localStorage.getItem('appearance_settings') || '{}');
+  // Get settings from parameter or user preferences service
+  const themeSettings = settings || userPreferencesService.getAppearanceSettings();
   
   // Apply theme
   root.classList.remove('light', 'dark');
@@ -77,13 +59,16 @@ const applyThemeSettings = (settings?: AppearanceSettings) => {
 
 export const useTheme = () => {
   useEffect(() => {
+    // Migrate from old global settings to user-specific
+    userPreferencesService.migrateFromGlobalSettings();
+    
     // Apply theme immediately on hook mount
     applyThemeSettings();
     
     // Listen for system theme changes if auto mode is enabled
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
     const handleChange = () => {
-      const settings = JSON.parse(localStorage.getItem('appearance_settings') || '{}');
+      const settings = userPreferencesService.getAppearanceSettings();
       if (settings.theme === 'auto') {
         applyThemeSettings(settings);
       }
@@ -97,4 +82,4 @@ export const useTheme = () => {
   }, []);
 };
 
-export { applyThemeSettings };
+export { applyThemeSettings, userPreferencesService };

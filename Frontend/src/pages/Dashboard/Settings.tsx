@@ -2,8 +2,8 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useUser } from '../../context/UserContext';
-import { applyThemeSettings } from '../../hooks/useTheme';
 import { 
+  Settings, 
   Shield, 
   Palette,
   Save,
@@ -12,17 +12,27 @@ import {
   LogOut,
   Download,
   Upload,
+  Database,
+  Lock,
+  Activity,
+  Globe,
   Smartphone,
   Trash2,
   RefreshCw,
+  Copy,
+  ExternalLink,
   AlertTriangle,
   CheckCircle,
   XCircle,
+  Clock,
   Monitor,
   Moon,
   Sun,
   Zap,
-  FileText
+  UserX,
+  FileText,
+  ShieldCheck,
+  Fingerprint
 } from 'lucide-react';
 import { Card } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
@@ -30,12 +40,14 @@ import { Button } from '../../components/ui/button';
 const Settings: React.FC = () => {
   const navigate = useNavigate();
   const { user, logout } = useUser();
-  const [activeTab, setActiveTab] = useState<'security' | 'appearance'>('security');
+  const [activeTab, setActiveTab] = useState<'security' | 'appearance' | 'privacy'>('security');
   const [saving, setSaving] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteConfirmation, setDeleteConfirmation] = useState('');
   const [activeSessions, setActiveSessions] = useState<any[]>([]);
   const [loadingSessions, setLoadingSessions] = useState(true);
   const [exportProgress, setExportProgress] = useState(0);
@@ -48,26 +60,24 @@ const Settings: React.FC = () => {
     confirmPassword: ''
   });
 
+  // Privacy Settings State
+  const [privacySettings, setPrivacySettings] = useState({
+    profileVisibility: 'public',
+    showEmail: false,
+    showLocation: true,
+    allowMessages: true,
+    dataCollection: true,
+    analyticsTracking: true,
+    marketingCommunications: false,
+    cookieConsent: 'necessary',
+    dataRetention: '12months',
+    twoFactorAuth: false,
+    biometricAuth: false,
+    loginAlerts: true
+  });
 
   // Advanced Appearance State
-  const [advancedAppearance, setAdvancedAppearance] = useState<{
-    customTheme: boolean;
-    primaryColor: string;
-    accentColor: string;
-    customCSS: string;
-    animationsEnabled: boolean;
-    reducedMotion: boolean;
-    highContrast: boolean;
-    fontSize: number;
-    fontFamily: string;
-    sidebarCollapsed: boolean;
-    showStatusIndicators: boolean;
-    theme: 'light' | 'dark' | 'auto';
-    density: 'compact' | 'comfortable' | 'spacious';
-    compactMode: boolean;
-    customPresets: Array<{name: string, colors: any}>;
-    activePreset: string | null;
-  }>({
+  const [advancedAppearance, setAdvancedAppearance] = useState({
     customTheme: false,
     primaryColor: '#8b5cf6',
     accentColor: '#3b82f6',
@@ -78,12 +88,7 @@ const Settings: React.FC = () => {
     fontSize: 16,
     fontFamily: 'Inter',
     sidebarCollapsed: false,
-    showStatusIndicators: true,
-    theme: 'dark',
-    density: 'comfortable',
-    compactMode: false,
-    customPresets: [] as Array<{name: string, colors: any}>,
-    activePreset: null as string | null
+    showStatusIndicators: true
   });
 
   const handlePasswordChange = async () => {
@@ -108,94 +113,18 @@ const Settings: React.FC = () => {
     }
   };
 
-  const handleSaveAppearance = async () => {
+  const handleSaveNotifications = async () => {
     setSaving(true);
     try {
-      // Save to localStorage for persistence
-      localStorage.setItem('appearance_settings', JSON.stringify(advancedAppearance));
-      
-      // Apply theme to document using the global function
-      applyThemeSettings(advancedAppearance);
-      
       // Simulate API call
       await new Promise(resolve => setTimeout(resolve, 1000));
-      toast.success(
-        <div className="flex items-center gap-3">
-          <Save className="w-5 h-5 text-green-400" />
-          <div>
-            <p className="font-medium">Appearance settings saved!</p>
-            <p className="text-sm opacity-90">Your preferences have been applied successfully.</p>
-          </div>
-        </div>,
-        { duration: 4000 }
-      );
+      toast.success('Privacy settings updated!');
     } catch (error) {
-      toast.error(
-        <div className="flex items-center gap-3">
-          <XCircle className="w-5 h-5 text-red-400" />
-          <div>
-            <p className="font-medium">Failed to save settings</p>
-            <p className="text-sm opacity-90">Please try again later.</p>
-          </div>
-        </div>,
-        { duration: 4000 }
-      );
+      toast.error('Failed to update privacy settings');
     } finally {
       setSaving(false);
     }
   };
-
-  const handleResetAppearance = () => {
-    const defaultSettings: typeof advancedAppearance = {
-      customTheme: false,
-      primaryColor: '#8b5cf6',
-      accentColor: '#3b82f6',
-      customCSS: '',
-      animationsEnabled: true,
-      reducedMotion: false,
-      highContrast: false,
-      fontSize: 16,
-      fontFamily: 'Inter',
-      sidebarCollapsed: false,
-      showStatusIndicators: true,
-      theme: 'dark',
-      density: 'comfortable',
-      compactMode: false,
-      customPresets: [],
-      activePreset: null
-    };
-    setAdvancedAppearance(defaultSettings);
-    localStorage.removeItem('appearance_settings');
-    applyThemeSettings(defaultSettings);
-    toast.success(
-      <div className="flex items-center gap-3">
-        <RefreshCw className="w-5 h-5 text-green-400" />
-        <div>
-          <p className="font-medium">Settings reset to defaults</p>
-          <p className="text-sm opacity-90">All appearance settings have been restored.</p>
-        </div>
-      </div>,
-      { duration: 4000 }
-    );
-  };
-
-  // Load saved settings on mount
-  React.useEffect(() => {
-    const savedSettings = localStorage.getItem('appearance_settings');
-    if (savedSettings) {
-      try {
-        const parsed = JSON.parse(savedSettings);
-        setAdvancedAppearance(prev => ({ 
-          ...prev, 
-          ...parsed,
-          theme: (parsed.theme as 'light' | 'dark' | 'auto') || 'dark',
-          density: (parsed.density as 'compact' | 'comfortable' | 'spacious') || 'comfortable'
-        } as typeof prev));
-      } catch (error) {
-        console.error('Failed to load appearance settings:', error);
-      }
-    }
-  }, []);
 
   const handleLogout = () => {
     logout();
@@ -208,6 +137,7 @@ const Settings: React.FC = () => {
       const token = localStorage.getItem('auth_token');
       
       if (!token) {
+        console.log('No token found in localStorage');
         // Fallback to current session only
         const currentSession = {
           sessionId: 'current',
@@ -222,6 +152,8 @@ const Settings: React.FC = () => {
         return;
       }
       
+      console.log('Fetching sessions with token:', token.substring(0, 20) + '...');
+      
       const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/sessions/my-sessions`, {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -229,8 +161,13 @@ const Settings: React.FC = () => {
         }
       });
       
+      console.log('Sessions response status:', response.status);
+      
       if (response.ok) {
         const data = await response.json();
+        console.log('Sessions data:', data);
+        console.log('Sessions array:', data.data.sessions);
+        console.log('Sessions length:', data.data.sessions?.length);
         
         // Handle different possible data structures
         let sessions = [];
@@ -241,6 +178,8 @@ const Settings: React.FC = () => {
         } else if (data.data) {
           sessions = data.data;
         }
+        
+        console.log('Final sessions array:', sessions);
         
         // Always add current session if no sessions exist
         if (sessions.length === 0) {
@@ -263,14 +202,17 @@ const Settings: React.FC = () => {
           };
           
           sessions = [currentSession];
+          console.log('Added current session:', currentSession);
         }
         
         setActiveSessions(sessions);
       } else {
         const errorData = await response.json().catch(() => ({}));
+        console.log('Sessions error:', errorData);
         
         // If unauthorized, clear token and redirect to login
         if (response.status === 401) {
+          console.log('Token invalid, clearing and redirecting');
           localStorage.removeItem('token');
           toast.error('Session expired. Please login again.');
           // You might want to redirect to login here
@@ -347,6 +289,7 @@ const Settings: React.FC = () => {
         async (position) => {
           try {
             const { latitude, longitude } = position.coords;
+            console.log('Got coordinates:', latitude, longitude);
             
             // Reverse geocoding with OpenStreetMap (free)
             const response = await fetch(
@@ -359,15 +302,18 @@ const Settings: React.FC = () => {
               const location = [city || town || village, state, country]
                 .filter(Boolean)
                 .join(', ');
+              console.log('Browser geolocation success:', location);
               resolve(location || 'Unknown');
             } else {
               resolve('Unknown');
             }
           } catch (error) {
+            console.log('Reverse geocoding failed:', error);
             resolve('Unknown');
           }
         },
         (error) => {
+          console.log('Geolocation denied:', error);
           resolve('Unknown');
         },
         {
@@ -388,10 +334,11 @@ const Settings: React.FC = () => {
         const response = await fetch(`http://ip-api.com/json/${ip}?fields=status,country,regionName,city,query`);
         const data = await response.json();
         if (data.status === 'success' && data.city) {
+          console.log('ip-api.com success:', data);
           return `${data.city}, ${data.regionName}, ${data.country}`;
         }
       } catch (e) {
-        // ip-api.com failed
+        console.log('ip-api.com failed');
       }
 
       // Method 2: ipinfo.io (good accuracy)
@@ -399,10 +346,11 @@ const Settings: React.FC = () => {
         const response = await fetch(`https://ipinfo.io/${ip}/json?token=free`);
         const data = await response.json();
         if (data.city && data.country) {
+          console.log('ipinfo.io success:', data);
           return `${data.city}, ${data.region || data.country}`;
         }
       } catch (e) {
-        // ipinfo.io failed
+        console.log('ipinfo.io failed');
       }
 
       // Method 3: ipapi.co (reliable)
@@ -410,10 +358,11 @@ const Settings: React.FC = () => {
         const response = await fetch(`https://ipapi.co/${ip}/json/`);
         const data = await response.json();
         if (data.city && data.country_name) {
+          console.log('ipapi.co success:', data);
           return `${data.city}, ${data.region}, ${data.country_name}`;
         }
       } catch (e) {
-        // ipapi.co failed
+        console.log('ipapi.co failed');
       }
 
       // Method 4: Use timezone as last resort
@@ -421,11 +370,13 @@ const Settings: React.FC = () => {
       const city = timezone.split('/')[1]?.replace(/_/g, ' ');
       const country = timezone.split('/')[0]?.replace(/_/g, ' ');
       if (city && city !== 'Unknown') {
+        console.log('timezone fallback:', timezone);
         return `${city}, ${country}`;
       }
 
       return 'Unknown';
     } catch (error) {
+      console.error('All location services failed:', error);
       return 'Unknown';
     }
   };
@@ -445,6 +396,7 @@ const isTokenExpired = (token: string): boolean => {
   React.useEffect(() => {
     const token = localStorage.getItem('auth_token');
     if (token && isTokenExpired(token)) {
+      console.log('Token expired, clearing and redirecting');
       localStorage.removeItem('auth_token');
       localStorage.removeItem('user_data');
       localStorage.removeItem('user_sessions');
@@ -464,12 +416,20 @@ const isTokenExpired = (token: string): boolean => {
 
   // Real Session Management
   const revokeSession = async (sessionId: string) => {
+    console.log('=== REVOKE SESSION START ===');
+    console.log('Attempting to revoke session:', sessionId);
+    console.log('Timestamp:', new Date().toISOString());
+    
     try {
       const token = localStorage.getItem('auth_token');
+      console.log('Using token:', token ? 'present' : 'missing');
+      console.log('Token value:', token?.substring(0, 50) + '...');
+      console.log('Token length:', token?.length || 0);
       
       // Test the token and validate it
       if (token) {
         if (isTokenExpired(token)) {
+          console.log('ERROR: Token expired!');
           toast.error('Session expired. Please login again.');
           localStorage.removeItem('auth_token');
           localStorage.removeItem('user_data');
@@ -477,10 +437,17 @@ const isTokenExpired = (token: string): boolean => {
           window.location.href = '/login';
           return;
         }
+        console.log('Token is valid, proceeding with revoke...');
       } else {
+        console.log('ERROR: No token found!');
         toast.error('Please login to revoke sessions');
         return;
       }
+      
+      console.log('Making API call to:', `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/sessions/terminate/${sessionId}`);
+      
+      const startTime = Date.now();
+      console.log('API call started at:', startTime);
       
       // Add timeout to prevent hanging
       const controller = new AbortController();
@@ -498,11 +465,16 @@ const isTokenExpired = (token: string): boolean => {
       clearTimeout(timeoutId);
       
       const endTime = Date.now();
+      console.log('API call completed at:', endTime);
+      console.log('API call duration:', endTime - startTime, 'ms');
+      console.log('Revoke response status:', response.status);
       
       let responseData = {};
       try {
         responseData = await response.json();
+        console.log('Revoke response data:', responseData);
       } catch (jsonError) {
+        console.log('Failed to parse JSON response:', jsonError);
         responseData = { message: 'Invalid JSON response' };
       }
       
@@ -516,11 +488,13 @@ const isTokenExpired = (token: string): boolean => {
         const updatedSessions = localSessions.filter(session => session.sessionId !== sessionId);
         localStorage.setItem('user_sessions', JSON.stringify(updatedSessions));
         
-        // Also remove from localStorage
+        console.log('Session revoked from both backend and localStorage');
       } else {
+        console.log('Revoke failed:', responseData);
         toast.error(`Failed to revoke session: ${responseData.message || 'Unknown error'}`);
       }
     } catch (error) {
+      console.error('Failed to revoke session:', error);
       toast.error('Failed to revoke session');
     }
   };
@@ -558,7 +532,7 @@ const isTokenExpired = (token: string): boolean => {
     
     const userData = {
       profile: user,
-      settings: { advancedAppearance },
+      settings: { privacySettings, advancedAppearance },
       exportDate: new Date().toISOString()
     };
     
@@ -590,6 +564,17 @@ const isTokenExpired = (token: string): boolean => {
     }
   };
 
+  // Account Deletion
+  const deleteAccount = () => {
+    if (deleteConfirmation.toLowerCase() === 'delete my account') {
+      toast.success('Account deletion request submitted');
+      setShowDeleteModal(false);
+      setDeleteConfirmation('');
+      // Handle account deletion logic
+    } else {
+      toast.error('Please type the confirmation text exactly');
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -606,7 +591,8 @@ const isTokenExpired = (token: string): boolean => {
         <div className="flex space-x-1">
           {[
             { id: 'security', label: 'Security', icon: <Shield className="w-4 h-4" /> },
-            { id: 'appearance', label: 'Appearance', icon: <Palette className="w-4 h-4" /> }
+            { id: 'appearance', label: 'Appearance', icon: <Palette className="w-4 h-4" /> },
+            { id: 'privacy', label: 'Privacy', icon: <ShieldCheck className="w-4 h-4" /> }
           ].map((tab) => (
             <button
               key={tab.id}
@@ -702,211 +688,65 @@ const isTokenExpired = (token: string): boolean => {
       {activeTab === 'appearance' && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-6">
-            {/* Theme Selection */}
             <Card className="bg-gray-900 border-gray-800 p-6">
               <h3 className="text-lg font-semibold text-white mb-6 flex items-center gap-2">
                 <Palette className="w-5 h-5 text-green-400" />
-                Theme Selection
-              </h3>
-              
-              <div className="space-y-6">
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-3">
-                    Color Theme
-                  </label>
-                  <div className="grid grid-cols-3 gap-3">
-                    {[
-                      { value: 'light', label: 'Light', icon: <Sun className="w-4 h-4" />, description: 'Bright and clean' },
-                      { value: 'dark', label: 'Dark', icon: <Moon className="w-4 h-4" />, description: 'Easy on the eyes' },
-                      { value: 'auto', label: 'Auto', icon: <Monitor className="w-4 h-4" />, description: 'Follow system' }
-                    ].map((theme) => (
-                      <button
-                        key={theme.value}
-                        onClick={() => setAdvancedAppearance({...advancedAppearance, theme: theme.value as 'light' | 'dark' | 'auto', customTheme: false})}
-                        className={`p-4 rounded-lg border transition-all hover:scale-105 flex flex-col items-center gap-2 ${
-                          advancedAppearance.theme === theme.value && !advancedAppearance.customTheme
-                            ? 'bg-purple-600/20 border-purple-500 text-purple-400 shadow-lg shadow-purple-500/20'
-                            : 'bg-gray-800 border-gray-700 text-gray-300 hover:border-gray-600'
-                        }`}
-                      >
-                        {theme.icon}
-                        <span className="text-sm font-medium">{theme.label}</span>
-                        <span className="text-xs text-gray-400">{theme.description}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-3">
-                    Preset Themes
-                  </label>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                    {[
-                      { name: 'Purple', primary: '#8b5cf6', accent: '#3b82f6' },
-                      { name: 'Blue', primary: '#3b82f6', accent: '#06b6d4' },
-                      { name: 'Green', primary: '#10b981', accent: '#84cc16' },
-                      { name: 'Orange', primary: '#f97316', accent: '#f59e0b' },
-                      { name: 'Red', primary: '#ef4444', accent: '#f87171' },
-                      { name: 'Pink', primary: '#ec4899', accent: '#f472b6' },
-                      { name: 'Teal', primary: '#14b8a6', accent: '#06b6d4' },
-                      { name: 'Indigo', primary: '#6366f1', accent: '#8b5cf6' }
-                    ].map((preset) => (
-                      <button
-                        key={preset.name}
-                        onClick={() => setAdvancedAppearance({
-                          ...advancedAppearance, 
-                          customTheme: true, 
-                          primaryColor: preset.primary, 
-                          accentColor: preset.accent
-                        })}
-                        className={`p-3 rounded-lg border transition-all hover:scale-105 ${
-                          advancedAppearance.customTheme && 
-                          advancedAppearance.primaryColor === preset.primary && 
-                          advancedAppearance.accentColor === preset.accent
-                            ? 'ring-2 ring-purple-500 border-purple-500'
-                            : 'border-gray-700 hover:border-gray-600'
-                        }`}
-                      >
-                        <div className="flex items-center gap-2 mb-2">
-                          <div 
-                            className="w-4 h-4 rounded-full" 
-                            style={{ backgroundColor: preset.primary }}
-                          />
-                          <div 
-                            className="w-4 h-4 rounded-full" 
-                            style={{ backgroundColor: preset.accent }}
-                          />
-                        </div>
-                        <span className="text-xs text-gray-300">{preset.name}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </Card>
-
-            {/* Custom Theme Editor */}
-            <Card className="bg-gray-900 border-gray-800 p-6">
-              <h3 className="text-lg font-semibold text-white mb-6 flex items-center gap-2">
-                <Zap className="w-5 h-5 text-yellow-400" />
-                Custom Theme Editor
-              </h3>
-              
-              <div className="space-y-6">
-                <div className="flex items-center justify-between p-4 bg-gray-800 rounded-lg">
-                  <div>
-                    <p className="text-white font-medium">Enable Custom Theme</p>
-                    <p className="text-gray-400 text-sm">Create your own color scheme</p>
-                  </div>
-                  <button
-                    onClick={() => setAdvancedAppearance({...advancedAppearance, customTheme: !advancedAppearance.customTheme})}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                      advancedAppearance.customTheme ? 'bg-purple-600' : 'bg-gray-600'
-                    }`}
-                  >
-                    <span
-                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                        advancedAppearance.customTheme ? 'translate-x-6' : 'translate-x-1'
-                      }`}
-                    />
-                  </button>
-                </div>
-
-                {advancedAppearance.customTheme && (
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-2">
-                          Primary Color
-                        </label>
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="color"
-                            value={advancedAppearance.primaryColor}
-                            onChange={(e) => setAdvancedAppearance({...advancedAppearance, primaryColor: e.target.value})}
-                            className="w-12 h-12 rounded cursor-pointer border border-gray-600"
-                          />
-                          <input
-                            type="text"
-                            value={advancedAppearance.primaryColor}
-                            onChange={(e) => setAdvancedAppearance({...advancedAppearance, primaryColor: e.target.value})}
-                            className="flex-1 px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white text-sm"
-                            placeholder="#8b5cf6"
-                          />
-                        </div>
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-2">
-                          Accent Color
-                        </label>
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="color"
-                            value={advancedAppearance.accentColor}
-                            onChange={(e) => setAdvancedAppearance({...advancedAppearance, accentColor: e.target.value})}
-                            className="w-12 h-12 rounded cursor-pointer border border-gray-600"
-                          />
-                          <input
-                            type="text"
-                            value={advancedAppearance.accentColor}
-                            onChange={(e) => setAdvancedAppearance({...advancedAppearance, accentColor: e.target.value})}
-                            className="flex-1 px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white text-sm"
-                            placeholder="#3b82f6"
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">
-                        Custom CSS
-                      </label>
-                      <textarea
-                        value={advancedAppearance.customCSS}
-                        onChange={(e) => setAdvancedAppearance({...advancedAppearance, customCSS: e.target.value})}
-                        rows={4}
-                        className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white font-mono text-sm focus:outline-none focus:border-purple-500 transition-colors resize-none"
-                        placeholder="/* Add your custom CSS here */&#10;.custom-class {&#10;  color: #your-color;&#10;}"
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
-            </Card>
-
-            {/* Typography Settings */}
-            <Card className="bg-gray-900 border-gray-800 p-6">
-              <h3 className="text-lg font-semibold text-white mb-6 flex items-center gap-2">
-                <FileText className="w-5 h-5 text-blue-400" />
-                Typography
+                Theme & Display
               </h3>
               
               <div className="space-y-6">
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Theme
+                  </label>
+                  <div className="grid grid-cols-3 gap-3">
+                    {[
+                      { value: 'light', label: 'Light', icon: <Sun className="w-4 h-4" /> },
+                      { value: 'dark', label: 'Dark', icon: <Moon className="w-4 h-4" /> },
+                      { value: 'auto', label: 'Auto', icon: <Monitor className="w-4 h-4" /> }
+                    ].map((theme) => (
+                      <button
+                        key={theme.value}
+                        onClick={() => setAdvancedAppearance({...advancedAppearance, customTheme: false})}
+                        className={`p-3 rounded-lg border transition-colors flex flex-col items-center gap-2 ${
+                          !advancedAppearance.customTheme && 'dark' === theme.value
+                            ? 'bg-purple-600/20 border-purple-500 text-purple-400'
+                            : 'bg-gray-800 border-gray-700 text-gray-300 hover:border-gray-600'
+                        }`}
+                      >
+                        {theme.icon}
+                        <span className="text-sm font-medium">{theme.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Language
+                  </label>
+                  <select
+                    className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-purple-500 transition-colors"
+                  >
+                    <option value="en">English</option>
+                    <option value="es">Spanish</option>
+                    <option value="fr">French</option>
+                    <option value="de">German</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
                     Font Size: {advancedAppearance.fontSize}px
                   </label>
-                  <div className="flex items-center gap-4">
-                    <span className="text-sm text-gray-400">12px</span>
-                    <input
-                      type="range"
-                      min="12"
-                      max="20"
-                      value={advancedAppearance.fontSize}
-                      onChange={(e) => setAdvancedAppearance({...advancedAppearance, fontSize: parseInt(e.target.value)})}
-                      className="flex-1 h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
-                    />
-                    <span className="text-sm text-gray-400">20px</span>
-                  </div>
-                  <div className="mt-2 text-center">
-                    <span 
-                      className="text-gray-300"
-                      style={{ fontSize: `${advancedAppearance.fontSize}px` }}
-                    >
-                      Preview Text Size
-                    </span>
-                  </div>
+                  <input
+                    type="range"
+                    min="12"
+                    max="20"
+                    value={advancedAppearance.fontSize}
+                    onChange={(e) => setAdvancedAppearance({...advancedAppearance, fontSize: parseInt(e.target.value)})}
+                    className="w-full"
+                  />
                 </div>
 
                 <div>
@@ -918,86 +758,116 @@ const isTokenExpired = (token: string): boolean => {
                     onChange={(e) => setAdvancedAppearance({...advancedAppearance, fontFamily: e.target.value})}
                     className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-purple-500 transition-colors"
                   >
-                    <option value="Inter">Inter (Default)</option>
+                    <option value="Inter">Inter</option>
                     <option value="Roboto">Roboto</option>
                     <option value="Open Sans">Open Sans</option>
                     <option value="Poppins">Poppins</option>
                     <option value="JetBrains Mono">JetBrains Mono</option>
-                    <option value="system-ui">System UI</option>
-                    <option value="Georgia">Georgia</option>
-                    <option value="Courier New">Courier New</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Language & Region
-                  </label>
-                  <select
-                    className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-purple-500 transition-colors"
-                  >
-                    <option value="en">English (US)</option>
-                    <option value="en-GB">English (UK)</option>
-                    <option value="es">Spanish</option>
-                    <option value="fr">French</option>
-                    <option value="de">German</option>
-                    <option value="ja">Japanese</option>
-                    <option value="ko">Korean</option>
-                    <option value="zh">Chinese</option>
                   </select>
                 </div>
               </div>
             </Card>
 
-            {/* Layout & Density */}
             <Card className="bg-gray-900 border-gray-800 p-6">
               <h3 className="text-lg font-semibold text-white mb-6 flex items-center gap-2">
-                <Monitor className="w-5 h-5 text-purple-400" />
-                Layout & Density
+                <Zap className="w-5 h-5 text-yellow-400" />
+                Advanced Customization
               </h3>
               
               <div className="space-y-6">
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-3">
-                    Interface Density
-                  </label>
-                  <div className="grid grid-cols-3 gap-3">
-                    {[
-                      { value: 'compact', label: 'Compact', description: 'More content visible' },
-                      { value: 'comfortable', label: 'Comfortable', description: 'Balanced spacing' },
-                      { value: 'spacious', label: 'Spacious', description: 'More breathing room' }
-                    ].map((density) => (
+                  <h4 className="text-white font-medium mb-4">Custom Theme</h4>
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between p-4 bg-gray-800 rounded-lg">
+                      <div>
+                        <p className="text-white font-medium">Enable Custom Theme</p>
+                        <p className="text-gray-400 text-sm">Create your own color scheme</p>
+                      </div>
                       <button
-                        key={density.value}
-                        onClick={() => setAdvancedAppearance({...advancedAppearance, density: density.value as 'compact' | 'comfortable' | 'spacious'})}
-                        className={`p-3 rounded-lg border transition-all ${
-                          advancedAppearance.density === density.value
-                            ? 'bg-purple-600/20 border-purple-500 text-purple-400'
-                            : 'bg-gray-800 border-gray-700 text-gray-300 hover:border-gray-600'
+                        onClick={() => setAdvancedAppearance({...advancedAppearance, customTheme: !advancedAppearance.customTheme})}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                          advancedAppearance.customTheme ? 'bg-purple-600' : 'bg-gray-600'
                         }`}
                       >
-                        <span className="text-sm font-medium">{density.label}</span>
-                        <span className="text-xs text-gray-400 block mt-1">{density.description}</span>
+                        <span
+                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                            advancedAppearance.customTheme ? 'translate-x-6' : 'translate-x-1'
+                          }`}
+                        />
                       </button>
-                    ))}
+                    </div>
+
+                    {advancedAppearance.customTheme && (
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-300 mb-2">
+                            Primary Color
+                          </label>
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="color"
+                              value={advancedAppearance.primaryColor}
+                              onChange={(e) => setAdvancedAppearance({...advancedAppearance, primaryColor: e.target.value})}
+                              className="w-12 h-12 rounded cursor-pointer"
+                            />
+                            <input
+                              type="text"
+                              value={advancedAppearance.primaryColor}
+                              onChange={(e) => setAdvancedAppearance({...advancedAppearance, primaryColor: e.target.value})}
+                              className="flex-1 px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white"
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-300 mb-2">
+                            Accent Color
+                          </label>
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="color"
+                              value={advancedAppearance.accentColor}
+                              onChange={(e) => setAdvancedAppearance({...advancedAppearance, accentColor: e.target.value})}
+                              className="w-12 h-12 rounded cursor-pointer"
+                            />
+                            <input
+                              type="text"
+                              value={advancedAppearance.accentColor}
+                              onChange={(e) => setAdvancedAppearance({...advancedAppearance, accentColor: e.target.value})}
+                              className="flex-1 px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
+                </div>
+
+                <div>
+                  <h4 className="text-white font-medium mb-4">Custom CSS</h4>
+                  <textarea
+                    value={advancedAppearance.customCSS}
+                    onChange={(e) => setAdvancedAppearance({...advancedAppearance, customCSS: e.target.value})}
+                    rows={4}
+                    className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white font-mono text-sm focus:outline-none focus:border-purple-500 transition-colors resize-none"
+                    placeholder="/* Add your custom CSS here */"
+                  />
                 </div>
 
                 <div className="space-y-3">
                   <div className="flex items-center justify-between p-4 bg-gray-800 rounded-lg">
                     <div>
-                      <p className="text-white font-medium">Compact Mode</p>
-                      <p className="text-gray-400 text-sm">Reduce spacing throughout the interface</p>
+                      <p className="text-white font-medium">Animations</p>
+                      <p className="text-gray-400 text-sm">Enable UI animations</p>
                     </div>
                     <button
-                      onClick={() => setAdvancedAppearance({...advancedAppearance, compactMode: !advancedAppearance.compactMode})}
+                      onClick={() => setAdvancedAppearance({...advancedAppearance, animationsEnabled: !advancedAppearance.animationsEnabled})}
                       className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                        advancedAppearance.compactMode ? 'bg-purple-600' : 'bg-gray-600'
+                        advancedAppearance.animationsEnabled ? 'bg-purple-600' : 'bg-gray-600'
                       }`}
                     >
                       <span
                         className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                          advancedAppearance.compactMode ? 'translate-x-6' : 'translate-x-1'
+                          advancedAppearance.animationsEnabled ? 'translate-x-6' : 'translate-x-1'
                         }`}
                       />
                     </button>
@@ -1005,18 +875,18 @@ const isTokenExpired = (token: string): boolean => {
 
                   <div className="flex items-center justify-between p-4 bg-gray-800 rounded-lg">
                     <div>
-                      <p className="text-white font-medium">Sidebar Collapsed</p>
-                      <p className="text-gray-400 text-sm">Keep sidebar collapsed by default</p>
+                      <p className="text-white font-medium">Reduced Motion</p>
+                      <p className="text-gray-400 text-sm">Minimize animations for accessibility</p>
                     </div>
                     <button
-                      onClick={() => setAdvancedAppearance({...advancedAppearance, sidebarCollapsed: !advancedAppearance.sidebarCollapsed})}
+                      onClick={() => setAdvancedAppearance({...advancedAppearance, reducedMotion: !advancedAppearance.reducedMotion})}
                       className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                        advancedAppearance.sidebarCollapsed ? 'bg-purple-600' : 'bg-gray-600'
+                        advancedAppearance.reducedMotion ? 'bg-purple-600' : 'bg-gray-600'
                       }`}
                     >
                       <span
                         className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                          advancedAppearance.sidebarCollapsed ? 'translate-x-6' : 'translate-x-1'
+                          advancedAppearance.reducedMotion ? 'translate-x-6' : 'translate-x-1'
                         }`}
                       />
                     </button>
@@ -1024,18 +894,18 @@ const isTokenExpired = (token: string): boolean => {
 
                   <div className="flex items-center justify-between p-4 bg-gray-800 rounded-lg">
                     <div>
-                      <p className="text-white font-medium">Status Indicators</p>
-                      <p className="text-gray-400 text-sm">Show online status and activity indicators</p>
+                      <p className="text-white font-medium">High Contrast</p>
+                      <p className="text-gray-400 text-sm">Increase contrast for better visibility</p>
                     </div>
                     <button
-                      onClick={() => setAdvancedAppearance({...advancedAppearance, showStatusIndicators: !advancedAppearance.showStatusIndicators})}
+                      onClick={() => setAdvancedAppearance({...advancedAppearance, highContrast: !advancedAppearance.highContrast})}
                       className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                        advancedAppearance.showStatusIndicators ? 'bg-purple-600' : 'bg-gray-600'
+                        advancedAppearance.highContrast ? 'bg-purple-600' : 'bg-gray-600'
                       }`}
                     >
                       <span
                         className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                          advancedAppearance.showStatusIndicators ? 'translate-x-6' : 'translate-x-1'
+                          advancedAppearance.highContrast ? 'translate-x-6' : 'translate-x-1'
                         }`}
                       />
                     </button>
@@ -1043,225 +913,9 @@ const isTokenExpired = (token: string): boolean => {
                 </div>
               </div>
             </Card>
-
-            {/* Accessibility Features */}
-            <Card className="bg-gray-900 border-gray-800 p-6">
-              <h3 className="text-lg font-semibold text-white mb-6 flex items-center gap-2">
-                <Shield className="w-5 h-5 text-green-400" />
-                Accessibility
-              </h3>
-              
-              <div className="space-y-3">
-                <div className="flex items-center justify-between p-4 bg-gray-800 rounded-lg">
-                  <div>
-                    <p className="text-white font-medium">Animations</p>
-                    <p className="text-gray-400 text-sm">Enable UI animations and transitions</p>
-                  </div>
-                  <button
-                    onClick={() => setAdvancedAppearance({...advancedAppearance, animationsEnabled: !advancedAppearance.animationsEnabled})}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                      advancedAppearance.animationsEnabled ? 'bg-purple-600' : 'bg-gray-600'
-                    }`}
-                  >
-                    <span
-                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                        advancedAppearance.animationsEnabled ? 'translate-x-6' : 'translate-x-1'
-                      }`}
-                    />
-                  </button>
-                </div>
-
-                <div className="flex items-center justify-between p-4 bg-gray-800 rounded-lg">
-                  <div>
-                    <p className="text-white font-medium">Reduced Motion</p>
-                    <p className="text-gray-400 text-sm">Minimize animations for accessibility</p>
-                  </div>
-                  <button
-                    onClick={() => setAdvancedAppearance({...advancedAppearance, reducedMotion: !advancedAppearance.reducedMotion})}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                      advancedAppearance.reducedMotion ? 'bg-purple-600' : 'bg-gray-600'
-                    }`}
-                  >
-                    <span
-                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                        advancedAppearance.reducedMotion ? 'translate-x-6' : 'translate-x-1'
-                      }`}
-                    />
-                  </button>
-                </div>
-
-                <div className="flex items-center justify-between p-4 bg-gray-800 rounded-lg">
-                  <div>
-                    <p className="text-white font-medium">High Contrast</p>
-                    <p className="text-gray-400 text-sm">Increase contrast for better visibility</p>
-                  </div>
-                  <button
-                    onClick={() => setAdvancedAppearance({...advancedAppearance, highContrast: !advancedAppearance.highContrast})}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                      advancedAppearance.highContrast ? 'bg-purple-600' : 'bg-gray-600'
-                    }`}
-                  >
-                    <span
-                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                        advancedAppearance.highContrast ? 'translate-x-6' : 'translate-x-1'
-                      }`}
-                    />
-                  </button>
-                </div>
-              </div>
-            </Card>
           </div>
 
-          {/* Preview & Actions Sidebar */}
-          <div className="space-y-6">
-            {/* Live Preview Card */}
-            <Card className="bg-gray-900 border-gray-800 p-6">
-              <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                <Eye className="w-5 h-5 text-blue-400" />
-                Live Preview
-              </h3>
-              
-              <div className="space-y-4">
-                <div 
-                  className="p-4 rounded-lg border-2 border-dashed border-gray-700"
-                  style={{
-                    backgroundColor: advancedAppearance.customTheme ? `${advancedAppearance.primaryColor}10` : undefined,
-                    borderColor: advancedAppearance.customTheme ? advancedAppearance.primaryColor : undefined
-                  }}
-                >
-                  <h4 
-                    className="font-medium mb-2"
-                    style={{ 
-                      color: advancedAppearance.customTheme ? advancedAppearance.primaryColor : undefined,
-                      fontSize: `${advancedAppearance.fontSize + 2}px`,
-                      fontFamily: advancedAppearance.fontFamily
-                    }}
-                  >
-                    Sample Heading
-                  </h4>
-                  <p 
-                    className="text-gray-300 text-sm"
-                    style={{ 
-                      fontSize: `${advancedAppearance.fontSize}px`,
-                      fontFamily: advancedAppearance.fontFamily
-                    }}
-                  >
-                    This is how your text will appear with the current settings. Lorem ipsum dolor sit amet, consectetur adipiscing elit.
-                  </p>
-                  <button 
-                    className="mt-3 px-4 py-2 rounded text-white text-sm font-medium"
-                    style={{
-                      backgroundColor: advancedAppearance.customTheme ? advancedAppearance.primaryColor : undefined,
-                      fontSize: `${advancedAppearance.fontSize - 2}px`,
-                      fontFamily: advancedAppearance.fontFamily
-                    }}
-                  >
-                    Sample Button
-                  </button>
-                </div>
-                
-                <div className="text-xs text-gray-400 space-y-1">
-                  <p>Theme: {advancedAppearance.theme}</p>
-                  <p>Font: {advancedAppearance.fontFamily} ({advancedAppearance.fontSize}px)</p>
-                  <p>Density: {advancedAppearance.density}</p>
-                  {advancedAppearance.customTheme && (
-                    <>
-                      <p>Primary: {advancedAppearance.primaryColor}</p>
-                      <p>Accent: {advancedAppearance.accentColor}</p>
-                    </>
-                  )}
-                </div>
-              </div>
-            </Card>
-
-            {/* Actions Card */}
-            <Card className="bg-gray-900 border-gray-800 p-6">
-              <h3 className="text-lg font-semibold text-white mb-4">Actions</h3>
-              
-              <div className="space-y-3">
-                <Button
-                  onClick={handleSaveAppearance}
-                  disabled={saving}
-                  className="w-full bg-purple-600 hover:bg-purple-700 text-white"
-                >
-                  {saving ? (
-                    <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                      Saving...
-                    </>
-                  ) : (
-                    <>
-                      <Save className="w-4 h-4 mr-2" />
-                      Save Settings
-                    </>
-                  )}
-                </Button>
-                
-                <Button
-                  onClick={handleResetAppearance}
-                  variant="outline"
-                  className="w-full border-gray-600 text-gray-300 hover:bg-gray-800"
-                >
-                  <RefreshCw className="w-4 h-4 mr-2" />
-                  Reset to Defaults
-                </Button>
-                
-                <Button
-                  onClick={() => {
-                    const dataStr = JSON.stringify(advancedAppearance, null, 2);
-                    const dataBlob = new Blob([dataStr], { type: 'application/json' });
-                    const url = URL.createObjectURL(dataBlob);
-                    const link = document.createElement('a');
-                    link.href = url;
-                    link.download = 'appearance-settings.json';
-                    link.click();
-                    toast.success(
-                      <div className="flex items-center gap-3">
-                        <Download className="w-5 h-5 text-green-400" />
-                        <div>
-                          <p className="font-medium">Settings exported successfully!</p>
-                          <p className="text-sm opacity-90">Your appearance settings have been downloaded.</p>
-                        </div>
-                      </div>,
-                      { duration: 4000 }
-                    );
-                  }}
-                  variant="outline"
-                  className="w-full border-gray-600 text-gray-300 hover:bg-gray-800"
-                >
-                  <Download className="w-4 h-4 mr-2" />
-                  Export Settings
-                </Button>
-              </div>
-            </Card>
-
-            {/* Tips Card */}
-            <Card className="bg-gray-900 border-gray-800 p-6">
-              <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                <AlertTriangle className="w-5 h-5 text-yellow-400" />
-                Tips
-              </h3>
-              
-              <div className="space-y-3 text-sm text-gray-300">
-                <div className="flex items-start gap-2">
-                  <CheckCircle className="w-4 h-4 text-green-400 mt-0.5 flex-shrink-0" />
-                  <p>Settings are automatically saved to your browser</p>
-                </div>
-                <div className="flex items-start gap-2">
-                  <CheckCircle className="w-4 h-4 text-green-400 mt-0.5 flex-shrink-0" />
-                  <p>Custom CSS allows for advanced personalization</p>
-                </div>
-                <div className="flex items-start gap-2">
-                  <CheckCircle className="w-4 h-4 text-green-400 mt-0.5 flex-shrink-0" />
-                  <p>Use reduced motion if you're sensitive to animations</p>
-                </div>
-                <div className="flex items-start gap-2">
-                  <CheckCircle className="w-4 h-4 text-green-400 mt-0.5 flex-shrink-0" />
-                  <p>High contrast mode improves readability</p>
-                </div>
-              </div>
-            </Card>
-          </div>
+          
         </div>
       )}
 

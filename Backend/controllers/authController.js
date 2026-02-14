@@ -1,6 +1,7 @@
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const User = require("../models/user");
+const { checkAccountLockout, recordFailedAttempt, recordSuccessfulAttempt } = require("../middlewares/accountLockout");
 
 const INVALID_CREDENTIALS = "Invalid credentials";
 
@@ -257,8 +258,13 @@ exports.login = async (req, res) => {
 
     const user = await User.findOne({ email: email.trim().toLowerCase() });
     if (!user || !(await bcrypt.compare(password, user.password))) {
+      // Record failed attempt for lockout
+      recordFailedAttempt(req);
       return res.status(400).json({ success: false, message: INVALID_CREDENTIALS });
     }
+
+    // Record successful attempt and clear lockout
+    recordSuccessfulAttempt(req);
 
     const token = jwt.sign({ id: user._id }, JWT_SECRET, { expiresIn: "7d" });
 

@@ -8,6 +8,8 @@ import React, {
   useCallback,
 } from 'react';
 import { authService } from '../services/auth';
+import { sessionManager } from '../services/sessionManager';
+import { userPreferencesService } from '../services/userPreferences';
 
 export interface User {
   _id?: string;
@@ -132,8 +134,11 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
   const logout = useCallback(() => {
     setUserState(null);
     authService.logout();
-    localStorage.removeItem('user_data');
+    sessionManager.clearSessions();
+    // Clean up user-specific preferences
+    userPreferencesService.cleanupOldAppearanceSettings();
   }, []);
+  
 
   return (
     <UserContext.Provider value={{ user, setUser, updateUser, logout }}>

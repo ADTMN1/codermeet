@@ -4,6 +4,7 @@ const rateLimit = require("express-rate-limit");
 
 const authController = require("../controllers/authController");
 const sanitize = require("../middlewares/sanitize");
+const { checkAccountLockout } = require("../middlewares/accountLockout");
 const {
   registerValidators,
   loginValidators,
@@ -35,7 +36,7 @@ const registerLimiter = rateLimit({
 router.get("/check-user", authController.checkUserAvailability);
 router.get("/check-github", authController.checkGithubAvailability);
 router.post("/register", registerLimiter, registerValidators, checkValidation, authController.register);
-router.post("/login", loginLimiter, loginValidators, checkValidation, authController.login);
+router.post("/login", checkAccountLockout, loginLimiter, loginValidators, checkValidation, authController.login);
 router.post("/logout", authController.logout);
 
 module.exports = router;

@@ -13,6 +13,7 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@types/csurf": "^1.11.5",
     "axios": "^1.13.4",
     "bcryptjs": "^3.0.3",
     "cloudinary": "^2.8.0",
