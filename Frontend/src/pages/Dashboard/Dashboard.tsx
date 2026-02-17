@@ -95,6 +95,9 @@ const Dashboard: React.FC = () => {
 
   });
 
+  // Calculate real-time progress based on completed challenges
+  const onprogress = stats.totalChallenges > 0 ? Math.round((stats.completedChallenges / stats.totalChallenges) * 100) : 0;
+
   const [mentorshipSession, setMentorshipSession] = useState<any>(null);
 
   const [unreadCount, setUnreadCount] = useState(0);
@@ -279,13 +282,9 @@ const Dashboard: React.FC = () => {
         // Fallback to sample data if API fails
 
         setLeaderboard([
-
-          { name: user?.username || user?.name || 'You', points: user?.points || 0, rank: 1, total_point: user?.points || 0, isCurrentUser: true },
-
-          { name: '@Amanuel', points: 120, rank: 2, total_point: 300 },
-
-          { name: '@Selam', points: 100, rank: 3, total_point: 200 },
-
+          { _id: user?._id || '1', name: user?.username || user?.name || 'You', username: user?.username || 'You', points: user?.points || 0, rank: 1, total_point: user?.points || 0, isCurrentUser: true },
+          { _id: '2', name: '@Amanuel', username: '@Amanuel', points: 120, rank: 2, total_point: 300, isCurrentUser: false },
+          { _id: '3', name: '@Selam', username: '@Selam', points: 100, rank: 3, total_point: 200, isCurrentUser: false },
         ]);
 
       } finally {
@@ -311,10 +310,6 @@ const Dashboard: React.FC = () => {
     { name: 'Team Beta', project: 'Portfolio Builder', progress: 45 },
 
   ];
-
-
-
-  const onprogress = 45;
 
 
 
@@ -772,15 +767,22 @@ const Dashboard: React.FC = () => {
 
             </div>
 
-            <p className="text-gray-400 mb-2">Build a Real-Time Chat App</p>
+            <div className="text-gray-400 mb-2">
+              {stats.totalChallenges > 0 ? 'Active challenge available' : 'No active challenges'}
+            </div>
+            <div className="text-gray-500 mb-4">
+              {stats.totalChallenges > 0 ? 'Join now to compete!' : 'Check back soon for new challenges'}
+            </div>
+            <div className="text-green-500 font-semibold mb-4">
+              {stats.totalChallenges > 0 ? 'Prizes available for winners!' : ''}
+            </div>
 
-            <p className="text-gray-500 mb-4">Deadline: Nov 20, 2025</p>
-
-            <p className="text-green-500 font-semibold mb-4">
-
-              Prize: 2000 Birr + T-shirt + Feature
-
-            </p>
+            {/* Show current stats value */}
+            {process.env.NODE_ENV === 'development' && (
+              <div className="text-xs text-gray-600 mb-2">
+              {stats.totalChallenges}
+              </div>
+            )}
 
             <button
 
@@ -790,7 +792,7 @@ const Dashboard: React.FC = () => {
 
               className={`text-heading font-medium leading-5 rounded-full text-sm px-4 py-2.5 focus:outline-none cursor-pointer transition shadow-md ${
 
-                user?.plan?.toLowerCase() === 'trial'
+                user?.plan?.toLowerCase() === 'trial' || !stats || stats.totalChallenges === 0 || stats.totalChallenges === undefined
 
                   ? 'bg-gray-600 text-gray-400 cursor-not-allowed hover:bg-gray-600'
 
@@ -798,11 +800,11 @@ const Dashboard: React.FC = () => {
 
               }`}
 
-              disabled={user?.plan?.toLowerCase() === 'trial'}
+              disabled={user?.plan?.toLowerCase() === 'trial' || !stats || stats.totalChallenges === 0 || stats.totalChallenges === undefined}
 
             >
 
-              {user?.plan?.toLowerCase() === 'trial' ? 'Upgrade Required' : 'Join'}
+              {user?.plan?.toLowerCase() === 'trial' ? 'Upgrade Required' : (!stats || stats.totalChallenges === 0 || stats.totalChallenges === undefined) ? 'No Challenge' : 'Join'}
 
             </button>
 

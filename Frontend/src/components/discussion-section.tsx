@@ -467,70 +467,87 @@ export function DiscussionSection({ challengeId }: DiscussionSectionProps) {
   return (
     <Card className="bg-slate-900/50 border-blue-500/20 shadow-lg shadow-blue-500/10 backdrop-blur-sm">
       <div className="p-6 space-y-4">
-        <div className="flex items-center gap-2">
-          <MessageSquare className="w-5 h-5 text-blue-400" />
-          <h3 className="text-blue-300">Discussion Forum</h3>
-          <div className="ml-auto flex items-center gap-3">
-            {/* Connection Status Indicator */}
-            <div className="flex items-center gap-2">
-              <div className={`w-2 h-2 rounded-full ${
-                connectionStatus === 'connected' 
-                  ? 'bg-green-500 animate-pulse' 
-                  : connectionStatus === 'connecting' 
-                    ? 'bg-yellow-500 animate-pulse' 
-                    : 'bg-red-500'
-              }`} />
-              <span className={`text-xs ${
-                connectionStatus === 'connected' 
-                  ? 'text-green-400' 
-                  : connectionStatus === 'connecting' 
-                    ? 'text-yellow-400' 
-                    : 'text-red-400'
-              }`}>
-                {connectionStatus === 'connected' ? 'Connected' : 
-                 connectionStatus === 'connecting' ? 'Connecting...' : 'Disconnected'}
-              </span>
+        {!challengeId ? (
+          // No Challenge State
+          <div className="text-center py-12">
+            <MessageSquare className="w-16 h-16 text-slate-600 mx-auto mb-4" />
+            <h3 className="text-xl text-slate-400 mb-2">Discussion Unavailable</h3>
+            <p className="text-slate-500 text-sm max-w-md mx-auto">
+              Join an active challenge to participate in discussions and connect with other developers.
+            </p>
+            <div className="mt-6 p-4 rounded-lg bg-slate-800/50 border border-slate-700/50">
+              <p className="text-xs text-slate-400">
+                <span className="text-blue-400">💡 Tip:</span> Discussions are available once you register for an active challenge.
+              </p>
             </div>
-            
-            {/* Online Users */}
-            {onlineCount > 0 && (
-              <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-gradient-to-r from-green-900/30 to-emerald-900/30 border border-green-500/30">
-                <Wifi className="w-4 h-4 text-green-400" />
-                <span className="text-xs text-green-400 font-medium">
-                  {onlineCount} {onlineCount === 1 ? 'User' : 'Users'} Online
-                </span>
-                <div className="flex -space-x-2">
-                  {onlineUsers.slice(0, 3).map((onlineUser, index) => (
-                    <div
-                      key={onlineUser._id}
-                      className="w-6 h-6 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 border-2 border-slate-900 flex items-center justify-center text-xs text-white font-bold"
-                      style={{ zIndex: 3 - index }}
-                    >
-                      {onlineUser.avatar ? (
-                        <img 
-                          src={onlineUser.avatar} 
-                          alt={onlineUser.fullName} 
-                          className="w-full h-full rounded-full object-cover"
-                        />
-                      ) : (
-                        onlineUser.fullName?.charAt(0)?.toUpperCase() || 'U'
+          </div>
+        ) : (
+          // Normal Discussion UI
+          <>
+            <div className="flex items-center gap-2">
+              <MessageSquare className="w-5 h-5 text-blue-400" />
+              <h3 className="text-blue-300">Discussion Forum</h3>
+              <div className="ml-auto flex items-center gap-3">
+                {/* Connection Status Indicator */}
+                <div className="flex items-center gap-2">
+                  <div className={`w-2 h-2 rounded-full ${
+                    connectionStatus === 'connected' 
+                      ? 'bg-green-500 animate-pulse' 
+                      : connectionStatus === 'connecting' 
+                        ? 'bg-yellow-500 animate-pulse' 
+                        : 'bg-red-500'
+                  }`} />
+                  <span className={`text-xs ${
+                    connectionStatus === 'connected' 
+                      ? 'text-green-400' 
+                      : connectionStatus === 'connecting' 
+                        ? 'text-yellow-400' 
+                        : 'text-red-400'
+                  }`}>
+                    {connectionStatus === 'connected' ? 'Connected' : 
+                       connectionStatus === 'connecting' ? 'Connecting...' : 'Disconnected'}
+                  </span>
+                </div>
+                
+                {/* Online Users */}
+                {onlineCount > 0 && (
+                  <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-gradient-to-r from-green-900/30 to-emerald-900/30 border border-green-500/30">
+                    <Wifi className="w-4 h-4 text-green-400" />
+                    <span className="text-xs text-green-400 font-medium">
+                      {onlineCount} {onlineCount === 1 ? 'User' : 'Users'} Online
+                    </span>
+                    <div className="flex -space-x-2">
+                      {onlineUsers.slice(0, 3).map((onlineUser, index) => (
+                        <div
+                          key={onlineUser._id}
+                          className="w-6 h-6 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 border-2 border-slate-900 flex items-center justify-center text-xs text-white font-bold"
+                          style={{ zIndex: 3 - index }}
+                        >
+                          {onlineUser.avatar ? (
+                            <img 
+                              src={onlineUser.avatar} 
+                              alt={onlineUser.fullName} 
+                              className="w-full h-full rounded-full object-cover"
+                            />
+                          ) : (
+                            onlineUser.fullName?.charAt(0)?.toUpperCase() || 'U'
+                          )}
+                        </div>
+                      ))}
+                      {onlineCount > 3 && (
+                        <div className="w-6 h-6 rounded-full bg-gradient-to-br from-slate-600 to-slate-700 border-2 border-slate-900 flex items-center justify-center text-xs text-white font-bold">
+                          +{onlineCount - 3}
+                        </div>
                       )}
                     </div>
-                  ))}
-                  {onlineCount > 3 && (
-                    <div className="w-6 h-6 rounded-full bg-gradient-to-br from-slate-600 to-slate-700 border-2 border-slate-900 flex items-center justify-center text-xs text-white font-bold">
-                      +{onlineCount - 3}
-                    </div>
-                  )}
-                </div>
+                  </div>
+                )}
+                
+                <span className="text-xs text-slate-500">
+                  {messages.length} messages
+                </span>
               </div>
-            )}
-            
-            <span className="text-xs text-slate-500">
-              {messages.length} messages
-            </span>
-          </div>
-        </div>
+            </div>
 
         {/* Typing indicator */}
         {typingUsers.size > 0 && (
@@ -745,6 +762,8 @@ export function DiscussionSection({ challengeId }: DiscussionSectionProps) {
             </Button>
           </div>
         </form>
+        </>
+        )}
       </div>
     </Card>
   );

@@ -37,57 +37,92 @@ export default function WeeklyChallenge() {
   // Check if user is registered for the current challenge
   useEffect(() => {
     const checkRegistration = async () => {
-      if (!user || !challenge?._id) return;
+      if (!user?._id || !challenge?._id) {
+        console.warn('Missing user ID or challenge ID for registration check');
+        return;
+      }
       
       try {
         const token = authService.getToken();
-        const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/challenges/${challenge._id}/check-registration`, {
+        if (!token) {
+          console.warn('No authentication token available');
+          return;
+        }
+
+        const response = await fetch(`${import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000'}/api/challenges/${challenge._id}/check-registration`, {
+          method: 'GET',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': token ? `Bearer ${token}` : ''
+            'Authorization': `Bearer ${token}`
           }
         });
+        
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
         
         const data = await response.json();
         if (data.success) {
           setIsRegistered(data.isRegistered);
+        } else {
+          console.error('Registration check failed:', data.message);
         }
       } catch (error) {
-        // Error checking registration - assume not registered
+        console.error('❌ Registration check error:', error);
+        // Don't set state on error to avoid UI flicker
       }
     };
 
     checkRegistration();
-  }, [user, challenge]);
+  }, [user?._id, challenge?._id]);
 
   // Fetch user's submission
   useEffect(() => {
     const fetchSubmission = async () => {
-      if (!user || !challenge?._id) return;
+      if (!user?._id || !challenge?._id) {
+        console.warn('Missing user ID or challenge ID for submission fetch');
+        return;
+      }
       
       try {
         const token = authService.getToken();
+        if (!token) {
+          console.warn('No authentication token available for submission fetch');
+          return;
+        }
         
-        const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/challenges/${challenge._id}/my-submission`, {
+        const response = await fetch(`${import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000'}/api/challenges/${challenge._id}/my-submission`, {
+          method: 'GET',
           headers: {
-            'Authorization': token ? `Bearer ${token}` : ''
+            'Authorization': `Bearer ${token}`
           }
         });
+        
+        if (!response.ok) {
+          if (response.status === 404) {
+            // No submission found - this is expected
+            setSubmission(null);
+            return;
+          }
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
         
         const data = await response.json();
         
         if (data.success) {
           setSubmission(data.data);
+        } else {
+          console.error('Submission fetch failed:', data.message);
+          setSubmission(null);
         }
       } catch (error) {
         console.error('❌ Submission fetch error:', error);
-        // No submission found or error
         setSubmission(null);
       }
     };
 
     fetchSubmission();
-  }, [user, challenge]);
+  }, [user?._id, challenge?._id]);
 
   const handleJoinClick = () => {
     setRegistrationModalOpen(true);
@@ -105,7 +140,11 @@ export default function WeeklyChallenge() {
 
       {/* Main Container */}
       <div className="container mx-auto px-4 py-8 max-w-7xl">
-        <ChallengeHeader />
+        <ChallengeHeader 
+          challengeTitle={challenge?.title || "Build a Real-Time Chat App"}
+          challengeDifficulty={challenge?.difficulty || "Intermediate"}
+          challengePoints={500}
+        />
 
         {/* Main Grid Layout */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-8">
