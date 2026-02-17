@@ -213,13 +213,13 @@ const ImpressiveLeaderboard: React.FC = () => {
       setLoading(true);
       
       // Fetch real data from API
-      const response = await axios.get(`${API_URL}/api/leaderboard`, {
+      const response = await axios.get(`${API_URL}/leaderboard`, {
         params: { limit: 50 }, // Get more users for better filtering
         headers: { Authorization: `Bearer ${localStorage.getItem('auth_token')}` }
       });
 
       const apiData = response.data;
-      let realData = apiData.users.map((user: any) => {
+      let realData = apiData.map((user: any) => {
         return {
           _id: user._id,
           name: user.fullName || user.username,
@@ -269,14 +269,14 @@ const ImpressiveLeaderboard: React.FC = () => {
 
       setLeaderboard(realData);
       
-      // Calculate stats
+      // Calculate stats from the user data
       const newStats = {
-        totalUsers: apiData.totalUsers,
-        activeUsers: apiData.activeUsers,
-        totalPoints: apiData.totalPoints,
-        averagePoints: apiData.averagePoints,
-        topScore: apiData.topScore,
-        updated: apiData.updated
+        totalUsers: realData.length,
+        activeUsers: realData.filter((u: LeaderboardUser) => u.lastActive && new Date(u.lastActive) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)).length, // Active in last 7 days
+        totalPoints: realData.reduce((sum: number, u: LeaderboardUser) => sum + u.points, 0),
+        averagePoints: realData.length > 0 ? Math.round(realData.reduce((sum: number, u: LeaderboardUser) => sum + u.points, 0) / realData.length) : 0,
+        topScore: realData.length > 0 ? realData[0].points : 0,
+        updated: new Date().toISOString()
       };
       setStats(newStats);
 
