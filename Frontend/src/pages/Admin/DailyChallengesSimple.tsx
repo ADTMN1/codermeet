@@ -137,7 +137,7 @@ const DailyChallengesSimple: React.FC = () => {
       setLoading(true);
       const token = localStorage.getItem('auth_token');
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/daily-challenge/all?page=${pagination.current}&limit=10&status=${statusFilter}`,
+        `${import.meta.env.VITE_API_URL/daily-challenge/all?page=${pagination.current}&limit=10&status=${statusFilter}`,
         {
           headers: {
             'Content-Type': 'application/json',
@@ -183,7 +183,7 @@ const DailyChallengesSimple: React.FC = () => {
 
     try {
       const token = localStorage.getItem('auth_token');
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/daily-challenge/${id}`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL/daily-challenge/${id}`, {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
@@ -474,8 +474,8 @@ const ChallengeForm: React.FC<{
     try {
       const token = localStorage.getItem('auth_token');
       const url = challenge 
-        ? `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/daily-challenge/${challenge._id}`
-        : `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/daily-challenge/create`;
+        ? `${import.meta.env.VITE_API_URL/daily-challenge/${challenge._id}`
+        : `${import.meta.env.VITE_API_URL/daily-challenge/create`;
       
       const method = challenge ? 'PUT' : 'POST';
       

@@ -1,5 +1,6 @@
 import { io, Socket } from 'socket.io-client';
 import { authService } from './auth';
+import { SOCKET_URL } from '../config/api';
 
 class SocketService {
   private socket: Socket | null = null;
@@ -22,7 +23,7 @@ class SocketService {
       return;
     }
     
-    this.socket = io(import.meta.env.VITE_API_URL || 'http://localhost:5000', {
+    this.socket = io(SOCKET_URL, {
       transports: ['websocket', 'polling'],
       auth: {
         token: token

@@ -72,7 +72,7 @@ export function LiveStats({ challengeId }: { challengeId?: string }) {
     // Fetch initial data from API as fallback
     const fetchInitialStats = async () => {
       try {
-        const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/challenges/${challengeId}/stats`, {
+        const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/challenges/${challengeId}/stats`, {
           headers: {
             'Authorization': localStorage.getItem('auth_token') ? `Bearer ${localStorage.getItem('auth_token')}` : ''
           }

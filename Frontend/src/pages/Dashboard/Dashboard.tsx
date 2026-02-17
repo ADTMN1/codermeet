@@ -243,18 +243,18 @@ const Dashboard: React.FC = () => {
 
         // Fetch leaderboard data, stats, mentorship session, and exact rank
         const [leaderboardRes, statsRes, mentorshipRes, rankRes] = await Promise.all([
-          axios.get(`${API_BASE_URL}/api/leaderboard`),
-          axios.get(`${API_BASE_URL}/api/users/${user._id}/stats`, {
+          axios.get(`${API_BASE_URL}/leaderboard`),
+          axios.get(`${API_BASE_URL}/users/${user._id}/stats`, {
             headers: {
               'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
             }
           }),
-          axios.get(`${API_BASE_URL}/api/mentorship/upcoming`, {
+          axios.get(`${API_BASE_URL}/mentorship/upcoming`, {
             headers: {
               'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
             }
           }),
-          axios.get(`${API_BASE_URL}/api/users/rank`, {
+          axios.get(`${API_BASE_URL}/users/rank`, {
             headers: {
               'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
             }
@@ -334,7 +334,7 @@ const Dashboard: React.FC = () => {
 
 
 
-      const response = await axios.get(`${API_BASE_URL}/api/users/notifications/count`, {
+      const response = await axios.get(`${API_BASE_URL}/users/notifications/count`, {
 
         headers: { Authorization: `Bearer ${token}` }
 

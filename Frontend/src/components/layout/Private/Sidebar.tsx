@@ -70,7 +70,7 @@ export default function Sidebar() {
 
 
 
-      const response = await axios.get(`${API_URL}/api/users/notifications/count`, {
+      const response = await axios.get(`${API_URL}/users/notifications/count`, {
 
         headers: { Authorization: `Bearer ${token}` }
 

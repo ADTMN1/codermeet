@@ -154,7 +154,7 @@ const Settings: React.FC = () => {
       
       console.log('Fetching sessions with token:', token.substring(0, 20) + '...');
       
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/sessions/my-sessions`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/sessions/my-sessions`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -444,7 +444,7 @@ const isTokenExpired = (token: string): boolean => {
         return;
       }
       
-      console.log('Making API call to:', `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/sessions/terminate/${sessionId}`);
+      console.log('Making API call to:', `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/sessions/terminate/${sessionId}`);
       
       const startTime = Date.now();
       console.log('API call started at:', startTime);
@@ -453,7 +453,7 @@ const isTokenExpired = (token: string): boolean => {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 second timeout
       
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/sessions/terminate/${sessionId}`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/sessions/terminate/${sessionId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -502,7 +502,7 @@ const isTokenExpired = (token: string): boolean => {
   const revokeAllSessions = async () => {
     try {
       const token = localStorage.getItem('auth_token');
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/sessions/terminate-all-others`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/sessions/terminate-all-others`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,

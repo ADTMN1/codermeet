@@ -142,7 +142,7 @@ const AIDailyChallenges: React.FC = () => {
       setLoading(true);
       const token = localStorage.getItem('auth_token');
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/admin/challenges/all`,
+        `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/admin/challenges/all`,
         {
           headers: {
             'Content-Type': 'application/json',
@@ -188,7 +188,7 @@ const AIDailyChallenges: React.FC = () => {
     try {
       const token = localStorage.getItem('auth_token');
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/admin/challenges/stats`,
+        `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/admin/challenges/stats`,
         {
           headers: {
             'Content-Type': 'application/json',
@@ -212,7 +212,7 @@ const AIDailyChallenges: React.FC = () => {
     try {
       const token = localStorage.getItem('auth_token');
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/admin/challenges/available-dates?daysAhead=30`,
+        `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/admin/challenges/available-dates?daysAhead=30`,
         {
           headers: {
             'Content-Type': 'application/json',
@@ -243,7 +243,7 @@ const AIDailyChallenges: React.FC = () => {
       const token = localStorage.getItem('auth_token');
       const monthYear = `${bulkPreferences.selectedYear}-${String(bulkPreferences.selectedMonth + 1).padStart(2, '0')}`;
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/admin/challenges/monthly-schedule?monthYear=${monthYear}`,
+        `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/admin/challenges/monthly-schedule?monthYear=${monthYear}`,
         {
           headers: {
             'Content-Type': 'application/json',
@@ -269,7 +269,7 @@ const AIDailyChallenges: React.FC = () => {
     try {
       const token = localStorage.getItem('auth_token');
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/admin/challenges/generate`,
+        `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/admin/challenges/generate`,
         {
           method: 'POST',
           headers: {
@@ -307,7 +307,7 @@ const AIDailyChallenges: React.FC = () => {
     try {
       const token = localStorage.getItem('auth_token');
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/admin/challenges/bulk-register`,
+        `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/admin/challenges/bulk-register`,
         {
           method: 'POST',
           headers: {
@@ -440,7 +440,7 @@ const AIDailyChallenges: React.FC = () => {
     try {
       const token = localStorage.getItem('auth_token');
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/admin/challenges/generate-weekly`,
+        `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/admin/challenges/generate-weekly`,
         {
           method: 'POST',
           headers: {
@@ -482,7 +482,7 @@ const AIDailyChallenges: React.FC = () => {
     try {
       const token = localStorage.getItem('auth_token');
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/admin/challenges/generate-topic`,
+        `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/admin/challenges/generate-topic`,
         {
           method: 'POST',
           headers: {
@@ -522,7 +522,7 @@ const AIDailyChallenges: React.FC = () => {
 
     try {
       const token = localStorage.getItem('auth_token');
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/daily-challenge/${id}`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/daily-challenge/${id}`, {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',

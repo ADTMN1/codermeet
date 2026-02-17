@@ -108,7 +108,7 @@ const SignupForm: React.FC = () => {
     
     try {
       const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-      const response = await axios.get(`${API_BASE_URL}/api/auth/check-user`, {
+      const response = await axios.get(`${API_BASE_URL}/auth/check-user`, {
         params: { field, value }
       });
       // Backend returns { available: true/false }, so we return !available for exists
@@ -124,7 +124,7 @@ const SignupForm: React.FC = () => {
     
     try {
       const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-      const response = await axios.get(`${API_BASE_URL}/api/auth/check-github`, {
+      const response = await axios.get(`${API_BASE_URL}/auth/check-github`, {
         params: { githubUrl }
       });
       // Backend returns { available: true/false }, so we return !available for exists

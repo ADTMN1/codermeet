@@ -41,7 +41,7 @@ export default function WeeklyChallenge() {
       
       try {
         const token = authService.getToken();
-        const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/challenges/${challenge._id}/check-registration`, {
+        const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/challenges/${challenge._id}/check-registration`, {
           headers: {
             'Content-Type': 'application/json',
             'Authorization': token ? `Bearer ${token}` : ''
@@ -68,7 +68,7 @@ export default function WeeklyChallenge() {
       try {
         const token = authService.getToken();
         
-        const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/challenges/${challenge._id}/my-submission`, {
+        const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/challenges/${challenge._id}/my-submission`, {
           headers: {
             'Authorization': token ? `Bearer ${token}` : ''
           }

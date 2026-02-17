@@ -10,37 +10,47 @@ const userRooms = new Map(); // userId -> Set of roomIds
 
 // Authentication middleware for Socket.IO
 const authenticateSocket = async (socket, next) => {
-  socket.on('authenticate', async (data, callback) => {
-    try {
-      const { token } = data;
-      if (!token) {
-        return next(new Error('Authentication required'));
-      }
-
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      
-      const user = await User.findById(decoded.id).select('fullName username avatar');
-      if (!user) {
-        return next(new Error('User not found'));
-      }
-
-      socket.userId = decoded.id;
-      socket.user = user;
-      socket.username = user.username;
-
-      // Join notification room for real-time notifications
-      socket.join(`user_${decoded.id}`);
-      
-      // Track connected users
-      connectedUsers.set(decoded.id, socket);
-      
-      callback({ success: true, user: { id: user._id, fullName: user.fullName, username: user.username } });
-      next();
-    } catch (error) {
-      callback({ success: false, message: 'Authentication failed' });
-      next(new Error('Authentication failed'));
+  try {
+    console.log('🔐 Chat socket authentication attempt started');
+    const token = socket.handshake.auth.token || socket.handshake.headers.authorization?.replace('Bearer ', '');
+    
+    console.log('🔑 Token found:', !!token);
+    
+    if (!token) {
+      console.log('❌ No token provided in chat socket authentication');
+      return next(new Error('Authentication error: No token provided'));
     }
-  });
+
+    console.log('🔍 Verifying JWT token for chat...');
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    console.log('✅ JWT token verified successfully for chat:', { userId: decoded.id || decoded.userId });
+    
+    const user = await User.findById(decoded.id).select('fullName username avatar');
+    if (!user) {
+      console.log('❌ User not found in database for chat:', decoded.id);
+      return next(new Error('Authentication error: User not found'));
+    }
+
+    console.log('✅ User found for chat:', { fullName: user.fullName, username: user.username });
+    
+    socket.userId = decoded.id;
+    socket.user = user;
+    socket.username = user.username;
+
+    // Join notification room for real-time notifications
+    socket.join(`user_${decoded.id}`);
+    console.log('🔔 User joined notification room for chat:', `user_${decoded.id}`);
+    
+    // Track connected users
+    connectedUsers.set(decoded.id, socket);
+    console.log('👥 User added to connected users for chat:', { totalConnected: connectedUsers.size });
+    
+    console.log('✅ Chat authentication successful for user:', user.fullName);
+    next();
+  } catch (error) {
+    console.error('❌ Chat authentication error:', error.message);
+    next(new Error('Authentication error: Invalid token'));
+  }
 };
 
 // Helper functions
@@ -140,44 +150,41 @@ const handleChatConnection = (io) => {
             return;
           }
           
-          const isMember = room.members.some(member => member.userId.toString() === socket.userId);
-          if (!isMember && room.type !== 'public') {
+          // Check if user is member
+          const isMember = room.members.some(member => 
+            member.userId.toString() === socket.userId
+          );
+          
+          if (!isMember) {
             socket.emit('error', { message: 'Access denied' });
             return;
           }
           
-          // Join the room
+          // Join socket room
           socket.join(roomId);
           
-          // Add to user's room list
-          const userRoomIds = userRooms.get(socket.userId) || new Set();
-          userRoomIds.add(roomId);
-          userRooms.set(socket.userId, userRoomIds);
-          
-          // Update room member list
-          const existingMember = room.members.find(member => member.userId.toString() === socket.userId);
-          if (!existingMember) {
-            room.members.push({
-              userId: socket.userId,
-              role: 'member',
-              joinedAt: new Date(),
-              lastSeen: new Date(),
-              isOnline: true,
-              permissions: ['read', 'write']
-            });
-            room.currentMembers += 1;
-            room.lastActivity = new Date();
-            await room.save();
+          // Add to user's room set
+          if (!userRooms.has(socket.userId)) {
+            userRooms.set(socket.userId, new Set());
           }
+          userRooms.get(socket.userId).add(roomId);
           
-          // Notify others in the room
+          // Get current room users
           const roomUsers = getRoomUsers(roomId);
+          // Notify others in room
           socket.to(roomId).emit('userJoined', {
             userId: socket.userId,
             fullName: socket.user.fullName,
             username: socket.user.username,
             avatar: socket.user.avatar,
+            roomId,
             roomUsers
+          });
+          
+          // Send room users to requester
+          socket.emit('roomUsers', {
+            roomId,
+            users: roomUsers
           });
           
           // Send room details
@@ -225,6 +232,42 @@ const handleChatConnection = (io) => {
         } catch (error) {
           socket.emit('error', { message: 'Error leaving room' });
           console.error('Leave room error:', error);
+        }
+      });
+      
+      socket.on('getRoomUsers', async (data) => {
+        try {
+          const { roomId } = data;
+          
+          // Verify user has access
+          const room = await ChatRoom.findById(roomId);
+          if (!room) {
+            socket.emit('error', { message: 'Room not found' });
+            return;
+          }
+          
+          // Check if user is member
+          const isMember = room.members.some(member => 
+            member.userId.toString() === socket.userId
+          );
+          
+          if (!isMember) {
+            socket.emit('error', { message: 'Access denied' });
+            return;
+          }
+          
+          // Get current room users
+          const roomUsers = getRoomUsers(roomId);
+          
+          // Send room users to requester
+          socket.emit('roomUsers', {
+            roomId,
+            users: roomUsers
+          });
+          
+        } catch (error) {
+          console.error('Error getting room users:', error);
+          socket.emit('error', { message: 'Failed to get room users' });
         }
       });
       

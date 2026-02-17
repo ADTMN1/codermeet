@@ -90,7 +90,7 @@ export function RegistrationModal({
 
     try {
       // Call the registration API
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/challenges/${challengeId}/register`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/challenges/${challengeId}/register`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

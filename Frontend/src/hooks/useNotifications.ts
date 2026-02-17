@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useUser } from '../context/UserContext';
+import { SOCKET_URL } from '../config/api';
 
 interface Notification {
   _id: string;
@@ -25,7 +26,7 @@ export const useNotifications = () => {
     if (!user?._id) return;
 
     // Initialize socket connection
-    const socket = io(import.meta.env.VITE_API_URL || 'http://localhost:5000', {
+    const socket = io(SOCKET_URL, {
       auth: { token: localStorage.getItem('auth_token') },
       transports: ['websocket', 'polling']
     });
