@@ -9,7 +9,8 @@ const {
   cancelSession,
   joinSession,
   rateSession,
-  getMentorshipStats
+  getMentorshipStats,
+  getSessionRecordings
 } = require('../controllers/mentorshipController');
 
 // Get upcoming mentorship session
@@ -23,6 +24,9 @@ router.get('/mentors', authMiddleware, getAvailableMentors);
 
 // Get mentorship statistics
 router.get('/stats', authMiddleware, getMentorshipStats);
+
+// Get session recordings
+router.get('/recordings', authMiddleware, getSessionRecordings);
 
 // Book a new mentorship session
 router.post('/book', authMiddleware, bookSession);

@@ -68,7 +68,7 @@ const ViewProjects: React.FC = () => {
       const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
       
       // Fetch actual user projects from backend
-      const response = await fetch(`${API_BASE_URL}/api/users/projects`, {
+      const response = await fetch(`${API_BASE_URL}/users/projects`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }

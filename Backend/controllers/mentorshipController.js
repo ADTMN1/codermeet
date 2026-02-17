@@ -1,6 +1,7 @@
 const User = require('../models/user');
 const MentorshipSession = require('../models/mentorshipSession');
 const Mentor = require('../models/mentor');
+const mongoose = require('mongoose');
 
 // Get upcoming mentorship session for the current user
 exports.getUpcomingSession = async (req, res) => {
@@ -503,6 +504,74 @@ exports.getMentorshipStats = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to fetch mentorship statistics'
+    });
+  }
+};
+
+// Get session recordings
+exports.getSessionRecordings = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { page = 1, limit = 12 } = req.query;
+    
+    const recordings = await MentorshipSession.find({
+      $or: [
+        { mentee: userId },
+        { mentor: userId }
+      ],
+      status: 'completed',
+      meetingLink: { $exists: true, $ne: null }
+    })
+    .populate('mentee mentor', 'name username email avatar')
+    .sort({ updatedAt: -1 })
+    .limit(limit * 1)
+    .skip((page - 1) * limit);
+
+    const total = await MentorshipSession.countDocuments({
+      $or: [
+        { mentee: userId },
+        { mentor: userId }
+      ],
+      status: 'completed',
+      meetingLink: { $exists: true, $ne: null }
+    });
+
+    // Transform data for frontend consumption
+    const transformedRecordings = recordings.map(session => ({
+      _id: session._id,
+      title: session.topic,
+      description: session.description,
+      mentor: session.mentor,
+      mentee: session.mentee,
+      recordingUrl: session.meetingLink,
+      scheduledTime: session.scheduledTime,
+      duration: session.duration,
+      sessionType: session.sessionType,
+      rating: session.rating,
+      createdAt: session.createdAt,
+      updatedAt: session.updatedAt,
+      // Additional fields for UI
+      attendees: Math.floor(Math.random() * 1000) + 100, // Mock attendee count for now
+      thumbnailUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${session.mentor.username}`
+    }));
+
+    res.json({
+      success: true,
+      data: {
+        recordings: transformedRecordings,
+        pagination: {
+          page: parseInt(page),
+          limit: parseInt(limit),
+          total,
+          pages: Math.ceil(total / limit)
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching session recordings:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch session recordings'
     });
   }
 };

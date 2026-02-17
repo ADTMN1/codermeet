@@ -113,6 +113,12 @@ mentorshipSessionSchema.index({ scheduledTime: 1, status: 1 });
 // Update the updatedAt field before saving
 mentorshipSessionSchema.pre('save', function(next) {
   this.updatedAt = new Date();
+  
+  // Auto-generate recording link for completed sessions
+  if (this.status === 'completed' && !this.meetingLink) {
+    this.meetingLink = `https://meet.codermeet.com/session/${this._id}`;
+  }
+  
   next();
 });
 
