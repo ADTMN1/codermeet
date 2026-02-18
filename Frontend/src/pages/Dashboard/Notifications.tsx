@@ -10,6 +10,7 @@ import {
 } from 'react-icons/fa';
 import { toast } from 'sonner';
 import axios from 'axios';
+import { API_CONFIG } from '../../config/api';
 
 interface Notification {
   _id: string;
@@ -39,8 +40,6 @@ interface Notification {
 
 type FilterType = 'all' | 'read' | 'unread';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-
 const Notifications: React.FC = () => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [filteredNotifications, setFilteredNotifications] = useState<Notification[]>([]);
@@ -55,7 +54,7 @@ const Notifications: React.FC = () => {
       const token = localStorage.getItem('auth_token');
       if (!token) return;
 
-      const response = await axios.get(`${API_URL}/api/users/notifications`, {
+      const response = await axios.get(`${API_CONFIG.BASE_URL}/users/notifications`, {
         headers: { Authorization: `Bearer ${token}` }
       });
 
@@ -146,22 +145,26 @@ const Notifications: React.FC = () => {
   const handleClearSelection = () => setSelectedNotifications([]);
 
   const handleBulkMarkAsRead = async () => {
-    if (selectedNotifications.length === 0) return;
+    // Get all unread notifications
+    const unreadNotifications = notifications.filter(n => !n.read);
+    if (unreadNotifications.length === 0) {
+      toast.info('No unread notifications to mark as read');
+      return;
+    }
+    
     try {
       const token = localStorage.getItem('auth_token');
-      await Promise.all(selectedNotifications.map(id => 
-        axios.patch(`${API_URL}/api/users/notifications/${id}/read`, {}, {
+      await Promise.all(unreadNotifications.map(notification => 
+        axios.patch(`${API_CONFIG.BASE_URL}/users/notifications/${notification._id}/read`, {}, {
           headers: { Authorization: `Bearer ${token}` }
         })
       ));
-      setNotifications(prev => prev.map(n => 
-        selectedNotifications.includes(n._id) ? { ...n, read: true } : n
-      ));
+      setNotifications(prev => prev.map(n => ({ ...n, read: true })));
       
       // Dispatch event to update sidebar count
       window.dispatchEvent(new CustomEvent('notification-updated'));
       
-      toast.success(`${selectedNotifications.length} marked as read`);
+      toast.success(`${unreadNotifications.length} marked as read`);
       handleClearSelection();
     } catch (error) {
       toast.error('Failed to update notifications');
@@ -173,7 +176,7 @@ const Notifications: React.FC = () => {
     try {
       const token = localStorage.getItem('auth_token');
       await Promise.all(selectedNotifications.map(id => 
-        axios.delete(`${API_URL}/api/users/notifications/${id}`, {
+        axios.delete(`${API_CONFIG.BASE_URL}/users/notifications/${id}`, {
           headers: { Authorization: `Bearer ${token}` }
         })
       ));
@@ -348,7 +351,7 @@ const Notifications: React.FC = () => {
                       onClick={async () => {
                         try {
                           const token = localStorage.getItem('auth_token');
-                          await axios.patch(`${API_URL}/api/users/notifications/${notification._id}/read`, {}, {
+                          await axios.patch(`${API_CONFIG.BASE_URL}/users/notifications/${notification._id}/read`, {}, {
                             headers: { Authorization: `Bearer ${token}` }
                           });
                           setNotifications(prev => prev.map(n => n._id === notification._id ? { ...n, read: true } : n));
@@ -367,7 +370,7 @@ const Notifications: React.FC = () => {
                     onClick={async () => {
                       try {
                         const token = localStorage.getItem('auth_token');
-                        await axios.delete(`${API_URL}/api/users/notifications/${notification._id}`, {
+                        await axios.delete(`${API_CONFIG.BASE_URL}/users/notifications/${notification._id}`, {
                           headers: { Authorization: `Bearer ${token}` }
                         });
                         setNotifications(prev => prev.filter(n => n._id !== notification._id));

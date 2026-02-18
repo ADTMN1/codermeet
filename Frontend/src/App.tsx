@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
-import { Toaster } from './components/ui/sonner';
+import { Toaster } from './components/ui/toast';
+import { ToastProvider } from './context/ToastContext';
 import { useTheme } from './hooks/useTheme';
 import { sessionManager } from './services/sessionManager';
 
@@ -51,9 +52,11 @@ function App() {
   useTheme();
   
   return (
-    <BrowserRouter>
-      <AppContent />
-    </BrowserRouter>
+    <ToastProvider>
+      <BrowserRouter>
+        <AppContent />
+      </BrowserRouter>
+    </ToastProvider>
   );
 }
 

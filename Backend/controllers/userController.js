@@ -2,6 +2,7 @@ const User = require("../models/user");
 const Submission = require("../models/submission");
 const DailySubmission = require("../models/dailySubmission");
 const BusinessIdea = require("../models/businessIdea");
+const Challenge = require("../models/challenge");
 const Announcement = require("../models/announcement");
 const Comment = require("../models/comment");
 const Team = require("../models/team");
@@ -864,6 +865,11 @@ exports.getUserStats = async (req, res) => {
 
     const completedChallenges = completedSubmissions + completedDaily + completedBusiness;
 
+    // Count total projects (participations in challenges)
+    const totalProjects = await Challenge.countDocuments({
+      'participants.user': userId
+    });
+
     // Get user's rank based on points
     const user = await User.findById(userId).select('points');
     const usersWithMorePoints = await User.countDocuments({ points: { $gt: user?.points || 0 } });
@@ -875,7 +881,8 @@ exports.getUserStats = async (req, res) => {
         totalChallenges,
         completedChallenges,
         rank,
-        totalUsers
+        totalUsers,
+        totalProjects
       }
     });
   } catch (error) {
@@ -1042,5 +1049,110 @@ exports.createNotification = async (data, io = null) => {
   } catch (error) {
     console.error('❌ Error creating notification:', error);
     throw error;
+  }
+};
+
+// Get user points statistics
+exports.getUserPointsStats = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+
+    // Only allow users to get their own stats
+    if (userId !== id) {
+      return res.status(403).json({ success: false, message: 'Access denied' });
+    }
+
+    const user = await User.findById(userId).select('points pointsAwarded lastPointsUpdate');
+    
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    // Calculate points this month and week
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const startOfWeek = new Date(now.setDate(now.getDate() - now.getDay()));
+    
+    const pointsThisMonth = user.pointsAwarded?.filter(award => 
+      new Date(award.awardedAt) >= startOfMonth
+    ).reduce((sum, award) => sum + (award.points || 0), 0) || 0;
+    
+    const pointsThisWeek = user.pointsAwarded?.filter(award => 
+      new Date(award.awardedAt) >= startOfWeek
+    ).reduce((sum, award) => sum + (award.points || 0), 0) || 0;
+
+    // Get current rank
+    const usersWithMorePoints = await User.countDocuments({ points: { $gt: user.points || 0 } });
+    const currentRank = usersWithMorePoints + 1;
+
+    // Calculate next rank and points needed
+    const rankThresholds = [
+      { name: 'Bronze', minPoints: 0 },
+      { name: 'Silver', minPoints: 500 },
+      { name: 'Gold', minPoints: 1500 },
+      { name: 'Platinum', minPoints: 3000 }
+    ];
+
+    const currentRankInfo = rankThresholds.slice().reverse().find(rank => user.points >= rank.minPoints) || rankThresholds[0];
+    const nextRankInfo = rankThresholds.find(rank => rank.minPoints > (currentRankInfo?.minPoints || 0));
+    
+    const pointsToNextRank = nextRankInfo ? nextRankInfo.minPoints - user.points : 0;
+
+    res.json({
+      success: true,
+      data: {
+        totalPoints: user.points || 0,
+        pointsThisMonth,
+        pointsThisWeek,
+        currentRank: currentRankInfo.name,
+        nextRank: nextRankInfo?.name || 'Max Rank',
+        pointsToNextRank: Math.max(0, pointsToNextRank),
+        lastUpdated: user.lastPointsUpdate
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching user points stats:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+// Get user point activities
+exports.getUserPointActivities = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+
+    // Only allow users to get their own activities
+    if (userId !== id) {
+      return res.status(403).json({ success: false, message: 'Access denied' });
+    }
+
+    const user = await User.findById(userId).select('pointsAwarded');
+    
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    // Format point activities
+    const activities = (user.pointsAwarded || []).map(award => ({
+      id: award._id,
+      type: award.type || 'earned',
+      points: award.points || 0,
+      reason: award.reason || 'Points awarded',
+      awardedAt: award.awardedAt,
+      challengeId: award.challengeId,
+      dailyChallengeId: award.dailyChallengeId,
+      rank: award.rank,
+      score: award.score
+    })).sort((a, b) => new Date(b.awardedAt) - new Date(a.awardedAt));
+
+    res.json({
+      success: true,
+      data: activities
+    });
+  } catch (error) {
+    console.error('Error fetching user point activities:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
   }
 };

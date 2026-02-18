@@ -28,7 +28,11 @@ import {
 
   FaLightbulb,
 
-  FaCrown
+  FaCrown,
+
+  FaBook,
+
+  FaBookOpen
 
 } from 'react-icons/fa';
 
@@ -84,22 +88,18 @@ const Dashboard: React.FC = () => {
   const [paymentTxRef, setPaymentTxRef] = useState<string>('');
 
   const [stats, setStats] = useState({
-
     totalChallenges: 0,
-
     completedChallenges: 0,
-
     rank: 0,
-
     totalUsers: 0,
-
+    totalProjects: 0,
   });
 
   // Calculate real-time progress based on completed challenges
   const onprogress = stats.totalChallenges > 0 ? Math.round((stats.completedChallenges / stats.totalChallenges) * 100) : 0;
 
   const [mentorshipSession, setMentorshipSession] = useState<any>(null);
-
+  const [businessCompetition, setBusinessCompetition] = useState<any>(null);
   const [unreadCount, setUnreadCount] = useState(0);
 
 
@@ -245,7 +245,7 @@ const Dashboard: React.FC = () => {
         
 
         // Fetch leaderboard data, stats, mentorship session, and exact rank
-        const [leaderboardRes, statsRes, mentorshipRes, rankRes] = await Promise.all([
+        const [leaderboardRes, statsRes, mentorshipRes, rankRes, businessRes] = await Promise.all([
           axios.get(`${API_BASE_URL}/leaderboard`),
           axios.get(`${API_BASE_URL}/users/${user._id}/stats`, {
             headers: {
@@ -257,11 +257,12 @@ const Dashboard: React.FC = () => {
               'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
             }
           }),
-          axios.get(`${API_BASE_URL}/users/rank`, {
+          axios.get(`${API_BASE_URL}/leaderboard/user-rank`, {
             headers: {
               'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
             }
-          })
+          }),
+          axios.get(`${API_BASE_URL}/business-ideas/competition/active`)
         ]);
         
         setLeaderboard(leaderboardRes.data.users || []);
@@ -273,6 +274,11 @@ const Dashboard: React.FC = () => {
         // Set exact rank from backend
         if (rankRes.data.success && rankRes.data.rank) {
           setExactRank(rankRes.data.rank);
+        }
+
+        // Set business competition data
+        if (businessRes.data.success) {
+          setBusinessCompetition(businessRes.data.data);
         }
 
 
@@ -773,16 +779,6 @@ const Dashboard: React.FC = () => {
             <div className="text-gray-500 mb-4">
               {stats.totalChallenges > 0 ? 'Join now to compete!' : 'Check back soon for new challenges'}
             </div>
-            <div className="text-green-500 font-semibold mb-4">
-              {stats.totalChallenges > 0 ? 'Prizes available for winners!' : ''}
-            </div>
-
-            {/* Show current stats value */}
-            {process.env.NODE_ENV === 'development' && (
-              <div className="text-xs text-gray-600 mb-2">
-              {stats.totalChallenges}
-              </div>
-            )}
 
             <button
 
@@ -892,7 +888,7 @@ const Dashboard: React.FC = () => {
 
             </div>
 
-            <p className="text-gray-400 mb-4 ">Total Projects Submitted: 15</p>
+            <p className="text-gray-400 mb-4 ">Total Projects Submitted: {stats.totalProjects || 0}</p>
 
 
 
@@ -914,42 +910,39 @@ const Dashboard: React.FC = () => {
 
 
 
-          {/* Active Teams */}
+          
+
+
+          {/* Resources */}
 
           <div className="bg-gray-800 p-6 rounded-xl shadow-lg border border-gray-700 hover:shadow-green-500/30 transition">
-
             <div className="flex items-center gap-3 mb-4">
-
-              <FaUsers className="text-green-400 w-6 h-6" />
-
-              <h2 className="text-xl font-bold text-white">Active Teams</h2>
-
+              <FaBook className="text-green-400 w-6 h-6" />
+              <h2 className="text-xl font-bold text-white">Resources</h2>
             </div>
 
-            {activeTeams.map((team, i) => (
-
-              <div key={i} className="mb-3">
-
-                <p className="text-gray-300 font-semibold">{team.name}</p>
-
-                <p className="text-gray-400 text-sm mb-1">{team.project}</p>
-
-                <div className="w-full h-2 bg-white/20 rounded-full">
-
-                  <div
-
-                    className="h-2 rounded-full bg-green-400"
-
-                    style={{ width: `${team.progress}%` }}
-
-                  ></div>
-
-                </div>
-
+            <div className="space-y-3 mb-4">
+              <div className="flex items-center gap-2 text-sm text-gray-400">
+                
+                <span>Documentation & guides</span>
               </div>
+              <div className="flex items-center gap-2 text-sm text-gray-400">
+              
+                <span>Development tools</span>
+              </div>
+              <div className="flex items-center gap-2 text-sm text-gray-400">
+              
+                <span>Best practices</span>
+              </div>
+            </div>
 
-            ))}
-
+            <button
+              type="button"
+              onClick={() => navigate('/resources')}
+              className="text-heading bg-neutral-primary box-border border border-transparent hover:bg-neutral-secondary-medium focus:ring-4 focus:ring-neutral-tertiary-soft font-medium leading-5 rounded-full text-sm px-4 py-2.5 focus:outline-none cursor-pointer hover:shadow-[0_0_15px_#C27AFF] shadow-md transition"
+            >
+              Explore Resources
+            </button>
           </div>
 
 
@@ -1040,21 +1033,15 @@ const Dashboard: React.FC = () => {
 
             </div>
 
+            <p className="text-gray-400 mb-2">Join the conversation today</p>
 
+            <ul className="text-gray-500 mb-4 space-y-1 text-sm">
 
-            <ul className="text-gray-400 mb-4 space-y-1">
+              <li>Active discussions in progress</li>
 
-              <li> Messages: 45</li>
-
-              <li>Bug Fixes: 12</li>
+            
 
             </ul>
-
-
-
-            <p className="text-gray-500 mb-4">5 new discussions</p>
-
-
 
             <button
 
@@ -1132,14 +1119,23 @@ const Dashboard: React.FC = () => {
 
             </div>
 
-            <p className="text-gray-400 mb-2">Submit your innovative startup idea</p>
+            <p className="text-gray-400 mb-2">
+              {businessCompetition?.description || 'Submit your innovative startup idea'}
+            </p>
 
-            <p className="text-gray-500 mb-4">Deadline: Dec 15, 2025</p>
+            <p className="text-gray-500 mb-4">
+              Deadline: {businessCompetition ? 
+                new Date(businessCompetition.deadline).toLocaleDateString('en-US', { 
+                  year: 'numeric', 
+                  month: 'short', 
+                  day: 'numeric' 
+                }) : 
+                'Dec 15, 2025'
+              }
+            </p>
 
             <p className="text-orange-400 font-semibold mb-4">
-
-              Grand Prize: 5000 Birr + Mentorship
-
+              Grand Prize: {businessCompetition?.prize || '5000 Birr + Mentorship'}
             </p>
 
             <button
@@ -1213,4 +1209,5 @@ const Dashboard: React.FC = () => {
 
 
 export default Dashboard;
+
 

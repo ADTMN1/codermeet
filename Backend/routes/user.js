@@ -113,6 +113,12 @@ router.put(
 // Get user statistics
 router.get("/:id/stats", authMiddleware, userController.getUserStats);
 
+// Get user points statistics
+router.get("/points-stats/:id", authMiddleware, userController.getUserPointsStats);
+
+// Get user point activities
+router.get("/point-activities/:id", authMiddleware, userController.getUserPointActivities);
+
 // Notification routes
 router.get("/notifications", authMiddleware, userController.getNotifications);
 router.get("/notifications/count", authMiddleware, userController.getUnreadNotificationCount);

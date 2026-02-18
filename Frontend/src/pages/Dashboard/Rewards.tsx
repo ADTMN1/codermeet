@@ -206,10 +206,10 @@ const Rewards: React.FC = () => {
 
       // Fetch real data from API
       const [statsRes, activitiesRes] = await Promise.all([
-        axios.get(`${API_URL}/api/users/points-stats/${user._id}`, { 
+        axios.get(`${API_URL}/users/points-stats/${user._id}`, { 
           headers: { Authorization: `Bearer ${token}` } 
         }),
-        axios.get(`${API_URL}/api/users/point-activities/${user._id}`, { 
+        axios.get(`${API_URL}/users/point-activities/${user._id}`, { 
           headers: { Authorization: `Bearer ${token}` } 
         })
       ]);

@@ -33,7 +33,13 @@ interface LeaderboardUser {
   previousRank?: number;
   avatar?: string;
   profilePicture?: string;
-  badges?: string[];
+  badges?: Array<{
+    id: string;
+    name: string;
+    description: string;
+    icon: string;
+    rarity: string;
+  }>;
   streak?: number;
   joinDate?: string;
   lastActive?: string;
@@ -55,6 +61,7 @@ interface LeaderboardStats {
 const ImpressiveLeaderboard: React.FC = () => {
   const { user } = useUser();
   const [leaderboard, setLeaderboard] = useState<LeaderboardUser[]>([]);
+  const [exactRank, setExactRank] = useState<number | null>(null);
   const [stats, setStats] = useState<LeaderboardStats>({
     totalUsers: 0,
     activeUsers: 0,
@@ -212,31 +219,41 @@ const ImpressiveLeaderboard: React.FC = () => {
     try {
       setLoading(true);
       
-      // Fetch real data from API
-      const response = await axios.get(`${API_URL}/leaderboard`, {
-        params: { limit: 50 }, // Get more users for better filtering
-        headers: { Authorization: `Bearer ${localStorage.getItem('auth_token')}` }
-      });
+      // Fetch real data from API and exact rank
+      const [leaderboardResponse, rankResponse] = await Promise.all([
+        axios.get(`${API_URL}/leaderboard`, {
+          params: { limit: 50 }, // Get more users for better filtering
+          headers: { Authorization: `Bearer ${localStorage.getItem('auth_token')}` }
+        }),
+        user ? axios.get(`${API_URL}/leaderboard/user-rank`, {
+          headers: { Authorization: `Bearer ${localStorage.getItem('auth_token')}` }
+        }).catch(() => ({ data: { success: false, rank: null } })) : Promise.resolve({ data: { success: false, rank: null } })
+      ]);
 
-      const apiData = response.data;
-      let realData = apiData.map((user: any) => {
+      // Set exact rank if available
+      if (rankResponse.data.success && rankResponse.data.rank) {
+        setExactRank(rankResponse.data.rank);
+      }
+
+      const apiData = leaderboardResponse.data;
+      let realData = (apiData.users || apiData).map((userData: any) => {
         return {
-          _id: user._id,
-          name: user.fullName || user.username,
-          username: user.username ? `@${user.username}` : '',
-          points: user.points || 0,
-          rank: user.rank,
-          avatar: user.avatar || user.profileImage,
-          profilePicture: user.avatar || user.profileImage,
-          badges: [], // TODO: Implement badges system
-          streak: user.streak || 0,
-          joinDate: new Date(user.joinDate).toLocaleDateString(),
-          lastActive: user.lastActive ? 
-            new Date(user.lastActive).toLocaleString() : 'Unknown',
-          challengesCompleted: user.challengesCompleted || 0,
-          projectsSubmitted: user.projectsSubmitted || 0,
-          communityScore: user.communityScore || '0.0',
-          isCurrentUser: user ? (user._id === user._id) : false
+          _id: userData._id,
+          name: userData.fullName || userData.username,
+          username: userData.username ? `@${userData.username}` : '',
+          points: userData.points || 0,
+          rank: userData.rank,
+          avatar: userData.avatar || userData.profileImage,
+          profilePicture: userData.avatar || userData.profileImage,
+          badges: userData.badges || [],
+          streak: userData.streak || 0,
+          joinDate: new Date(userData.joinDate).toLocaleDateString(),
+          lastActive: userData.lastActive ? 
+            new Date(userData.lastActive).toLocaleString() : 'Unknown',
+          challengesCompleted: userData.challengesCompleted || 0,
+          projectsSubmitted: userData.projectsSubmitted || 0,
+          communityScore: userData.communityScore || '0.0',
+          isCurrentUser: user ? (userData._id === user._id) : false
         };
       });
       
@@ -259,24 +276,28 @@ const ImpressiveLeaderboard: React.FC = () => {
         rank: index + 1
       }));
 
-      // Mark current user
+      // Mark current user and use exact rank if available
       if (user) {
-        realData = realData.map((u: LeaderboardUser) => ({
-          ...u,
-          isCurrentUser: u._id === user._id || u.name === user.name || u.username === `@${user.username}`
-        }));
+        realData = realData.map((u: LeaderboardUser) => {
+          const isCurrentUser = u._id === user._id || u.name === user.name || u.username === `@${user.username}`;
+          return {
+            ...u,
+            isCurrentUser,
+            rank: isCurrentUser && exactRank ? exactRank : u.rank // Use exact rank for current user
+          };
+        });
       }
 
       setLeaderboard(realData);
       
-      // Calculate stats from the user data
+      // Use stats from API response, but calculate some from the limited data
       const newStats = {
-        totalUsers: realData.length,
-        activeUsers: realData.filter((u: LeaderboardUser) => u.lastActive && new Date(u.lastActive) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)).length, // Active in last 7 days
-        totalPoints: realData.reduce((sum: number, u: LeaderboardUser) => sum + u.points, 0),
-        averagePoints: realData.length > 0 ? Math.round(realData.reduce((sum: number, u: LeaderboardUser) => sum + u.points, 0) / realData.length) : 0,
-        topScore: realData.length > 0 ? realData[0].points : 0,
-        updated: new Date().toISOString()
+        totalUsers: apiData.totalUsers || realData.length, // Use backend totalUsers, fallback to array length
+        activeUsers: apiData.activeUsers || realData.filter((u: LeaderboardUser) => u.lastActive && new Date(u.lastActive) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)).length,
+        totalPoints: apiData.totalPoints || realData.reduce((sum: number, u: LeaderboardUser) => sum + u.points, 0),
+        averagePoints: apiData.averagePoints || (realData.length > 0 ? Math.round(realData.reduce((sum: number, u: LeaderboardUser) => sum + u.points, 0) / realData.length) : 0),
+        topScore: apiData.topScore || (realData.length > 0 ? realData[0].points : 0),
+        updated: apiData.updated || new Date().toISOString()
       };
       setStats(newStats);
 
@@ -500,8 +521,13 @@ const ImpressiveLeaderboard: React.FC = () => {
                 {user.badges && user.badges.length > 0 && (
                   <div className="flex flex-wrap gap-1 mt-2">
                     {user.badges.slice(0, 3).map((badge, index) => (
-                      <span key={index} className="px-2 py-1 bg-gray-700 text-xs rounded-full text-gray-300">
-                        {badge}
+                      <span 
+                        key={badge.id || index} 
+                        className="px-2 py-1 bg-gray-700 text-xs rounded-full text-gray-300 flex items-center gap-1"
+                        title={badge.description}
+                      >
+                        <span>{badge.icon}</span>
+                        {badge.name}
                       </span>
                     ))}
                     {user.badges.length > 3 && (
@@ -540,7 +566,7 @@ const ImpressiveLeaderboard: React.FC = () => {
         <div className="mt-6 p-4 bg-purple-900/20 border border-purple-500/30 rounded-lg">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <span className="text-purple-400 font-bold">#{leaderboard.find(u => u.isCurrentUser)?.rank || 'N/A'}</span>
+              <span className="text-purple-400 font-bold">#{exactRank || leaderboard.find(u => u.isCurrentUser)?.rank || 'N/A'}</span>
               <span className="text-white">Your Position</span>
             </div>
             <div className="text-right">

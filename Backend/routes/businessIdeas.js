@@ -5,13 +5,15 @@ const {
   getUserBusinessIdeas,
   getAllBusinessIdeas,
   updateIdeaStatus,
-  getIdeaStats
+  getIdeaStats,
+  getActiveCompetition
 } = require('../controllers/businessIdeaController');
 const { authenticate, requireAdmin } = require('../middlewares/roleBasedAuth');
 
 // Public routes (authenticated users)
 router.post('/', authenticate, submitBusinessIdea);
 router.get('/user/:userId', authenticate, getUserBusinessIdeas);
+router.get('/competition/active', getActiveCompetition);
 
 // Admin routes
 router.get('/', authenticate, requireAdmin, getAllBusinessIdeas);

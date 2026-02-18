@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useUser } from '../../context/UserContext';
+import { userPreferencesService, applyThemeSettings } from '../../hooks/useTheme';
 import { 
   Settings, 
   Shield, 
@@ -88,8 +89,20 @@ const Settings: React.FC = () => {
     fontSize: 16,
     fontFamily: 'Inter',
     sidebarCollapsed: false,
-    showStatusIndicators: true
+    showStatusIndicators: true,
+    theme: 'dark' as 'light' | 'dark' | 'auto'
   });
+
+  // Load saved settings on component mount
+  useEffect(() => {
+    const savedSettings = userPreferencesService.getAppearanceSettings();
+    setAdvancedAppearance(prev => ({ ...prev, ...savedSettings }));
+  }, []);
+
+  // Apply theme changes immediately
+  useEffect(() => {
+    applyThemeSettings(advancedAppearance);
+  }, [advancedAppearance]);
 
   const handlePasswordChange = async () => {
     if (passwordData.newPassword !== passwordData.confirmPassword) {
@@ -707,9 +720,13 @@ const isTokenExpired = (token: string): boolean => {
                     ].map((theme) => (
                       <button
                         key={theme.value}
-                        onClick={() => setAdvancedAppearance({...advancedAppearance, customTheme: false})}
+                        onClick={() => {
+                          setAdvancedAppearance(prev => ({ ...prev, theme: theme.value as 'light' | 'dark' | 'auto', customTheme: false }));
+                          userPreferencesService.saveAppearanceSettings({ theme: theme.value, customTheme: false });
+                          toast.success(`Theme changed to ${theme.label}`, 'Your appearance has been updated');
+                        }}
                         className={`p-3 rounded-lg border transition-colors flex flex-col items-center gap-2 ${
-                          !advancedAppearance.customTheme && 'dark' === theme.value
+                          !advancedAppearance.customTheme && advancedAppearance.theme === theme.value
                             ? 'bg-purple-600/20 border-purple-500 text-purple-400'
                             : 'bg-gray-800 border-gray-700 text-gray-300 hover:border-gray-600'
                         }`}
@@ -744,7 +761,12 @@ const isTokenExpired = (token: string): boolean => {
                     min="12"
                     max="20"
                     value={advancedAppearance.fontSize}
-                    onChange={(e) => setAdvancedAppearance({...advancedAppearance, fontSize: parseInt(e.target.value)})}
+                    onChange={(e) => {
+                    const newFontSize = parseInt(e.target.value);
+                    setAdvancedAppearance(prev => ({ ...prev, fontSize: newFontSize }));
+                    userPreferencesService.saveAppearanceSettings({ fontSize: newFontSize });
+                    toast.success('Font size updated', `Changed to ${newFontSize}px`);
+                  }}
                     className="w-full"
                   />
                 </div>
@@ -755,7 +777,12 @@ const isTokenExpired = (token: string): boolean => {
                   </label>
                   <select
                     value={advancedAppearance.fontFamily}
-                    onChange={(e) => setAdvancedAppearance({...advancedAppearance, fontFamily: e.target.value})}
+                    onChange={(e) => {
+                      const newFontFamily = e.target.value;
+                      setAdvancedAppearance(prev => ({ ...prev, fontFamily: newFontFamily }));
+                      userPreferencesService.saveAppearanceSettings({ fontFamily: newFontFamily });
+                      toast.success('Font family updated', `Changed to ${newFontFamily}`);
+                    }}
                     className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-purple-500 transition-colors"
                   >
                     <option value="Inter">Inter</option>
@@ -784,7 +811,15 @@ const isTokenExpired = (token: string): boolean => {
                         <p className="text-gray-400 text-sm">Create your own color scheme</p>
                       </div>
                       <button
-                        onClick={() => setAdvancedAppearance({...advancedAppearance, customTheme: !advancedAppearance.customTheme})}
+                        onClick={() => {
+                          const newCustomTheme = !advancedAppearance.customTheme;
+                          setAdvancedAppearance(prev => ({ ...prev, customTheme: newCustomTheme }));
+                          userPreferencesService.saveAppearanceSettings({ customTheme: newCustomTheme });
+                          toast.success(
+                            newCustomTheme ? 'Custom theme enabled' : 'Custom theme disabled',
+                            newCustomTheme ? 'You can now customize colors' : 'Using default theme colors'
+                          );
+                        }}
                         className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
                           advancedAppearance.customTheme ? 'bg-purple-600' : 'bg-gray-600'
                         }`}
@@ -807,13 +842,23 @@ const isTokenExpired = (token: string): boolean => {
                             <input
                               type="color"
                               value={advancedAppearance.primaryColor}
-                              onChange={(e) => setAdvancedAppearance({...advancedAppearance, primaryColor: e.target.value})}
+                              onChange={(e) => {
+                                const newPrimaryColor = e.target.value;
+                                setAdvancedAppearance(prev => ({ ...prev, primaryColor: newPrimaryColor }));
+                                userPreferencesService.saveAppearanceSettings({ primaryColor: newPrimaryColor });
+                                toast.success('Primary color updated', 'Theme color has been changed');
+                              }}
                               className="w-12 h-12 rounded cursor-pointer"
                             />
                             <input
                               type="text"
                               value={advancedAppearance.primaryColor}
-                              onChange={(e) => setAdvancedAppearance({...advancedAppearance, primaryColor: e.target.value})}
+                              onChange={(e) => {
+                                const newPrimaryColor = e.target.value;
+                                setAdvancedAppearance(prev => ({ ...prev, primaryColor: newPrimaryColor }));
+                                userPreferencesService.saveAppearanceSettings({ primaryColor: newPrimaryColor });
+                                toast.success('Primary color updated', 'Theme color has been changed');
+                              }}
                               className="flex-1 px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white"
                             />
                           </div>
@@ -826,13 +871,23 @@ const isTokenExpired = (token: string): boolean => {
                             <input
                               type="color"
                               value={advancedAppearance.accentColor}
-                              onChange={(e) => setAdvancedAppearance({...advancedAppearance, accentColor: e.target.value})}
+                              onChange={(e) => {
+                                const newAccentColor = e.target.value;
+                                setAdvancedAppearance(prev => ({ ...prev, accentColor: newAccentColor }));
+                                userPreferencesService.saveAppearanceSettings({ accentColor: newAccentColor });
+                                toast.success('Accent color updated', 'Theme accent color has been changed');
+                              }}
                               className="w-12 h-12 rounded cursor-pointer"
                             />
                             <input
                               type="text"
                               value={advancedAppearance.accentColor}
-                              onChange={(e) => setAdvancedAppearance({...advancedAppearance, accentColor: e.target.value})}
+                              onChange={(e) => {
+                                const newAccentColor = e.target.value;
+                                setAdvancedAppearance(prev => ({ ...prev, accentColor: newAccentColor }));
+                                userPreferencesService.saveAppearanceSettings({ accentColor: newAccentColor });
+                                toast.success('Accent color updated', 'Theme accent color has been changed');
+                              }}
                               className="flex-1 px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white"
                             />
                           </div>
@@ -846,7 +901,11 @@ const isTokenExpired = (token: string): boolean => {
                   <h4 className="text-white font-medium mb-4">Custom CSS</h4>
                   <textarea
                     value={advancedAppearance.customCSS}
-                    onChange={(e) => setAdvancedAppearance({...advancedAppearance, customCSS: e.target.value})}
+                    onChange={(e) => {
+                      const newCustomCSS = e.target.value;
+                      setAdvancedAppearance(prev => ({ ...prev, customCSS: newCustomCSS }));
+                      userPreferencesService.saveAppearanceSettings({ customCSS: newCustomCSS });
+                    }}
                     rows={4}
                     className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white font-mono text-sm focus:outline-none focus:border-purple-500 transition-colors resize-none"
                     placeholder="/* Add your custom CSS here */"
@@ -860,7 +919,15 @@ const isTokenExpired = (token: string): boolean => {
                       <p className="text-gray-400 text-sm">Enable UI animations</p>
                     </div>
                     <button
-                      onClick={() => setAdvancedAppearance({...advancedAppearance, animationsEnabled: !advancedAppearance.animationsEnabled})}
+                      onClick={() => {
+                        const newAnimationsEnabled = !advancedAppearance.animationsEnabled;
+                        setAdvancedAppearance(prev => ({ ...prev, animationsEnabled: newAnimationsEnabled }));
+                        userPreferencesService.saveAppearanceSettings({ animationsEnabled: newAnimationsEnabled });
+                        toast.success(
+                          newAnimationsEnabled ? 'Animations enabled' : 'Animations disabled',
+                          newAnimationsEnabled ? 'UI animations are now active' : 'UI animations are now minimized'
+                        );
+                      }}
                       className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
                         advancedAppearance.animationsEnabled ? 'bg-purple-600' : 'bg-gray-600'
                       }`}
@@ -879,7 +946,15 @@ const isTokenExpired = (token: string): boolean => {
                       <p className="text-gray-400 text-sm">Minimize animations for accessibility</p>
                     </div>
                     <button
-                      onClick={() => setAdvancedAppearance({...advancedAppearance, reducedMotion: !advancedAppearance.reducedMotion})}
+                      onClick={() => {
+                        const newReducedMotion = !advancedAppearance.reducedMotion;
+                        setAdvancedAppearance(prev => ({ ...prev, reducedMotion: newReducedMotion }));
+                        userPreferencesService.saveAppearanceSettings({ reducedMotion: newReducedMotion });
+                        toast.success(
+                          newReducedMotion ? 'Reduced motion enabled' : 'Reduced motion disabled',
+                          newReducedMotion ? 'Animations are now minimized for accessibility' : 'Normal animations restored'
+                        );
+                      }}
                       className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
                         advancedAppearance.reducedMotion ? 'bg-purple-600' : 'bg-gray-600'
                       }`}
@@ -898,7 +973,15 @@ const isTokenExpired = (token: string): boolean => {
                       <p className="text-gray-400 text-sm">Increase contrast for better visibility</p>
                     </div>
                     <button
-                      onClick={() => setAdvancedAppearance({...advancedAppearance, highContrast: !advancedAppearance.highContrast})}
+                      onClick={() => {
+                        const newHighContrast = !advancedAppearance.highContrast;
+                        setAdvancedAppearance(prev => ({ ...prev, highContrast: newHighContrast }));
+                        userPreferencesService.saveAppearanceSettings({ highContrast: newHighContrast });
+                        toast.success(
+                          newHighContrast ? 'High contrast enabled' : 'High contrast disabled',
+                          newHighContrast ? 'Increased contrast for better visibility' : 'Normal contrast restored'
+                        );
+                      }}
                       className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
                         advancedAppearance.highContrast ? 'bg-purple-600' : 'bg-gray-600'
                       }`}

@@ -1,4 +1,5 @@
 const BusinessIdea = require('../models/businessIdea');
+const Competition = require('../models/competition');
 const mongoose = require('mongoose');
 
 // Submit a new business idea
@@ -142,10 +143,43 @@ const getIdeaStats = async (req, res) => {
   }
 };
 
+// Get active business competition
+const getActiveCompetition = async (req, res) => {
+  try {
+    // Find active competition with deadline in the future
+    const activeCompetition = await Competition.findOne({
+      isActive: true,
+      deadline: { $gt: new Date() }
+    }).sort({ deadline: 1 }); // Get the soonest deadline
+
+    if (!activeCompetition) {
+      // Return null if no active competition exists
+      // Frontend will handle this by showing fallback content
+      return res.json({
+        success: true,
+        data: null
+      });
+    }
+
+    res.json({
+      success: true,
+      data: activeCompetition
+    });
+  } catch (error) {
+    console.error('Error fetching active competition:', error);
+    // Return null on database errors so frontend shows fallback
+    res.json({
+      success: true,
+      data: null
+    });
+  }
+};
+
 module.exports = {
   submitBusinessIdea,
   getUserBusinessIdeas,
   getAllBusinessIdeas,
   updateIdeaStatus,
-  getIdeaStats
+  getIdeaStats,
+  getActiveCompetition
 };
