@@ -646,7 +646,7 @@ const Dashboard: React.FC = () => {
 
                   onClick={handleNotificationClick}
 
-                  className="relative p-2 rounded-full hover:bg-gray-700 transition"
+                  className="relative p-3 rounded-full hover:bg-gray-700 transition min-w-[44px] min-h-[44px] flex items-center justify-center"
 
                   title="Notifications"
 
@@ -670,7 +670,7 @@ const Dashboard: React.FC = () => {
 
                   onClick={() => navigate('/profile')}
 
-                  className="p-2 rounded-full hover:bg-gray-700 transition"
+                  className="p-3 rounded-full hover:bg-gray-700 transition min-w-[44px] min-h-[44px] flex items-center justify-center"
 
                   title="View Profile"
 
@@ -684,7 +684,7 @@ const Dashboard: React.FC = () => {
 
               <button 
 
-                className="border-2 border-gray-600 hover:border-purple-500 px-6 py-3 rounded-lg font-semibold transition"
+                className="border-2 border-gray-600 hover:border-purple-500 px-6 py-3 rounded-lg font-semibold transition min-w-[120px]"
 
                 onClick={() => navigate('/projects')}
 
@@ -726,7 +726,7 @@ const Dashboard: React.FC = () => {
 
                   onClick={() => navigate('/pricing')}
 
-                  className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-4 py-2 rounded-lg font-semibold hover:from-purple-600 hover:to-pink-600 transition cursor-pointer"
+                  className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-6 py-3 rounded-lg font-semibold hover:from-purple-600 hover:to-pink-600 transition cursor-pointer min-w-[140px]"
 
                 >
 
@@ -773,7 +773,7 @@ const Dashboard: React.FC = () => {
 
               onClick={handleJoin}
 
-              className={`text-heading font-medium leading-5 rounded-full text-sm px-4 py-2.5 focus:outline-none cursor-pointer transition shadow-md ${
+              className={`text-heading font-medium leading-5 rounded-full text-sm px-6 py-3 focus:outline-none cursor-pointer transition shadow-md min-w-[100px] min-h-[44px] ${
 
                 user?.plan?.toLowerCase() === 'trial' || !stats || stats.totalChallenges === 0 || stats.totalChallenges === undefined
 
@@ -835,7 +835,7 @@ const Dashboard: React.FC = () => {
 
               onClick={handleSolveChallenge}
 
-              className={`text-heading font-medium leading-5 rounded-full text-sm px-4 py-2.5 focus:outline-none cursor-pointer transition shadow-md ${
+              className={`text-heading font-medium leading-5 rounded-full text-sm px-6 py-3 focus:outline-none cursor-pointer transition shadow-md min-w-[100px] min-h-[44px] ${
 
                 user?.plan?.toLowerCase() === 'trial'
 
@@ -885,7 +885,7 @@ const Dashboard: React.FC = () => {
 
               onClick={() => navigate('/projects')}
 
-              className="text-heading bg-neutral-primary box-border border border-transparent hover:bg-neutral-secondary-medium focus:ring-4 focus:ring-neutral-tertiary-soft font-medium leading-5 rounded-full text-sm px-4 py-2.5 focus:outline-none cursor-pointer hover:shadow-[0_0_15px_#C27AFF] shadow-md transition"
+              className="text-heading bg-neutral-primary box-border border border-transparent hover:bg-neutral-secondary-medium focus:ring-4 focus:ring-neutral-tertiary-soft font-medium leading-5 rounded-full text-sm px-6 py-3 focus:outline-none cursor-pointer hover:shadow-[0_0_15px_#C27AFF] shadow-md transition min-w-[120px] min-h-[44px]"
 
             >
 
@@ -926,7 +926,7 @@ const Dashboard: React.FC = () => {
             <button
               type="button"
               onClick={() => navigate('/resources')}
-              className="text-heading bg-neutral-primary box-border border border-transparent hover:bg-neutral-secondary-medium focus:ring-4 focus:ring-neutral-tertiary-soft font-medium leading-5 rounded-full text-sm px-4 py-2.5 focus:outline-none cursor-pointer hover:shadow-[0_0_15px_#C27AFF] shadow-md transition"
+              className="text-heading bg-neutral-primary box-border border border-transparent hover:bg-neutral-secondary-medium focus:ring-4 focus:ring-neutral-tertiary-soft font-medium leading-5 rounded-full text-sm px-6 py-3 focus:outline-none cursor-pointer hover:shadow-[0_0_15px_#C27AFF] shadow-md transition min-w-[140px] min-h-[44px]"
             >
               Explore Resources
             </button>
@@ -992,7 +992,7 @@ const Dashboard: React.FC = () => {
 
               onClick={handleMentorshipAction}
 
-              className="text-heading bg-neutral-primary box-border border border-transparent hover:bg-neutral-secondary-medium focus:ring-4 focus:ring-neutral-tertiary-soft font-medium leading-5 rounded-full text-sm px-4 py-2.5 focus:outline-none cursor-pointer hover:shadow-[0_0_15px_#C27AFF] shadow-md transition"
+              className="text-heading bg-neutral-primary box-border border border-transparent hover:bg-neutral-secondary-medium focus:ring-4 focus:ring-neutral-tertiary-soft font-medium leading-5 rounded-full text-sm px-6 py-3 focus:outline-none cursor-pointer hover:shadow-[0_0_15px_#C27AFF] shadow-md transition min-w-[120px] min-h-[44px]"
 
             >
 
@@ -1036,7 +1036,7 @@ const Dashboard: React.FC = () => {
 
               onClick={() => navigate('/community')}
 
-              className="text-heading bg-neutral-primary box-border border border-transparent hover:bg-neutral-secondary-medium focus:ring-4 focus:ring-neutral-tertiary-soft font-medium leading-5 rounded-full text-sm px-4 py-2.5 focus:outline-none cursor-pointer hover:shadow-[0_0_15px_#C27AFF] shadow-md transition"
+              className="text-heading bg-neutral-primary box-border border border-transparent hover:bg-neutral-secondary-medium focus:ring-4 focus:ring-neutral-tertiary-soft font-medium leading-5 rounded-full text-sm px-6 py-3 focus:outline-none cursor-pointer hover:shadow-[0_0_15px_#C27AFF] shadow-md transition min-w-[130px] min-h-[44px]"
 
             >
 
@@ -1078,17 +1078,20 @@ const Dashboard: React.FC = () => {
 
             </p>
 
-            <button
+            <div 
 
-              type="button"
+              className="text-heading bg-neutral-primary box-border border border-transparent hover:bg-neutral-secondary-medium focus:ring-4 focus:ring-neutral-tertiary-soft font-medium leading-5 rounded-full text-sm px-6 py-3 focus:outline-none cursor-pointer hover:shadow-[0_0_15px_#C27AFF] shadow-md transition text-center min-w-[120px] min-h-[44px]"
 
-              className="text-heading bg-neutral-primary box-border border border-transparent hover:bg-neutral-secondary-medium focus:ring-4 focus:ring-neutral-tertiary-soft font-medium leading-5 rounded-full text-sm px-4 py-2.5 focus:outline-none cursor-pointer hover:shadow-[0_0_15px_#C27AFF] shadow-md transition"
+              onClick={(e) => {
+                e.stopPropagation();
+                navigate('/leaderboard');
+              }}
 
             >
 
               View Rankings
 
-            </button>
+            </div>
 
           </div>
 
@@ -1131,7 +1134,7 @@ const Dashboard: React.FC = () => {
 
               onClick={() => navigate('/business-competition')}
 
-              className="text-heading bg-neutral-primary box-border border border-transparent hover:bg-neutral-secondary-medium focus:ring-4 focus:ring-neutral-tertiary-soft font-medium leading-5 rounded-full text-sm px-4 py-2.5 focus:outline-none cursor-pointer hover:shadow-[0_0_15px_#FF8C00] shadow-md transition"
+              className="text-heading bg-neutral-primary box-border border border-transparent hover:bg-neutral-secondary-medium focus:ring-4 focus:ring-neutral-tertiary-soft font-medium leading-5 rounded-full text-sm px-6 py-3 focus:outline-none cursor-pointer hover:shadow-[0_0_15px_#FF8C00] shadow-md transition min-w-[120px] min-h-[44px]"
 
             >
 
@@ -1169,17 +1172,20 @@ const Dashboard: React.FC = () => {
 
             </p>
 
-            <button
+            <div 
 
-              type="button"
+              className="text-heading bg-neutral-primary box-border border border-transparent hover:bg-neutral-secondary-medium focus:ring-4 focus:ring-neutral-tertiary-soft font-medium leading-5 rounded-full text-sm px-6 py-3 focus:outline-none cursor-pointer hover:shadow-[0_0_15px_#C27AFF] shadow-md transition text-center min-w-[120px] min-h-[44px]"
 
-              className="text-heading bg-neutral-primary box-border border border-transparent hover:bg-neutral-secondary-medium focus:ring-4 focus:ring-neutral-tertiary-soft font-medium leading-5 rounded-full text-sm px-4 py-2.5 focus:outline-none cursor-pointer hover:shadow-[0_0_15px_#C27AFF] shadow-md transition"
+              onClick={(e) => {
+                e.stopPropagation();
+                navigate('/rewards');
+              }}
 
             >
 
               View Details
 
-            </button>
+            </div>
 
           </div>
 

@@ -1,7 +1,9 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 const Hero: React.FC = () => {
+  const navigate = useNavigate();
+  
   return (
     <section className="py-24 px-4 text-center">
       <div className="max-w-4xl mx-auto">
@@ -54,11 +56,17 @@ const Hero: React.FC = () => {
         </div>
 
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
-          <button className="bg-purple-500 hover:bg-purple-400  text-white px-8 py-4 rounded-lg font-semibold text-lg transition duration-200 shadow-lg hover:shadow-blue-500/40 transform hover:-translate-y-0.5 hover:scale-105 cursor-pointer">
-            <Link to="/login">Join Community</Link>
+          <button 
+            onClick={() => navigate('/login')}
+            className="bg-purple-500 hover:bg-purple-600 text-white px-8 py-4 rounded-lg font-semibold text-lg transition duration-200 shadow-lg hover:shadow-blue-500/40 transform hover:-translate-y-0.5 hover:scale-105 cursor-pointer min-w-[160px] min-h-[52px] flex items-center justify-center"
+          >
+            Join Community
           </button>
-          <button className="border-2 border-gray-600 hover:border-blue-400 text-gray-300 hover:text-blue-400 px-8 py-4 rounded-lg font-semibold text-lg transition duration-200 cursor-pointer">
-            <Link to="/about">Discover More</Link>
+          <button 
+            onClick={() => navigate('/about')}
+            className="border-2 border-gray-600 hover:border-blue-400 text-gray-300 hover:text-blue-400 px-8 py-4 rounded-lg font-semibold text-lg transition duration-200 cursor-pointer min-w-[160px] min-h-[52px] flex items-center justify-center"
+          >
+            Discover More
           </button>
         </div>
       </div>

@@ -1,10 +1,11 @@
 import React from 'react';
 
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 
 
 const Navbar: React.FC = () => {
+  const navigate = useNavigate();
 
   return (
 
@@ -92,16 +93,18 @@ const Navbar: React.FC = () => {
 
           <div className="flex items-center space-x-4">
 
-            <button className="border-2  text-white px-4 py-2 rounded-md text-sm font-mono font-semibold shadow-lg hover:shadow-blue-500/50 transform hover:-translate-y-0.5 hover:scale-105 transition duration-200 cursor-pointer">
-
-              <Link to="/login">Login In</Link>
-
+            <button 
+              onClick={() => navigate('/login')}
+              className="border-2 border-gray-600 hover:border-blue-400 text-white px-6 py-3 rounded-md text-sm font-mono font-semibold shadow-lg hover:shadow-blue-500/50 transform hover:-translate-y-0.5 hover:scale-105 transition duration-200 cursor-pointer min-w-[80px] min-h-[44px] flex items-center justify-center"
+            >
+              Login In
             </button>
 
-            <button className="bg-purple-500 hover:bg-purple-500  text-white px-4 py-2 rounded-md text-sm font-mono font-semibold shadow-lg hover:shadow-blue-500/50 transform hover:-translate-y-0.5 hover:scale-105 transition duration-200 cursor-pointer">
-
-              <Link to="/signup"> Sign Up</Link>
-
+            <button 
+              onClick={() => navigate('/signup')}
+              className="bg-purple-500 hover:bg-purple-600 text-white px-6 py-3 rounded-md text-sm font-mono font-semibold shadow-lg hover:shadow-blue-500/50 transform hover:-translate-y-0.5 hover:scale-105 transition duration-200 cursor-pointer min-w-[80px] min-h-[44px] flex items-center justify-center"
+            >
+              Sign Up
             </button>
 
           </div>
