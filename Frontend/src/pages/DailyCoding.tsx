@@ -91,7 +91,7 @@ export default function DailyCoding() {
     const fetchChallenge = async () => {
       try {
         const token = localStorage.getItem('auth_token');
-        const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/daily-challenge/today`, {
+        const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/daily-challenge/today`, {
           headers: {
             'Content-Type': 'application/json',
             'Authorization': token ? `Bearer ${token}` : ''
@@ -121,7 +121,7 @@ export default function DailyCoding() {
   useEffect(() => {
     const fetchLeaderboard = async () => {
       try {
-        const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/daily-challenge/leaderboard`);
+        const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/daily-challenge/leaderboard`);
         const data = await response.json();
         
         if (data.success) {
@@ -145,7 +145,7 @@ export default function DailyCoding() {
     
     try {
       const token = localStorage.getItem('auth_token');
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/daily-challenge/submit`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/daily-challenge/submit`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -167,7 +167,7 @@ export default function DailyCoding() {
         setOutput(`Status: ${passed ? 'PASSED' : 'FAILED'}\nScore: ${score}\nTime: ${data.data.completionTime || 'N/A'}`);
         
         // Refresh leaderboard
-        const leaderboardResponse = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/daily-challenge/leaderboard`);
+        const leaderboardResponse = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/daily-challenge/leaderboard`);
         const leaderboardData = await leaderboardResponse.json();
         if (leaderboardData.success) {
           setLeaderboard(leaderboardData.data);
@@ -406,26 +406,19 @@ export default function DailyCoding() {
                 <h3 className="text-xl font-bold text-yellow-300 mb-2">Daily Prizes</h3>
                 <p className="text-yellow-200 mb-4">Top 3 solvers win mobile cards!</p>
                 
-                <div className="space-y-3">
+                <div className="space-y-2">
                   <div className="flex items-center justify-center gap-2 text-yellow-400">
                     <FaCrown className="w-5 h-5" />
-                    <span className="font-bold">1st: 100 Birr</span>
+                    <span className="font-bold">1st: {challenge.prizes.first.amount} {challenge.prizes.first.currency}</span>
                   </div>
                   <div className="flex items-center justify-center gap-2 text-gray-300">
                     <FaMedal className="w-5 h-5" />
-                    <span className="font-bold">2nd: 50 Birr</span>
+                    <span className="font-bold">2nd: {challenge.prizes.second.amount} {challenge.prizes.second.currency}</span>
                   </div>
                   <div className="flex items-center justify-center gap-2 text-orange-400">
                     <FaAward className="w-5 h-5" />
-                    <span className="font-bold">3rd: 25 Birr</span>
+                    <span className="font-bold">3rd: {challenge.prizes.third.amount} {challenge.prizes.third.currency}</span>
                   </div>
-                </div>
-                
-                {/* Prize eligibility note */}
-                <div className="mt-4 pt-4 border-t border-yellow-500/30">
-                  <p className="text-xs text-yellow-200/80">
-                    🎯 Complete today's challenge to compete for prizes!
-                  </p>
                 </div>
               </div>
             </div>
@@ -442,32 +435,21 @@ export default function DailyCoding() {
                   leaderboard.map((entry) => (
                     <div
                       key={entry.user._id}
-                      className={`p-3 rounded-lg border transition-all duration-300 ${
+                      className={`p-3 rounded-lg border ${
                         entry.rank <= 3
                           ? entry.rank === 1
-                            ? 'bg-gradient-to-r from-yellow-500/10 to-amber-500/10 border-yellow-500/30 shadow-lg shadow-yellow-500/20'
+                            ? 'bg-yellow-500/10 border-yellow-500/30'
                             : entry.rank === 2
-                              ? 'bg-gradient-to-r from-slate-400/10 to-gray-400/10 border-slate-400/30 shadow-lg shadow-slate-400/20'
-                              : 'bg-gradient-to-r from-orange-700/10 to-amber-700/10 border-orange-700/30 shadow-lg shadow-orange-700/20'
+                              ? 'bg-slate-400/10 border-slate-400/30'
+                              : 'bg-orange-700/10 border-orange-700/30'
                           : 'bg-slate-700/30 border-slate-600/30'
                       }`}
                     >
                       <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          {/* Rank badge */}
-                          <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${
-                            entry.rank === 1 ? 'bg-yellow-500 text-white' :
-                            entry.rank === 2 ? 'bg-slate-400 text-white' :
-                            entry.rank === 3 ? 'bg-orange-600 text-white' :
-                            'bg-slate-600 text-slate-300'
-                          }`}>
-                            {entry.rank}
-                          </div>
-                          <div>
-                            <div className="text-white font-medium">{entry.user.fullName}</div>
-                            <div className="text-xs text-slate-400">
-                              Score: {entry.score} • Time: {entry.completionTime}ms
-                            </div>
+                        <div>
+                          <div className="text-white font-medium">{entry.user.fullName}</div>
+                          <div className="text-xs text-slate-400">
+                            Score: {entry.score} • Time: {entry.completionTime}ms
                           </div>
                         </div>
                         <div className="text-right">
@@ -475,13 +457,8 @@ export default function DailyCoding() {
                             #{entry.rank}
                           </div>
                           {entry.prize && (
-                            <div className="text-xs text-yellow-300 font-medium animate-pulse">
-                              🏆 {entry.prize.amount} {entry.prize.currency}
-                            </div>
-                          )}
-                          {entry.rank <= 3 && !entry.prize && (
-                            <div className="text-xs text-green-300 font-medium">
-                              🎯 Prize Eligible
+                            <div className="text-xs text-yellow-300 font-medium">
+                              {entry.prize.amount} {entry.prize.currency}
                             </div>
                           )}
                         </div>

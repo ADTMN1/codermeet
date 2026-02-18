@@ -177,6 +177,12 @@ const ViewProjects: React.FC = () => {
                 <h1 className="text-xl font-bold text-white">My Projects</h1>
               </div>
             </div>
+            <button
+              onClick={() => navigate('/dashboard')}
+              className="px-4 py-2 border border-gray-600 text-gray-300 rounded-lg hover:bg-gray-800 transition-colors"
+            >
+              Back to Dashboard
+            </button>
           </div>
         </div>
       </div>

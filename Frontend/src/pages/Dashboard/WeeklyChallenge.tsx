@@ -140,6 +140,16 @@ export default function WeeklyChallenge() {
 
       {/* Main Container */}
       <div className="container mx-auto px-4 py-8 max-w-7xl">
+        {/* Back to Dashboard Button */}
+        <div className="mb-6">
+          <button
+            onClick={() => navigate('/dashboard')}
+            className="px-4 py-2 border border-gray-600 text-gray-300 rounded-lg hover:bg-gray-800 transition-colors"
+          >
+            Back to Dashboard
+          </button>
+        </div>
+        
         <ChallengeHeader 
           challengeTitle={challenge?.title || "Build a Real-Time Chat App"}
           challengeDifficulty={challenge?.difficulty || "Intermediate"}

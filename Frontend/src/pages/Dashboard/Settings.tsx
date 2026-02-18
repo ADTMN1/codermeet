@@ -33,7 +33,8 @@ import {
   UserX,
   FileText,
   ShieldCheck,
-  Fingerprint
+  Fingerprint,
+  Loader
 } from 'lucide-react';
 import { Card } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
@@ -597,6 +598,12 @@ const isTokenExpired = (token: string): boolean => {
           <h2 className="text-2xl font-bold text-white mb-2">Settings</h2>
           <p className="text-gray-400">Manage your account settings and preferences</p>
         </div>
+        <button
+          onClick={() => navigate('/dashboard')}
+          className="px-4 py-2 border border-gray-600 text-gray-300 rounded-lg hover:bg-gray-800 transition-colors"
+        >
+          Back to Dashboard
+        </button>
       </div>
 
       {/* Settings Navigation */}
@@ -638,7 +645,7 @@ const isTokenExpired = (token: string): boolean => {
               <div className="space-y-4">
                 {loadingSessions ? (
                   <div className="text-center py-8">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 mx-auto mb-4"></div>
+                    <Loader className="animate-spin text-purple-400 w-8 h-8 mx-auto mb-4" />
                     <p className="text-gray-400">Loading sessions...</p>
                   </div>
                 ) : activeSessions.length === 0 ? (

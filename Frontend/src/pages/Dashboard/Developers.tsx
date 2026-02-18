@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { API_URL } from '../../config/api';
 import {
   FaSearch,
   FaUser,
@@ -21,7 +22,8 @@ import {
   FaPaperPlane,
   FaCheckCircle,
   FaExclamationTriangle,
-  FaInfoCircle
+  FaInfoCircle,
+  FaSpinner
 } from 'react-icons/fa';
 import { useUser } from '../../context/UserContext';
 import axios from 'axios';
@@ -95,7 +97,7 @@ const Developers: React.FC = () => {
     try {
       setLoading(true);
       const token = localStorage.getItem('auth_token');
-      const response = await axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/users/members`, {
+      const response = await axios.get(`${API_URL}/users/members`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -183,7 +185,7 @@ const Developers: React.FC = () => {
       setConnecting(developerId);
       const token = localStorage.getItem('auth_token');
       const response = await axios.post(
-        `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/users/connect/${developerId}`,
+        `${API_URL}/users/connect/${developerId}`,
         {},
         {
           headers: {
@@ -237,7 +239,7 @@ const Developers: React.FC = () => {
       
       // Send message to backend API
       const response = await axios.post(
-        `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/users/message/${messagePopup.developer._id}`,
+        `${API_URL}/users/message/${messagePopup.developer._id}`,
         {
           message: messageText.trim()
         },
@@ -353,7 +355,7 @@ const Developers: React.FC = () => {
     return (
       <div className="min-h-screen bg-gray-900 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-purple-500 mx-auto mb-4"></div>
+          <FaSpinner className="animate-spin text-purple-400 w-8 h-8 mx-auto mb-4" />
           <p className="text-gray-400">Loading developers...</p>
         </div>
       </div>
@@ -364,9 +366,17 @@ const Developers: React.FC = () => {
     <div className="min-h-screen bg-gray-900 text-gray-200 p-6">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-xl font-bold text-white mb-2">Find Developers</h1>
-          <p className="text-gray-400">Connect with talented developers in our community</p>
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <h1 className="text-xl font-bold text-white mb-2">Find Developers</h1>
+            <p className="text-gray-400">Connect with talented developers in our community</p>
+          </div>
+          <button
+            onClick={() => navigate('/dashboard')}
+            className="px-4 py-2 border border-gray-600 text-gray-300 rounded-lg hover:bg-gray-800 transition-colors"
+          >
+            Back to Dashboard
+          </button>
         </div>
 
         {/* Search and Filters */}

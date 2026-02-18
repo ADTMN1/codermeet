@@ -6,7 +6,8 @@ import {
   FaFilter,
   FaClock,
   FaCheckDouble,
-  FaCheckCircle
+  FaCheckCircle,
+  FaSpinner
 } from 'react-icons/fa';
 import { toast } from 'sonner';
 import axios from 'axios';
@@ -222,7 +223,10 @@ const Notifications: React.FC = () => {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-900 flex items-center justify-center">
-        <div className="animate-spin h-10 w-10 border-t-2 border-purple-500 rounded-full" />
+        <div className="text-center">
+          <FaSpinner className="animate-spin text-purple-400 w-8 h-8 mx-auto mb-4" />
+          <p className="text-gray-400">Loading notifications...</p>
+        </div>
       </div>
     );
   }
@@ -236,13 +240,12 @@ const Notifications: React.FC = () => {
             <h1 className="text-2xl font-bold text-white">Notifications</h1>
             {unreadCount > 0 && <span className="bg-purple-600 px-3 py-1 rounded-full text-sm">{unreadCount}</span>}
           </div>
-          <div className="flex gap-3">
-            {unreadCount > 0 && (
-              <button onClick={handleBulkMarkAsRead} className="px-4 py-2 bg-purple-600 rounded-lg flex items-center gap-2">
-                <FaCheck /> Mark all as read
-              </button>
-            )}
-          </div>
+          <button
+            onClick={() => navigate('/dashboard')}
+            className="px-4 py-2 border border-gray-600 text-gray-300 rounded-lg hover:bg-gray-800 transition-colors"
+          >
+            Back to Dashboard
+          </button>
         </div>
       </div>
 

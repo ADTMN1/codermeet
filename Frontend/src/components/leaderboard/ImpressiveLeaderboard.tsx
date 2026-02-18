@@ -21,7 +21,8 @@ import {
   FaFilter,
   FaCalendarAlt,
   FaClock,
-  FaEye
+  FaEye,
+  FaSpinner
 } from 'react-icons/fa';
 
 interface LeaderboardUser {
@@ -351,7 +352,10 @@ const ImpressiveLeaderboard: React.FC = () => {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px] bg-gray-900 rounded-xl">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
+        <div className="text-center">
+          <FaSpinner className="animate-spin text-purple-400 w-8 h-8 mx-auto mb-4" />
+          <p className="text-gray-400">Loading leaderboard...</p>
+        </div>
       </div>
     );
   }

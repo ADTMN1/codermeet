@@ -63,14 +63,7 @@ const DashboardLayout: React.FC = () => {
       <main className="flex-1 p-6">
         <Outlet />
 
-        {showBackButton && (
-          <button
-            onClick={() => window.history.back()}
-            className="mt-4 px-2 py-1 bg-purple-500 text-white rounded hover:bg-purple-600 transition cursor-pointer"
-          >
-            Back
-          </button>
-        )}
+        
       </main>
     </div>
   );

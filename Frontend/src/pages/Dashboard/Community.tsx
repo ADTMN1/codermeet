@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { io, Socket } from 'socket.io-client';
-import { API_CONFIG } from '../../config/api';
+import { API_CONFIG, SOCKET_URL } from '../../config/api';
 import {
   FaFolderOpen,
   FaCheckCircle,
@@ -277,7 +277,7 @@ const Community: React.FC = () => {
     const token = localStorage.getItem('auth_token');
     if (token) {
       try {
-        const response = fetch(`${API_CONFIG.BASE_URL}/users/me`, {
+        const response = fetch(`${import.meta.env.VITE_API_URL}/users/me`, {
           headers: {
             'Authorization': `Bearer ${token}`,
           },
@@ -347,7 +347,7 @@ const Community: React.FC = () => {
   const fetchProjects = async () => {
     try {
       const token = localStorage.getItem('auth_token');
-      const response = await fetch(`${API_CONFIG.BASE_URL}/users/community/projects`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/users/community/projects`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -410,7 +410,7 @@ const Community: React.FC = () => {
   const fetchAnnouncements = async () => {
     try {
       const token = localStorage.getItem('auth_token');
-      const response = await fetch(`${API_CONFIG.BASE_URL}/users/announcements`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/users/announcements`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -435,7 +435,7 @@ const Community: React.FC = () => {
   const fetchMembers = async () => {
     try {
       const token = localStorage.getItem('auth_token');
-      const response = await fetch(`${API_CONFIG.BASE_URL}/users/members`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/users/members`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -460,7 +460,7 @@ const Community: React.FC = () => {
   const fetchTeams = async () => {
     try {
       const token = localStorage.getItem('auth_token');
-      const response = await fetch(`${API_CONFIG.BASE_URL}/users/teams`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/users/teams`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -492,7 +492,7 @@ const Community: React.FC = () => {
       if (jobLocationFilter) params.append('location', jobLocationFilter);
       if (searchTerm) params.append('search', searchTerm);
       
-      const response = await fetch(`${API_CONFIG.BASE_URL}/jobs?${params}`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/jobs?${params}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -508,7 +508,7 @@ const Community: React.FC = () => {
         
         // Also fetch user's liked jobs to determine isLiked status
         try {
-          const userResponse = await fetch(`${API_CONFIG.BASE_URL}/users/profile`, {
+          const userResponse = await fetch(`${import.meta.env.VITE_API_URL}/users/profile`, {
             headers: {
               'Authorization': `Bearer ${token}`,
             },
@@ -569,19 +569,12 @@ const Community: React.FC = () => {
   // Chat states
   const [chatRooms, setChatRooms] = useState<ChatRoom[]>([]);
   const [selectedChatRoom, setSelectedChatRoom] = useState<ChatRoom | null>(null);
-  // Track current room ID separately
-  const [currentRoomId, setCurrentRoomId] = useState<string>(''); // Track current room ID separately
-  const currentRoomIdRef = useRef<string>(''); // Ref to avoid stale state issues
-  
-  // Debug: Track currentRoomId changes
-  useEffect(() => {
-    currentRoomIdRef.current = currentRoomId; // Update ref when state changes
-  }, [currentRoomId]);
   const [messageInput, setMessageInput] = useState('');
   const [messages, setMessages] = useState<any[]>([]);
   const [socket, setSocket] = useState<Socket | null>(null);
   const [typingUsers, setTypingUsers] = useState<{[key: string]: string}>({});
   const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set());
+  const [roomOnlineUsers, setRoomOnlineUsers] = useState<{[roomId: string]: string[]}>({});
   const [showCreateRoomModal, setShowCreateRoomModal] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
@@ -595,18 +588,11 @@ const Community: React.FC = () => {
     maxMembers: 100
   });
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const socketInitialized = useRef(false);
-  const processedMessageIds = useRef<Set<string>>(new Set()); // Track processed messages
-  const sentMessageIds = useRef<Set<string>>(new Set()); // Track sent messages to prevent duplicates
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
 
   // Fetch messages when selected room changes
   useEffect(() => {
-    if (selectedChatRoom && selectedChatRoom._id !== currentRoomId) {
-      console.log('🔄 Room changed, fetching messages for:', selectedChatRoom._id);
-      // Clear processed message IDs when switching rooms
-      processedMessageIds.current.clear();
-      sentMessageIds.current.clear(); // Also clear sent message IDs
-      setCurrentRoomId(selectedChatRoom._id);
+    if (selectedChatRoom) {
       fetchMessages(selectedChatRoom._id);
     }
   }, [selectedChatRoom]);
@@ -627,39 +613,34 @@ const Community: React.FC = () => {
   }, [showEmojiPicker]);
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+    // Fallback: scroll container to bottom immediately
+    if (messagesContainerRef.current) {
+      messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+    }
   };
 
-  // Initialize Socket.IO
+  // Initialize Socket.IO - only once on component mount
   useEffect(() => {
-    let newSocket: Socket | null = null;
-    
-    // Prevent multiple socket connections
-    if (socketInitialized.current || socket) {
-      return;
-    }
-    
     const token = localStorage.getItem('auth_token');
     if (token) {
-      newSocket = io('http://localhost:5000/chat', {
+      const newSocket = io(SOCKET_URL, {
         auth: { token }
       });
-      
-      socketInitialized.current = true;
 
       newSocket.on('connect', () => {
-        console.log('✅ FRONTEND SOCKET CONNECTED TO CHAT:', newSocket.id);
+        console.log('Socket connected');
         fetchChatRooms();
       });
 
       newSocket.on('disconnect', (reason) => {
-        console.log('❌ FRONTEND SOCKET DISCONNECTED:', reason);
-        socketInitialized.current = false; // Allow reconnection
+        console.log('Socket disconnected:', reason);
       });
 
       newSocket.on('connect_error', (error) => {
-        console.log('❌ FRONTEND SOCKET CONNECTION ERROR:', error);
-        socketInitialized.current = false; // Allow reconnection
+        console.error('Socket connection error:', error);
       });
 
       newSocket.on('roomsList', (rooms: ChatRoom[]) => {
@@ -668,37 +649,44 @@ const Community: React.FC = () => {
 
       newSocket.on('roomJoined', (room: ChatRoom) => {
         setSelectedChatRoom(room);
-        // Don't fetchMessages here - it will be called by useEffect when selectedChatRoom changes
+        // Don't fetch messages here - let the useEffect handle it
+      });
+
+      newSocket.on('userJoined', (data: any) => {
+        if (data.roomId) {
+          setRoomOnlineUsers(prev => ({
+            ...prev,
+            [data.roomId]: [...(prev[data.roomId] || []), data.userId]
+          }));
+        }
+      });
+
+      newSocket.on('userLeft', (data: any) => {
+        if (data.roomId) {
+          setRoomOnlineUsers(prev => ({
+            ...prev,
+            [data.roomId]: prev[data.roomId]?.filter(id => id !== data.userId) || []
+          }));
+        }
+      });
+
+      newSocket.on('roomUsers', (data: any) => {
+        if (data.roomId && data.users) {
+          setRoomOnlineUsers(prev => ({
+            ...prev,
+            [data.roomId]: data.users.map((user: any) => user.userId)
+          }));
+        }
       });
 
       newSocket.on('newMessage', (message: any) => {
-        console.log('🔔 Received newMessage:', message._id, 'Room:', message.roomId, 'Current room:', currentRoomIdRef.current);
-        
-        // Prevent duplicate messages - check both message ID and content+timestamp
-        const messageKey = `${message._id}_${message.content}_${message.createdAt}`;
-        if (processedMessageIds.current.has(message._id) || 
-            Array.from(processedMessageIds.current).some(id => {
-              const existingMsg = messages.find(m => m._id === id);
-              return existingMsg && existingMsg.content === message.content && 
-                     Math.abs(new Date(existingMsg.createdAt).getTime() - new Date(message.createdAt).getTime()) < 1000;
-            })) {
-          console.log('❌ Duplicate message prevented:', message._id);
-          return;
-        }
-        processedMessageIds.current.add(message._id);
-        console.log('✅ Added message to processed set:', message._id);
-        
-        // Check if message belongs to current room using ref (avoids stale state)
-        if (message.roomId === currentRoomIdRef.current) {
-          console.log('✅ Adding message to UI');
-          setMessages(prev => [...prev, message]);
-          // Only update filteredMessages if there's no active search
-          if (!searchQuery.trim()) {
-            setFilteredMessages(prev => [...prev, message]);
-          }
+        if (selectedChatRoom && message.roomId === selectedChatRoom._id) {
+          // Replace temporary message with real one if it exists
+          setMessages(prev => {
+            const filtered = prev.filter(msg => !msg._id?.startsWith('temp-'));
+            return [...filtered, message];
+          });
           scrollToBottom();
-        } else {
-          console.log('❌ Message not for current room');
         }
       });
 
@@ -770,16 +758,11 @@ const Community: React.FC = () => {
 
       setSocket(newSocket);
 
+      return () => {
+        newSocket.close();
+      };
     }
-
-    // Cleanup function
-    return () => {
-      if (newSocket) {
-        newSocket.disconnect();
-        socketInitialized.current = false;
-      }
-    };
-  }, []); // Empty dependency array to run only once
+  }, []); // ← Empty dependency array - only run once on mount
 
   const fetchChatRooms = async () => {
     try {
@@ -789,7 +772,7 @@ const Community: React.FC = () => {
         return;
       }
       
-      const response = await fetch(`${API_CONFIG.BASE_URL}/chat/rooms`, {
+      const response = await fetch('http://localhost:5000/api/chat/rooms', {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -811,14 +794,13 @@ const Community: React.FC = () => {
   };
 
   const fetchMessages = async (roomId: string) => {
-    console.log('📥 Fetching messages for room:', roomId);
     try {
       const token = localStorage.getItem('auth_token');
       if (!token) {
         return;
       }
       
-      const response = await fetch(`${API_CONFIG.BASE_URL}/chat/rooms/${roomId}/messages`, {
+      const response = await fetch(`http://localhost:5000/api/chat/rooms/${roomId}/messages`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -827,73 +809,84 @@ const Community: React.FC = () => {
 
       if (response.ok) {
         const data = await response.json();
-        let fetchedMessages = data.data || [];
-        console.log('📥 Fetched', fetchedMessages.length, 'messages');
-        
-        // Add fetched message IDs to processed set (don't clear - already cleared in useEffect)
-        fetchedMessages.forEach((msg: any) => {
-          if (msg._id) {
-            processedMessageIds.current.add(msg._id);
-          }
-        });
-        console.log('📥 Added', fetchedMessages.length, 'message IDs to processed set');
-        
-        // Sort messages by createdAt (oldest first, newest last)
-        fetchedMessages.sort((a: any, b: any) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-        
-        setMessages(fetchedMessages);
-        setFilteredMessages(fetchedMessages); // Also update filtered messages
+        // Reverse messages to show oldest first (newest at bottom)
+        const messages = data.data || [];
+        setMessages(messages.reverse());
         setSearchQuery(''); // Clear search when loading new messages
-        scrollToBottom();
       } else {
-        console.log('📥 Failed to fetch messages:', response.status);
         setMessages([]);
-        setFilteredMessages([]); // Also clear filtered messages
       }
     } catch (error) {
-      console.log('📥 Error fetching messages:', error);
       setMessages([]);
-      setFilteredMessages([]); // Also clear filtered messages
     }
   };
 
+  // Scroll to bottom when messages change
+  useEffect(() => {
+    if (messages.length > 0) {
+      // Immediate scroll for better UX
+      scrollToBottom();
+      // Also scroll after a short delay to ensure DOM is fully rendered
+      setTimeout(scrollToBottom, 50);
+    }
+  }, [messages]);
+
+  // Keep filteredMessages in sync with messages
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      setFilteredMessages(messages);
+    } else {
+      const filtered = messages.filter(message => 
+        message.content?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        message.senderId?.fullName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        message.fileName?.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+      setFilteredMessages(filtered);
+    }
+  }, [messages, searchQuery]);
+
+  // Scroll to bottom immediately when component mounts with messages
+  useEffect(() => {
+    if (messages.length > 0 && selectedChatRoom) {
+      scrollToBottom();
+    }
+  }, [selectedChatRoom]);
+
   const handleSelectRoom = (room: ChatRoom) => {
     setSelectedChatRoom(room);
-    setCurrentRoomId(room._id); // Set current room ID
-    currentRoomIdRef.current = room._id; // Also set ref directly
     setSearchQuery(''); // Clear search when switching rooms
-    
     if (socket) {
       socket.emit('joinRoom', { roomId: room._id });
+      // Request current room users
+      socket.emit('getRoomUsers', { roomId: room._id });
     }
   };
 
   const handleSendMessage = () => {
     if (messageInput.trim() || uploadedFile) {
       if (socket && selectedChatRoom) {
-        const clientMessageId = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-        
-        // Prevent sending the same message twice
-        if (sentMessageIds.current.has(clientMessageId)) {
-          console.log('❌ Duplicate send prevented:', clientMessageId);
-          return;
-        }
-        sentMessageIds.current.add(clientMessageId);
-        
         const message = {
           content: messageInput.trim(),
           roomId: selectedChatRoom._id,
           type: uploadedFile ? 'file' : 'text',
           fileName: uploadedFile?.name,
           fileSize: uploadedFile?.size,
-          messageId: clientMessageId,
-          senderId: currentUserId,
+          // Add temporary data for immediate UI display
+          _id: `temp-${Date.now()}`,
+          senderId: {
+            _id: 'temp',
+            fullName: 'You',
+            username: 'you',
+            avatar: currentUserAvatar // ← Add current user avatar
+          },
           createdAt: new Date().toISOString()
         };
 
-        console.log('📤 Sending message:', clientMessageId);
+        // Add message to UI immediately for sender
+        setMessages(prev => [...prev, message]);
+        scrollToBottom();
+
         socket.emit('sendMessage', message);
-        
         setMessageInput('');
         setUploadedFile(null);
         
@@ -905,11 +898,6 @@ const Community: React.FC = () => {
           clearTimeout(typingTimeout);
           setTypingTimeout(null);
         }
-        
-        // Clear sent message ID after a delay to allow re-sending same content later
-        setTimeout(() => {
-          sentMessageIds.current.delete(clientMessageId);
-        }, 1000);
       }
     }
   };
@@ -1022,7 +1010,7 @@ const emojiCategories = {
         return;
       }
       
-      const response = await fetch(`${API_CONFIG.BASE_URL}/chat/rooms`, {
+      const response = await fetch('http://localhost:5000/api/chat/rooms', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -1064,7 +1052,7 @@ const emojiCategories = {
   const handleLikeAnnouncement = async (announcementId: string) => {
     try {
       const token = localStorage.getItem('auth_token');
-      const response = await fetch(`${API_CONFIG.BASE_URL}/users/announcements/${announcementId}/like`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/users/announcements/${announcementId}/like`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -1090,7 +1078,7 @@ const emojiCategories = {
   const handleCommentAnnouncement = async (announcementId: string, comment: string) => {
     try {
       const token = localStorage.getItem('auth_token');
-      const response = await fetch(`${API_CONFIG.BASE_URL}/users/announcements/${announcementId}/comment`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/users/announcements/${announcementId}/comment`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -1117,7 +1105,7 @@ const emojiCategories = {
   const handleLikeProject = async (projectId: string) => {
     try {
       const token = localStorage.getItem('auth_token');
-      const response = await fetch(`${API_CONFIG.BASE_URL}/users/projects/${projectId}/like`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/users/projects/${projectId}/like`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -1143,7 +1131,7 @@ const emojiCategories = {
   const handleCommentProject = async (projectId: string, comment: string) => {
     try {
       const token = localStorage.getItem('auth_token');
-      const response = await fetch(`${API_CONFIG.BASE_URL}/users/projects/${projectId}/comment`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/users/projects/${projectId}/comment`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -1197,7 +1185,7 @@ const emojiCategories = {
         } : undefined
       };
 
-      const response = await fetch(`${API_CONFIG.BASE_URL}/jobs`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/jobs`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -1242,7 +1230,7 @@ const emojiCategories = {
   const handleLikeJob = async (jobId: string) => {
     try {
       const token = localStorage.getItem('auth_token');
-      const response = await fetch(`${API_CONFIG.BASE_URL}/jobs/${jobId}/like`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/jobs/${jobId}/like`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -1299,7 +1287,7 @@ const emojiCategories = {
 
     try {
       const token = localStorage.getItem('auth_token');
-      const response = await fetch(`${API_CONFIG.BASE_URL}/jobs/${jobId}/apply`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/jobs/${jobId}/apply`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -1335,7 +1323,7 @@ const emojiCategories = {
   const handleViewJob = async (jobId: string) => {
     try {
       const token = localStorage.getItem('auth_token');
-      const response = await fetch(`${API_CONFIG.BASE_URL}/jobs/${jobId}`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/jobs/${jobId}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -1358,7 +1346,7 @@ const emojiCategories = {
   const handleViewApplicants = async (jobId: string) => {
     try {
       const token = localStorage.getItem('auth_token');
-      const response = await fetch(`${API_CONFIG.BASE_URL}/jobs/${jobId}/applicants`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/jobs/${jobId}/applicants`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -1382,7 +1370,7 @@ const emojiCategories = {
   const handleAcceptApplicant = async (jobId: string, applicantId: string) => {
     try {
       const token = localStorage.getItem('auth_token');
-      const response = await fetch(`${API_CONFIG.BASE_URL}/jobs/${jobId}/accept-applicant`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/jobs/${jobId}/accept-applicant`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -1410,7 +1398,7 @@ const emojiCategories = {
   const handleRejectApplicant = async (jobId: string, applicantId: string) => {
     try {
       const token = localStorage.getItem('auth_token');
-      const response = await fetch(`${API_CONFIG.BASE_URL}/jobs/${jobId}/reject-applicant`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/jobs/${jobId}/reject-applicant`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -1438,7 +1426,7 @@ const emojiCategories = {
   const fetchAnnouncementComments = async (announcementId: string) => {
     try {
       const token = localStorage.getItem('auth_token');
-      const response = await fetch(`${API_CONFIG.BASE_URL}/users/announcements/${announcementId}/comments`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/users/announcements/${announcementId}/comments`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -1478,7 +1466,7 @@ const emojiCategories = {
     if (comment.trim()) {
       try {
         const token = localStorage.getItem('auth_token');
-        const response = await fetch(`${API_CONFIG.BASE_URL}/users/announcements/${announcementId}/comment`, {
+        const response = await fetch(`${import.meta.env.VITE_API_URL}/users/announcements/${announcementId}/comment`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -1523,7 +1511,7 @@ const emojiCategories = {
   const handleConnectMember = async (memberId: string) => {
     try {
       const token = localStorage.getItem('auth_token');
-      const response = await fetch(`${API_CONFIG.BASE_URL}/users/connect/${memberId}`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/users/connect/${memberId}`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -1573,7 +1561,7 @@ const emojiCategories = {
 
     try {
       const token = localStorage.getItem('auth_token');
-      const response = await fetch(`${API_CONFIG.BASE_URL}/users/message/${messageRecipient.id}`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/users/message/${messageRecipient.id}`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -1613,7 +1601,7 @@ const emojiCategories = {
         status: projectForm.status
       };
 
-      const response = await fetch(`${API_CONFIG.BASE_URL}/users/projects`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/users/projects`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -1673,7 +1661,7 @@ const emojiCategories = {
         expiresAt: expiresAt.toISOString()
       };
 
-      const response = await fetch(`${API_CONFIG.BASE_URL}/users/teams`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/users/teams`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -1747,7 +1735,7 @@ const emojiCategories = {
       // Set loading state for this specific team
       setJoiningTeamId(teamId);
 
-      const response = await fetch(`${API_CONFIG.BASE_URL}/users/teams/${teamId}/${isMember ? 'leave' : 'join'}`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/users/teams/${teamId}/${isMember ? 'leave' : 'join'}`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -1905,7 +1893,10 @@ const emojiCategories = {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-900 flex items-center justify-center">
-        <div className="text-white text-xl">Loading community data...</div>
+        <div className="text-center">
+          <FaSpinner className="animate-spin text-purple-400 w-8 h-8 mx-auto mb-4" />
+          <p className="text-gray-400">Loading community data...</p>
+        </div>
       </div>
     );
   }
@@ -1917,7 +1908,6 @@ const emojiCategories = {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-4">
-        
               <h1 className="text-xl font-bold text-white">Community Hub</h1>
             </div>
             <button
@@ -2525,8 +2515,12 @@ const emojiCategories = {
                             <p className="text-gray-400 text-sm truncate">{room.description}</p>
                           )}
                           <div className="flex items-center gap-2 mt-1">
+                            <span className="text-xs text-green-400">
+                              {roomOnlineUsers[room._id]?.length || 0} online
+                            </span>
+                            <span className="text-xs text-gray-500">•</span>
                             <span className="text-xs text-gray-500">
-                              {room.members?.length || 0}/{room.maxMembers || 100} members
+                              {room.members?.length || 0}/{room.maxMembers || 100} total
                             </span>
                             <span className="text-xs text-gray-500">•</span>
                             <span className="text-xs text-gray-500 capitalize">{room.type}</span>
@@ -2552,6 +2546,9 @@ const emojiCategories = {
                       <h2 className="text-xl font-bold text-white flex items-center gap-3">
                         <FaComments className="w-5 h-5 text-purple-400" />
                         {selectedChatRoom?.name || 'Chat Room'}
+                        <span className="text-sm text-gray-400">
+                          {roomOnlineUsers[selectedChatRoom?._id || '']?.length || 0} online
+                        </span>
                       </h2>
                       <div className="flex items-center gap-3">
                         <div className="relative">
@@ -2580,16 +2577,13 @@ const emojiCategories = {
                   </div>
 
                   {/* Messages */}
-                  <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                  <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-4 space-y-4">
                     {filteredMessages.map((message, index) => {
-                      const isCurrentUser = message.senderId?._id === currentUserId || message.senderId === currentUserId;
-                      const showDate = index === 0 || new Date(message.createdAt).toDateString() !== new Date(filteredMessages[index - 1]?.createdAt).toDateString();
-                      
-                      // Generate a unique key for each message
-                      const messageKey = message._id || `message-${index}-${message.messageId || Date.now()}`;
+                      const isCurrentUser = message.senderId?._id === currentUserId;
+                      const showDate = index === 0 || new Date(message.createdAt).toDateString() !== new Date(messages[index - 1]?.createdAt).toDateString();
                       
                       return (
-                        <div key={messageKey}>
+                        <div key={message._id}>
                           {showDate && (
                             <div className="text-center text-gray-500 text-xs my-4">
                               {new Date(message.createdAt).toLocaleDateString('en-US', {

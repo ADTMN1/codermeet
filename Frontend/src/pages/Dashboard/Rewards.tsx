@@ -25,7 +25,8 @@ import {
   FaCalendarAlt,
   FaGem,
   FaCrown,
-  FaArrowRight
+  FaArrowRight,
+  FaSpinner
 } from 'react-icons/fa';
 
 interface PointActivity {
@@ -257,7 +258,10 @@ const Rewards: React.FC = () => {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-900">
-        <LoadingSpinner size="lg" text="Loading rewards information..." />
+        <div className="text-center">
+          <FaSpinner className="animate-spin text-purple-400 w-8 h-8 mx-auto mb-4" />
+          <p className="text-gray-400">Loading rewards information...</p>
+        </div>
       </div>
     );
   }

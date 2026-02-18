@@ -1,39 +1,23 @@
 import React, { useEffect, useState } from 'react';
 
 import {
-
   FaTrophy,
-
   FaUsers,
-
   FaCode,
-
   FaLaptopCode,
-
   FaBell,
-
   FaMoneyBillWave,
-
   FaUser,
-
   FaStar,
-
   FaChartLine,
-
   FaMedal,
-
   FaAward,
-
   FaCheckCircle,
-
   FaLightbulb,
-
   FaCrown,
-
   FaBook,
-
-  FaBookOpen
-
+  FaBookOpen,
+  FaSpinner
 } from 'react-icons/fa';
 
 
@@ -519,7 +503,10 @@ const Dashboard: React.FC = () => {
 
       <div className="flex items-center justify-center min-h-screen bg-gray-900">
 
-        <LoadingSpinner size="lg" text="Loading dashboard..." />
+        <div className="text-center">
+          <FaSpinner className="animate-spin text-purple-400 w-8 h-8 mx-auto mb-4" />
+          <p className="text-gray-400">Loading dashboard...</p>
+        </div>
 
       </div>
 

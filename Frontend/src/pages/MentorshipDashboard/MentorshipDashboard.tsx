@@ -140,40 +140,6 @@ interface MentorshipStats {
   };
 }
 
-interface SessionRecording {
-  _id: string;
-  title: string;
-  description: string;
-  mentor: {
-    _id: string;
-    name: string;
-    username: string;
-    email: string;
-    avatar?: string;
-  };
-  mentee: {
-    _id: string;
-    name: string;
-    username: string;
-    email: string;
-    avatar?: string;
-  };
-  recordingUrl: string;
-  scheduledTime: string;
-  duration: number;
-  sessionType: string;
-  rating?: {
-    menteeRating?: number;
-    menteeFeedback?: string;
-    mentorRating?: number;
-    mentorFeedback?: string;
-  };
-  createdAt: string;
-  updatedAt: string;
-  attendees: number;
-  thumbnailUrl: string;
-}
-
 const MentorshipDashboard: React.FC = () => {
   const navigate = useNavigate();
   const [selectedMentor, setSelectedMentor] = useState<Mentor | null>(null);
@@ -183,7 +149,6 @@ const MentorshipDashboard: React.FC = () => {
   const [upcomingSession, setUpcomingSession] = useState<MentorshipSession | null>(null);
   const [userSessions, setUserSessions] = useState<MentorshipSession[]>([]);
   const [availableMentors, setAvailableMentors] = useState<Mentor[]>([]);
-  const [sessionRecordings, setSessionRecordings] = useState<SessionRecording[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeView, setActiveView] = useState<'overview' | 'discover' | 'records'>('overview');
   const [searchTerm, setSearchTerm] = useState('');
@@ -342,9 +307,8 @@ const MentorshipDashboard: React.FC = () => {
       // Initialize with empty arrays to prevent filter errors
       setUserSessions([]);
       setAvailableMentors([]);
-      setSessionRecordings([]);
       
-      const [upcomingRes, sessionsRes, mentorsRes, recordingsRes] = await Promise.all([
+      const [upcomingRes, sessionsRes, mentorsRes] = await Promise.all([
         axios.get(`${API_BASE_URL}/mentorship/upcoming`, {
           headers: { 'Authorization': `Bearer ${token}` }
         }).catch(err => {
@@ -362,12 +326,6 @@ const MentorshipDashboard: React.FC = () => {
         }).catch(err => {
           console.error('Error fetching available mentors:', err);
           return { data: { success: false, data: { mentors: [] } } };
-        }),
-        axios.get(`${API_BASE_URL}/mentorship/recordings`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        }).catch(err => {
-          console.error('Error fetching session recordings:', err);
-          return { data: { success: false, data: { recordings: [] } } };
         })
       ]);
 
@@ -484,24 +442,11 @@ const MentorshipDashboard: React.FC = () => {
           }
         ]);
       }
-
-      if (recordingsRes.data.success) {
-        const recordingsData = recordingsRes.data.data;
-        if (recordingsData && recordingsData.recordings && Array.isArray(recordingsData.recordings)) {
-          setSessionRecordings(recordingsData.recordings);
-        } else {
-          setSessionRecordings([]);
-        }
-      } else {
-        // Set empty recordings array if API fails
-        setSessionRecordings([]);
-      }
     } catch (error) {
       console.error('Error fetching mentorship data:', error);
       // Set fallback data
       setUserSessions([]);
       setAvailableMentors([]);
-      setSessionRecordings([]);
       setUpcomingSession(null);
     } finally {
       setIsLoading(false);
@@ -571,34 +516,6 @@ const MentorshipDashboard: React.FC = () => {
     
     // Show success message
     alert(`Joining "${sessionTitle}" session with ${mentorName}\n\nMeeting room: ${roomName}\n\nThe meeting will open in a new window.`);
-  };
-
-  const handleWatchRecording = (recordingUrl: string, title: string) => {
-    if (recordingUrl && recordingUrl !== '#') {
-      window.open(recordingUrl, '_blank', 'width=1200,height=800,scrollbars=yes,resizable=yes');
-    } else {
-      alert(`Recording for "${title}" is not available yet. Please check back later.`);
-    }
-  };
-
-  const formatTimeAgo = (dateString: string) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffInMs = now.getTime() - date.getTime();
-    const diffInHours = Math.floor(diffInMs / (1000 * 60 * 60));
-    const diffInDays = Math.floor(diffInHours / 24);
-
-    if (diffInHours < 1) {
-      return 'Just now';
-    } else if (diffInHours < 24) {
-      return `${diffInHours} hour${diffInHours > 1 ? 's' : ''} ago`;
-    } else if (diffInDays === 1) {
-      return 'Yesterday';
-    } else if (diffInDays < 7) {
-      return `${diffInDays} days ago`;
-    } else {
-      return date.toLocaleDateString();
-    }
   };
 
   if (isLoading) {
@@ -775,8 +692,8 @@ const MentorshipDashboard: React.FC = () => {
             {/* Records Section */}
             <div className="bg-gray-800/80 backdrop-blur-xl rounded-2xl border border-purple-500/20 p-6">
               <div className="flex items-center gap-3 mb-6">
-                <div className="w-9 h-9 bg-gradient-to-r from-orange-500 to-red-500 rounded-xl flex items-center justify-center">
-                  <FaVideo className="w-3 h-3 text-white" />
+                <div className="w-12 h-12 bg-gradient-to-r from-orange-500 to-red-500 rounded-xl flex items-center justify-center">
+                  <FaVideo className="w-6 h-6 text-white" />
                 </div>
                 <div>
                   <h2 className="text-2xl font-bold text-white">Session Records</h2>
@@ -784,70 +701,136 @@ const MentorshipDashboard: React.FC = () => {
                 </div>
               </div>
 
-              {sessionRecordings.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {sessionRecordings.map((recording) => (
-                    <div key={recording._id} className="relative bg-gray-800/80 backdrop-blur-xl rounded-xl border border-orange-500/30 overflow-hidden group">
-                      <div className="h-32 bg-gradient-to-r from-purple-600 to-blue-600 relative">
-                        <div className="absolute inset-0 bg-black/30"></div>
-                        <div className="absolute inset-0 flex items-center justify-center">
-                          <FaVideo className="w-12 h-12 text-white/50" />
-                        </div>
-                        <div className="absolute top-2 right-2 bg-red-500 text-white px-2 py-1 rounded text-xs font-bold">
-                          RECORDED
-                        </div>
-                      </div>
-                      
-                      <div className="p-4">
-                        <h3 className="font-bold text-white text-base mb-2">{recording.title}</h3>
-                        <div className="flex items-center gap-2 mb-3">
-                          <img
-                            src={recording.mentor.avatar || recording.thumbnailUrl}
-                            alt={recording.mentor.name}
-                            className="w-8 h-8 rounded-full border-2 border-orange-500/50"
-                          />
-                          <div>
-                            <p className="text-white font-medium text-sm">{recording.mentor.name}</p>
-                            <p className="text-gray-400 text-xs">@{recording.mentor.username}</p>
-                          </div>
-                        </div>
-                        
-                        <div className="flex items-center gap-3 text-xs text-gray-400 mb-3">
-                          <div className="flex items-center gap-1">
-                            <FaUsers className="text-orange-400" />
-                            <span>{recording.attendees} attended</span>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <FaClock className="text-orange-400" />
-                            <span>{formatTimeAgo(recording.updatedAt)}</span>
-                          </div>
-                        </div>
-                        
-                        <button 
-                          onClick={() => handleWatchRecording(recording.recordingUrl, recording.title)}
-                          className="w-full bg-gradient-to-r from-orange-500 to-red-500 text-white py-2 rounded-lg font-semibold hover:from-orange-600 hover:to-red-600 transition-all duration-300 transform hover:scale-105 text-sm"
-                        >
-                          Watch Recording
-                        </button>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {/* Record Card 1 */}
+                <div className="relative bg-gray-800/80 backdrop-blur-xl rounded-xl border border-orange-500/30 overflow-hidden group">
+                  <div className="h-32 bg-gradient-to-r from-purple-600 to-blue-600 relative">
+                    <div className="absolute inset-0 bg-black/30"></div>
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <FaVideo className="w-12 h-12 text-white/50" />
+                    </div>
+                    <div className="absolute top-2 right-2 bg-red-500 text-white px-2 py-1 rounded text-xs font-bold">
+                      RECORDED
+                    </div>
+                  </div>
+                  
+                  <div className="p-4">
+                    <h3 className="font-bold text-white text-base mb-2">Advanced React Patterns</h3>
+                    <div className="flex items-center gap-2 mb-3">
+                      <img
+                        src="https://api.dicebear.com/7.x/avataaars/svg?seed=reactmaster"
+                        alt="React Master"
+                        className="w-8 h-8 rounded-full border-2 border-orange-500/50"
+                      />
+                      <div>
+                        <p className="text-white font-medium text-sm">React Master</p>
+                        <p className="text-gray-400 text-xs">@reactmaster</p>
                       </div>
                     </div>
-                  ))}
+                    
+                    <div className="flex items-center gap-3 text-xs text-gray-400 mb-3">
+                      <div className="flex items-center gap-1">
+                        <FaUsers className="text-orange-400" />
+                        <span>524 attended</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <FaClock className="text-orange-400" />
+                        <span>2 hours ago</span>
+                      </div>
+                    </div>
+                    
+                    <button className="w-full bg-gradient-to-r from-orange-500 to-red-500 text-white py-2 rounded-lg font-semibold hover:from-orange-600 hover:to-red-600 transition-all duration-300 transform hover:scale-105 text-sm">
+                      Watch Recording
+                    </button>
+                  </div>
                 </div>
-              ) : (
-                <div className="text-center py-12">
-                  <FaVideo className="w-16 h-16 text-gray-600 mx-auto mb-4" />
-                  <h3 className="text-xl font-semibold text-gray-400 mb-2">No Session Records</h3>
-                  <p className="text-gray-500 text-sm">
-                    You don't have any recorded mentorship sessions yet. Complete a session to see its recording here.
-                  </p>
-                  <button 
-                    onClick={() => setActiveView('discover')}
-                    className="mt-6 bg-gradient-to-r from-purple-500 to-blue-500 text-white px-6 py-3 rounded-lg font-semibold hover:from-purple-600 hover:to-blue-600 transition-all duration-300 transform hover:scale-105"
-                  >
-                    Find Mentors
-                  </button>
+
+                {/* Record Card 2 */}
+                <div className="relative bg-gray-800/80 backdrop-blur-xl rounded-xl border border-orange-500/30 overflow-hidden group">
+                  <div className="h-32 bg-gradient-to-r from-green-600 to-teal-600 relative">
+                    <div className="absolute inset-0 bg-black/30"></div>
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <FaVideo className="w-12 h-12 text-white/50" />
+                    </div>
+                    <div className="absolute top-2 right-2 bg-red-500 text-white px-2 py-1 rounded text-xs font-bold">
+                      RECORDED
+                    </div>
+                  </div>
+                  
+                  <div className="p-4">
+                    <h3 className="font-bold text-white text-base mb-2">Node.js Best Practices</h3>
+                    <div className="flex items-center gap-2 mb-3">
+                      <img
+                        src="https://api.dicebear.com/7.x/avataaars/svg?seed=nodeguru"
+                        alt="Node Guru"
+                        className="w-8 h-8 rounded-full border-2 border-orange-500/50"
+                      />
+                      <div>
+                        <p className="text-white font-medium text-sm">Node Guru</p>
+                        <p className="text-gray-400 text-xs">@nodeguru</p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-3 text-xs text-gray-400 mb-3">
+                      <div className="flex items-center gap-1">
+                        <FaUsers className="text-orange-400" />
+                        <span>342 attended</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <FaClock className="text-orange-400" />
+                        <span>1 day ago</span>
+                      </div>
+                    </div>
+                    
+                    <button className="w-full bg-gradient-to-r from-orange-500 to-red-500 text-white py-2 rounded-lg font-semibold hover:from-orange-600 hover:to-red-600 transition-all duration-300 transform hover:scale-105 text-sm">
+                      Watch Recording
+                    </button>
+                  </div>
                 </div>
-              )}
+
+                {/* Record Card 3 */}
+                <div className="relative bg-gray-800/80 backdrop-blur-xl rounded-xl border border-orange-500/30 overflow-hidden group">
+                  <div className="h-32 bg-gradient-to-r from-orange-600 to-red-600 relative">
+                    <div className="absolute inset-0 bg-black/30"></div>
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <FaVideo className="w-12 h-12 text-white/50" />
+                    </div>
+                    <div className="absolute top-2 right-2 bg-red-500 text-white px-2 py-1 rounded text-xs font-bold">
+                      RECORDED
+                    </div>
+                  </div>
+                  
+                  <div className="p-4">
+                    <h3 className="font-bold text-white text-base mb-2">TypeScript Advanced Tips</h3>
+                    <div className="flex items-center gap-2 mb-3">
+                      <img
+                        src="https://api.dicebear.com/7.x/avataaars/svg?seed=tsexpert"
+                        alt="TS Expert"
+                        className="w-8 h-8 rounded-full border-2 border-orange-500/50"
+                      />
+                      <div>
+                        <p className="text-white font-medium text-sm">TS Expert</p>
+                        <p className="text-gray-400 text-xs">@tsexpert</p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-3 text-xs text-gray-400 mb-3">
+                      <div className="flex items-center gap-1">
+                        <FaUsers className="text-orange-400" />
+                        <span>892 attended</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <FaClock className="text-orange-400" />
+                        <span>3 days ago</span>
+                      </div>
+                    </div>
+                    
+                    <button className="w-full bg-gradient-to-r from-orange-500 to-red-500 text-white py-2 rounded-lg font-semibold hover:from-orange-600 hover:to-red-600 transition-all duration-300 transform hover:scale-105 text-sm">
+                      Watch Recording
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         )}
