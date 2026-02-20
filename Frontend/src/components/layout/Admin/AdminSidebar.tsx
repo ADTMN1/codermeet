@@ -1,27 +1,72 @@
-import React, { useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import React, { useState, useEffect } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { 
-  LayoutDashboard,
-  Users,
-  Trophy,
-  FileText,
-  Server,
-  Calendar,
-  Award,
-  BarChart3,
+  LayoutDashboard, 
+  Users, 
+  Trophy, 
+  Target, 
   Settings,
   Menu,
   X,
   Home,
   Shield,
-  Lightbulb
+  Lightbulb,
+  FileText,
+  Server,
+  Calendar,
+  Award,
+  BarChart3
 } from 'lucide-react';
+import { adminService } from '../../../services/adminService';
 
 const AdminSidebar: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [adminProfile, setAdminProfile] = useState({
+    fullName: 'Admin User',
+    email: 'admin@codermeet.com',
+    role: 'admin'
+  });
+  const [loading, setLoading] = useState(true);
+
+  // Load admin profile on mount
+  useEffect(() => {
+    const loadAdminProfile = async () => {
+      // First try to get cached data from localStorage
+      const cachedUser = localStorage.getItem('user_data');
+      if (cachedUser) {
+        try {
+          const userData = JSON.parse(cachedUser);
+          setAdminProfile({
+            fullName: userData.fullName || 'Admin User',
+            email: userData.email || 'admin@codermeet.com',
+            role: userData.role || 'admin'
+          });
+          setLoading(false); // Hide loading immediately with cached data
+        } catch (e) {
+          console.error('Failed to parse cached user data:', e);
+        }
+      }
+
+      // Then fetch fresh data from API
+      try {
+        const profile = await adminService.getProfile();
+        setAdminProfile({
+          fullName: profile.fullName || 'Admin User',
+          email: profile.email || 'admin@codermeet.com',
+          role: profile.role || 'admin'
+        });
+      } catch (error) {
+        console.error('Failed to load admin profile:', error);
+        // Keep cached/default values on error
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadAdminProfile();
+  }, []);
 
   // Simple logout function
   const handleLogout = () => {
@@ -112,24 +157,37 @@ const AdminSidebar: React.FC = () => {
       sidebarCollapsed ? 'w-20' : 'w-80'
     } min-h-screen sticky top-0`}>
       {/* Profile Section */}
-      <div className="p-6 border-b border-red-900/20 bg-gradient-to-r from-red-900/10 to-black">
+      <div className="p-0.5 border-b border-red-900/20 bg-gradient-to-r from-red-900/10 to-black">
+      
         <div className="flex items-center justify-between">
           {!sidebarCollapsed && (
             <div className="flex items-center gap-3 flex-1">
-              <div className="w-12 h-12 bg-gradient-to-r from-red-500 to-red-700 rounded-xl flex items-center justify-center shadow-lg shadow-red-500/25">
-                <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                </svg>
+              
+              <div className="w-12 h-12 bg-gradient-to-r from-red-500 to-red-700 rounded-xl flex items-center justify-center shadow-lg shadow-red-500/25 ml-9">
+                <span className="text-white font-bold text-lg">
+                  {adminProfile.fullName.charAt(0).toUpperCase()}
+                </span>
               </div>
               <div className="flex-1 text-center">
-                <h1 className="text-lg font-bold text-white">Admin User</h1>
-                <p className="text-xs text-red-400">admin@codermeet.com</p>
+                {/* <h1 className="text-lg font-bold text-white capitalize">
+                  {loading ? 'Loading...' : adminProfile.fullName}
+                </h1> */}
+                
+                <div className="flex items-center justify-center gap-1 mt-1">
+                  <Shield className="w-3 h-3 text-red-400" />
+                  <span className="text-xs text-red-400 capitalize">
+                    {adminProfile.role.replace('_', ' ')}
+                  </span>
+                </div>
+                <p className="text-xs text-red-400">
+                  {adminProfile.email}
+                </p>
               </div>
             </div>
           )}
           <button
             onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-            className="p-2.5 rounded-lg hover:bg-red-900/20 text-red-400 hover:text-red-300 transition-all duration-200 hover:scale-105"
+            className="p-5.5 rounded-lg hover:bg-red-900/20 text-red-400 hover:text-red-300 transition-all duration-200 hover:scale-105"
           >
             {sidebarCollapsed ? <Menu className="w-5 h-5" /> : <X className="w-5 h-5" />}
           </button>

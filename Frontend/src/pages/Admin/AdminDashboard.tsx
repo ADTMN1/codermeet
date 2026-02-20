@@ -198,17 +198,17 @@ const AdminDashboard: React.FC = () => {
       });
       
       // Calculate total challenges (main + daily)
-      const totalChallenges = (challengesData?.data?.challenges?.length || 0) + (dailyChallengesData?.data?.length || 0);
+      const totalChallenges = (challengesData?.data?.length || 0) + (dailyChallengesData?.data?.length || 0);
       
       setUsers(usersData || []);
       setStats(statsData || null);
-      setChallenges(challengesData?.data?.challenges || []);
+      setChallenges(challengesData?.data || []);
       setChallengeStats(challengeStatsData?.data || null);
       setLastRefresh(new Date());
       
       console.log('🔍 Debug - Set states:', {
         totalChallenges,
-        challenges: (challengesData?.data?.challenges?.length || 0),
+        challenges: (challengesData?.data?.length || 0),
         dailyChallenges: (dailyChallengesData?.data?.length || 0),
         challengeStats: challengeStatsData?.data ? 'exists' : 'null'
       });

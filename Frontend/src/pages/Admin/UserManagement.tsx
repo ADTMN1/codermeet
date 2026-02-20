@@ -58,22 +58,41 @@ const UserManagement: React.FC = () => {
       ));
       toast.success(`User role updated to ${newRole}`);
     } catch (error: any) {
-      toast.error('Failed to update user role');
+      console.error('Role update error:', error);
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to update user role';
+      toast.error(errorMessage);
     }
   };
 
+  const [deleteDialog, setDeleteDialog] = useState<{
+    isOpen: boolean;
+    userName?: string;
+    userId?: string;
+    isDeleting?: boolean;
+  } | null>(null);
+
   const handleDeleteUser = async (userId: string, userName: string) => {
-    if (!confirm(`Are you sure you want to delete user "${userName}"? This action cannot be undone.`)) {
-      return;
-    }
+    setDeleteDialog({
+      isOpen: true,
+      userName,
+      userId
+    });
+  };
+
+  const confirmDeleteUser = async () => {
+    if (!deleteDialog?.userId) return;
+
+    setDeleteDialog(prev => prev ? { ...prev, isDeleting: true } : null);
 
     try {
-      await adminService.deleteUser(userId);
-      setUsers(users.filter(user => user._id !== userId));
+      await adminService.deleteUser(deleteDialog.userId);
+      setUsers(users.filter(user => user._id !== deleteDialog.userId));
       toast.success('User deleted successfully');
       fetchUserData(); // Refresh stats
+      setDeleteDialog(null);
     } catch (error) {
       toast.error('Failed to delete user');
+      setDeleteDialog(prev => prev ? { ...prev, isDeleting: false } : null);
     }
   };
 
@@ -205,8 +224,12 @@ const UserManagement: React.FC = () => {
             className="px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-red-500 transition-colors"
           >
             <option value="all">All Roles</option>
-            <option value="user">Users</option>
+            <option value="trial">Trial Users</option>
+            <option value="basic">Basic Users</option>
+            <option value="professional">Professionals</option>
+            <option value="moderator">Moderators</option>
             <option value="admin">Admins</option>
+            <option value="super_admin">Super Admins</option>
           </select>
 
           <select
@@ -277,14 +300,22 @@ const UserManagement: React.FC = () => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
-                      user.role === 'admin' 
+                      user.role === 'admin' || user.role === 'super_admin'
                         ? 'bg-red-100 text-red-800 border border-red-200' 
+                        : user.role === 'moderator'
+                        ? 'bg-orange-100 text-orange-800 border border-orange-200'
+                        : user.role === 'professional'
+                        ? 'bg-purple-100 text-purple-800 border border-purple-200'
                         : 'bg-gray-100 text-gray-800 border border-gray-200'
                     }`}>
-                      {user.role === 'admin' ? (
-                        <><Shield className="h-3 w-3 mr-1" /> Admin</>
+                      {user.role === 'admin' || user.role === 'super_admin' ? (
+                        <><Shield className="h-3 w-3 mr-1" /> {user.role === 'super_admin' ? 'Super Admin' : 'Admin'}</>
+                      ) : user.role === 'moderator' ? (
+                        <><Shield className="h-3 w-3 mr-1" /> Moderator</>
+                      ) : user.role === 'professional' ? (
+                        <><UserIcon className="h-3 w-3 mr-1" /> Professional</>
                       ) : (
-                        <><UserIcon className="h-3 w-3 mr-1" /> User</>
+                        <><UserIcon className="h-3 w-3 mr-1" /> {user.role === 'basic' ? 'Basic' : 'Trial'}</>
                       )}
                     </span>
                   </td>
@@ -321,8 +352,10 @@ const UserManagement: React.FC = () => {
                         onChange={(e) => handleRoleChange(user._id, e.target.value)}
                         className="text-xs px-3 py-1.5 bg-gray-800 border border-gray-700 rounded text-white focus:outline-none focus:border-red-500 transition-colors"
                       >
-                        <option value="user">User</option>
+                        <option value="basic">Basic User</option>
+                        <option value="trial">Trial User</option>
                         <option value="admin">Admin</option>
+                         <option value="professional">Professional</option>
                       </select>
                       <button
                         onClick={() => handleDeleteUser(user._id, user.fullName)}
@@ -347,6 +380,59 @@ const UserManagement: React.FC = () => {
           )}
         </div>
       </Card>
+
+      {/* Professional Delete Confirmation Dialog */}
+      {deleteDialog && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-gray-900 border border-gray-700 rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
+            <div className="flex items-center mb-4">
+              <div className="w-12 h-12 bg-red-900/20 rounded-full flex items-center justify-center mr-4">
+                <Trash2 className="h-6 w-6 text-red-400" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-white">Confirm User Deletion</h3>
+                <p className="text-sm text-gray-400">This action is permanent and cannot be undone</p>
+              </div>
+            </div>
+            
+            <div className="mb-6">
+              <p className="text-gray-300">
+                Are you sure you want to delete user <span className="font-semibold text-white">"{deleteDialog.userName}"</span>?
+              </p>
+              <p className="text-sm text-gray-500 mt-2">
+                This will permanently remove their account and all associated data.
+              </p>
+            </div>
+
+            <div className="flex justify-end space-x-3">
+              <button
+                onClick={() => setDeleteDialog(null)}
+                disabled={deleteDialog.isDeleting}
+                className="px-4 py-2 text-gray-300 bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDeleteUser}
+                disabled={deleteDialog.isDeleting}
+                className="px-4 py-2 text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors font-medium flex items-center disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+              >
+                {deleteDialog.isDeleting ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    Deleting...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Delete User
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

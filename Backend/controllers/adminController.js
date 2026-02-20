@@ -412,10 +412,10 @@ exports.updateUserRole = async (req, res) => {
     const { userId } = req.params;
     const { role } = req.body;
 
-    if (!["user", "admin"].includes(role)) {
+    if (!["basic", "trial", "admin", "moderator", "professional", "super_admin"].includes(role)) {
       return res.status(400).json({ 
         success: false, 
-        message: "Invalid role. Must be 'user' or 'admin'" 
+        message: "Invalid role. Must be one of: 'basic', 'trial', 'admin', 'moderator', 'professional', 'super_admin'" 
       });
     }
 
