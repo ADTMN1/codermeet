@@ -73,8 +73,9 @@ export function UploadSection({ registrationMode, challengeId }: UploadSectionPr
     try {
       const submissionData: SubmissionData = {
         githubUrl: githubUrl,
+        liveUrl: '', // Optional field for weekly challenges
         description: `Project submitted by ${registrationMode === 'solo' ? 'individual' : 'team'} participant`,
-        files: fileName ? [{
+        screenshots: fileName ? [{
           filename: fileName,
           url: '', // Will be populated when file upload is implemented
           size: 0

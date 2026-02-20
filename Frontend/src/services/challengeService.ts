@@ -1,7 +1,6 @@
 import axios from 'axios';
 import { authService } from './auth';
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+import { API_URL } from '../config/api';
 
 const getAuthHeaders = () => {
   const token = authService.getToken();
@@ -100,7 +99,12 @@ export interface Challenge {
 }
 
 export interface ChallengeStats {
-  overview: {
+  totalGenerated: number;
+  successRate: number;
+  avgGenerationTime: number;
+  mostUsedCategory: string;
+  mostUsedDifficulty: string;
+  overview?: {
     totalChallenges: number;
     draftChallenges: number;
     publishedChallenges: number;
@@ -110,26 +114,26 @@ export interface ChallengeStats {
     totalSubmissions: number;
     featuredChallenges: number;
   };
-  byCategory: Array<{
+  byCategory?: Array<{
     _id: string;
     count: number;
     avgParticipants: number;
     avgSubmissions: number;
   }>;
-  byDifficulty: Array<{
+  byDifficulty?: Array<{
     _id: string;
     count: number;
     avgParticipants: number;
     avgSubmissions: number;
   }>;
-  recentActivity: Challenge[];
+  recentActivity?: Challenge[];
 }
 
 export const challengeService = {
   // Create new challenge
   createChallenge: async (challengeData: any): Promise<Challenge> => {
     return retryRequest(async () => {
-      const response = await axios.post(`${API_URL}/api/admin/challenges`, challengeData, {
+      const response = await axios.post(`${API_URL}/admin/challenges`, challengeData, {
         headers: getAuthHeaders(),
       });
       return response.data.data;
@@ -144,9 +148,9 @@ export const challengeService = {
     category?: string;
     difficulty?: string;
     search?: string;
-  }): Promise<{ data: Challenge[]; pagination: any }> => {
+  }): Promise<{ success: boolean; data: { challenges: Challenge[]; pagination: any } }> => {
     return retryRequest(async () => {
-      const response = await axios.get(`${API_URL}/api/admin/challenges/admin`, {
+      const response = await axios.get(`${API_URL}/admin/challenges/all`, {
         params,
         headers: getAuthHeaders(),
       });
@@ -154,10 +158,25 @@ export const challengeService = {
     });
   },
 
+  // Get daily challenges (AI generated)
+  getDailyChallenges: async (params?: {
+    page?: number;
+    limit?: number;
+    status?: string;
+  }): Promise<{ data: Challenge[]; pagination: any }> => {
+    return retryRequest(async () => {
+      const response = await axios.get(`${API_URL}/admin/challenges/daily`, {
+        params,
+        headers: getAuthHeaders(),
+      });
+      return response.data.data;
+    });
+  },
+
   // Get challenge by ID
   getChallengeById: async (id: string): Promise<Challenge> => {
     return retryRequest(async () => {
-      const response = await axios.get(`${API_URL}/api/admin/challenges/${id}`, {
+      const response = await axios.get(`${API_URL}/admin/challenges/${id}`, {
         headers: getAuthHeaders(),
       });
       return response.data.data;
@@ -167,7 +186,7 @@ export const challengeService = {
   // Update challenge
   updateChallenge: async (id: string, challengeData: Partial<Challenge>): Promise<Challenge> => {
     return retryRequest(async () => {
-      const response = await axios.put(`${API_URL}/api/admin/challenges/${id}`, challengeData, {
+      const response = await axios.put(`${API_URL}/admin/challenges/${id}`, challengeData, {
         headers: getAuthHeaders(),
       });
       return response.data.data;
@@ -177,7 +196,7 @@ export const challengeService = {
   // Delete challenge
   deleteChallenge: async (id: string): Promise<void> => {
     return retryRequest(async () => {
-      await axios.delete(`${API_URL}/api/admin/challenges/${id}`, {
+      await axios.delete(`${API_URL}/admin/challenges/${id}`, {
         headers: getAuthHeaders(),
       });
     });
@@ -186,7 +205,7 @@ export const challengeService = {
   // Get challenge statistics
   getChallengeStats: async (): Promise<ChallengeStats> => {
     return retryRequest(async () => {
-      const response = await axios.get(`${API_URL}/api/admin/challenges/stats`, {
+      const response = await axios.get(`${API_URL}/admin/challenges/stats`, {
         headers: getAuthHeaders(),
       });
       return response.data.data;
@@ -199,7 +218,7 @@ export const challengeService = {
     page?: number;
     limit?: number;
   }): Promise<{ data: any[]; pagination: any }> => {
-    const response = await axios.get(`${API_URL}/api/admin/challenges/${id}/submissions`, {
+    const response = await axios.get(`${API_URL}/admin/challenges/${id}/submissions`, {
       params,
       headers: getAuthHeaders(),
     });
@@ -213,7 +232,7 @@ export const challengeService = {
     feedback: string;
   }): Promise<any> => {
     const response = await axios.put(
-      `${API_URL}/api/admin/challenges/${challengeId}/submissions/${submissionId}/review`,
+      `${API_URL}/admin/challenges/${challengeId}/submissions/${submissionId}/review`,
       reviewData,
       {
         headers: getAuthHeaders(),
@@ -228,12 +247,109 @@ export const challengeService = {
     userId: string;
   }>): Promise<Challenge> => {
     const response = await axios.post(
-      `${API_URL}/api/admin/challenges/${challengeId}/select-winners`,
+      `${API_URL}/admin/challenges/${challengeId}/select-winners`,
       { winners },
       {
         headers: getAuthHeaders(),
       }
     );
+    return response.data.data;
+  },
+
+  // Weekly Challenges API
+  getAllWeeklyChallenges: async (params?: {
+    page?: number;
+    limit?: number;
+    status?: string;
+    category?: string;
+    difficulty?: string;
+    year?: number;
+    search?: string;
+  }): Promise<{ data: any[]; pagination: any }> => {
+    const response = await axios.get(`${API_URL}/weekly-challenges`, {
+      params,
+      headers: getAuthHeaders(),
+    });
+    return response.data.data;
+  },
+
+  getWeeklyChallengeById: async (id: string): Promise<any> => {
+    const response = await axios.get(`${API_URL}/weekly-challenges/${id}`, {
+      headers: getAuthHeaders(),
+    });
+    return response.data.data;
+  },
+
+  createWeeklyChallenge: async (challengeData: any): Promise<any> => {
+    const response = await axios.post(`${API_URL}/weekly-challenges`, challengeData, {
+      headers: getAuthHeaders(),
+    });
+    return response.data.data;
+  },
+
+  updateWeeklyChallenge: async (id: string, challengeData: any): Promise<any> => {
+    const response = await axios.put(`${API_URL}/weekly-challenges/${id}`, challengeData, {
+      headers: getAuthHeaders(),
+    });
+    return response.data.data;
+  },
+
+  deleteWeeklyChallenge: async (id: string): Promise<void> => {
+    await axios.delete(`${API_URL}/weekly-challenges/${id}`, {
+      headers: getAuthHeaders(),
+    });
+  },
+
+  joinWeeklyChallenge: async (id: string): Promise<any> => {
+    const response = await axios.post(`${API_URL}/weekly-challenges/${id}/join`, {}, {
+      headers: getAuthHeaders(),
+    });
+    return response.data.data;
+  },
+
+  submitWeeklyChallenge: async (id: string, submissionData: {
+    githubUrl: string;
+    liveUrl?: string;
+    description: string;
+    screenshots?: string[];
+  }): Promise<any> => {
+    const response = await axios.post(`${API_URL}/weekly-challenges/${id}/submit`, submissionData, {
+      headers: getAuthHeaders(),
+    });
+    return response.data.data;
+  },
+
+  reviewWeeklySubmission: async (challengeId: string, submissionId: string, reviewData: {
+    status: string;
+    score: number;
+    reviewComments?: string;
+  }): Promise<any> => {
+    const response = await axios.put(
+      `${API_URL}/weekly-challenges/${challengeId}/submissions/${submissionId}/review`,
+      reviewData,
+      {
+        headers: getAuthHeaders(),
+      }
+    );
+    return response.data.data;
+  },
+
+  announceWeeklyWinners: async (challengeId: string, winners: Array<{
+    userId: string;
+    rank: number;
+    score: number;
+    prizeAmount: number;
+  }>): Promise<any> => {
+    const response = await axios.put(`${API_URL}/weekly-challenges/${challengeId}/announce-winners`, { winners }, {
+      headers: getAuthHeaders(),
+    });
+    return response.data.data;
+  },
+
+  getWeeklyChallengeStats: async (): Promise<any> => {
+    const response = await axios.get(`${API_URL}/weekly-challenges/stats`, {
+      headers: getAuthHeaders(),
+    });
     return response.data.data;
   },
 };

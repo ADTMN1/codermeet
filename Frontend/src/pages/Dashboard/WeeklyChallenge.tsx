@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 
 import { ChallengeHeader } from '../../components/challenge-header';
 // import { ChallengeOverviewCard } from './components/challenge-overview-card';
@@ -23,6 +24,8 @@ import { authService } from '../../services/auth';
 
 export default function WeeklyChallenge() {
   const { user } = useUser();
+  const navigate = useNavigate();
+  const { id } = useParams(); // Get challenge ID from URL params
   const [isRegistered, setIsRegistered] = useState(false);
   const [registrationModalOpen, setRegistrationModalOpen] = useState(false);
   const [registrationMode, setRegistrationMode] = useState<'solo' | 'team'>(
@@ -34,95 +37,31 @@ export default function WeeklyChallenge() {
   // Challenge deadline passed (set to false initially, true to show winners)
   const [challengeEnded, setChallengeEnded] = useState(false);
 
-  // Check if user is registered for the current challenge
+  // Check if user is registered for current challenge
   useEffect(() => {
-    const checkRegistration = async () => {
-      if (!user?._id || !challenge?._id) {
-        console.warn('Missing user ID or challenge ID for registration check');
-        return;
-      }
-      
-      try {
-        const token = authService.getToken();
-        if (!token) {
-          console.warn('No authentication token available');
-          return;
-        }
-
-        const response = await fetch(`${import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000'}/api/challenges/${challenge._id}/check-registration`, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          }
-        });
-        
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-        
-        const data = await response.json();
-        if (data.success) {
-          setIsRegistered(data.isRegistered);
-        } else {
-          console.error('Registration check failed:', data.message);
-        }
-      } catch (error) {
-        console.error('❌ Registration check error:', error);
-        // Don't set state on error to avoid UI flicker
-      }
-    };
-
-    checkRegistration();
-  }, [user?._id, challenge?._id]);
+    if (!user?._id || !challenge?._id) {
+      return;
+    }
+    
+    // Check if user is in participants list
+    const isUserRegistered = challenge.participants?.some(
+      (participant: any) => participant.user?._id === user._id || participant.user === user._id
+    );
+    setIsRegistered(isUserRegistered);
+  }, [user?._id, challenge?._id, challenge?.participants]);
 
   // Fetch user's submission
   useEffect(() => {
-    const fetchSubmission = async () => {
-      if (!user?._id || !challenge?._id) {
-        console.warn('Missing user ID or challenge ID for submission fetch');
-        return;
-      }
-      
-      try {
-        const token = authService.getToken();
-        if (!token) {
-          console.warn('No authentication token available for submission fetch');
-          return;
-        }
-        
-        const response = await fetch(`${import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000'}/api/challenges/${challenge._id}/my-submission`, {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
-        
-        if (!response.ok) {
-          if (response.status === 404) {
-            // No submission found - this is expected
-            setSubmission(null);
-            return;
-          }
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-        
-        const data = await response.json();
-        
-        if (data.success) {
-          setSubmission(data.data);
-        } else {
-          console.error('Submission fetch failed:', data.message);
-          setSubmission(null);
-        }
-      } catch (error) {
-        console.error('❌ Submission fetch error:', error);
-        setSubmission(null);
-      }
-    };
-
-    fetchSubmission();
-  }, [user?._id, challenge?._id]);
+    if (!user?._id || !challenge?._id) {
+      return;
+    }
+    
+    // Check if user has submitted in the challenge submissions
+    const userSubmission = challenge.submissions?.find(
+      (submission: any) => submission.user?._id === user._id || submission.user === user._id
+    );
+    setSubmission(userSubmission || null);
+  }, [user?._id, challenge?._id, challenge?.submissions]);
 
   const handleJoinClick = () => {
     setRegistrationModalOpen(true);
@@ -163,6 +102,7 @@ export default function WeeklyChallenge() {
             <ChallengeOverviewCard
               isRegistered={isRegistered}
               onJoinClick={handleJoinClick}
+              challengeId={id} // Pass URL parameter or undefined to fetch first active
               onChallengeLoaded={setChallenge} // Set challenge when loaded
             />
 

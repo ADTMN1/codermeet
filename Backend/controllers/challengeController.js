@@ -75,12 +75,14 @@ exports.getAllChallenges = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      data: challengesData,
-      pagination: {
-        page: pageNum,
-        limit: limitNum,
-        total,
-        pages: Math.ceil(total / limitNum)
+      data: {
+        challenges: challengesData,
+        pagination: {
+          page: pageNum,
+          limit: limitNum,
+          total,
+          pages: Math.ceil(total / limitNum)
+        }
       }
     });
   } catch (error) {
@@ -220,7 +222,10 @@ exports.getChallengeByIdStats = async (req, res) => {
 // Get challenge statistics
 exports.getChallengeStats = async (req, res) => {
   try {
-    const stats = await Challenge.aggregate([
+    const DailyChallenge = require('../models/dailyChallenge');
+    
+    // Get main challenge stats
+    const mainStats = await Challenge.aggregate([
       {
         $group: {
           _id: null,
@@ -238,10 +243,24 @@ exports.getChallengeStats = async (req, res) => {
             $sum: { $cond: [{ $eq: ['$status', 'completed'] }, 1, 0] }
           },
           totalParticipants: { $sum: '$currentParticipants' },
-          totalSubmissions: { $sum: { $size: '$submissions' } },
+          totalSubmissions: { $sum: { $size: { $ifNull: ['$submissions', []] } } },
           featuredChallenges: {
             $sum: { $cond: ['$featured', 1, 0] }
           }
+        }
+      }
+    ]);
+
+    // Get daily challenge stats
+    const dailyStats = await DailyChallenge.aggregate([
+      {
+        $group: {
+          _id: null,
+          totalDailyChallenges: { $sum: 1 },
+          activeDailyChallenges: {
+            $sum: { $cond: ['$isActive', 1, 0] }
+          },
+          totalDailySubmissions: { $sum: { $size: { $ifNull: ['$submissions', []] } } }
         }
       }
     ]);
@@ -278,16 +297,36 @@ exports.getChallengeStats = async (req, res) => {
     .sort({ createdAt: -1 })
     .limit(10);
 
+    // Combine stats
+    const main = mainStats[0] || {};
+    const daily = dailyStats[0] || {};
+    
+    const combinedOverview = {
+      totalChallenges: (main.totalChallenges || 0) + (daily.totalDailyChallenges || 0),
+      draftChallenges: main.draftChallenges || 0,
+      publishedChallenges: main.publishedChallenges || 0,
+      activeChallenges: (main.activeChallenges || 0) + (daily.activeDailyChallenges || 0),
+      completedChallenges: main.completedChallenges || 0,
+      totalParticipants: main.totalParticipants || 0,
+      totalSubmissions: (main.totalSubmissions || 0) + (daily.totalDailySubmissions || 0),
+      featuredChallenges: main.featuredChallenges || 0,
+      // Add breakdown for clarity
+      mainChallenges: main.totalChallenges || 0,
+      dailyChallenges: daily.totalDailyChallenges || 0
+    };
+
     res.status(200).json({
       success: true,
       data: {
-        overview: stats[0] || {},
+        overview: combinedOverview,
         byCategory: categoryStats,
         byDifficulty: difficultyStats,
-        recentActivity
+        recentActivity,
+        totalGenerated: combinedOverview.totalChallenges // For frontend compatibility
       }
     });
   } catch (error) {
+    console.error('Error fetching challenge stats:', error);
     res.status(500).json({
       success: false,
       message: 'Error fetching challenge stats',

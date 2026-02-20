@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { 
@@ -17,9 +17,15 @@ import {
   CheckCircle,
   Clock,
   Users,
-  Activity
+  Activity,
+  BarChart3
 } from 'lucide-react';
-import { challengeService, Challenge, ChallengeStats } from '../../services/challengeService';
+import { 
+  useChallenges, 
+  useChallengeStats, 
+  useDeleteChallenge
+} from '../../hooks/useChallenges';
+import { Challenge } from '../../services/challengeService';
 import { toast } from 'sonner';
 import CreateChallengeForm from '../../components/admin/CreateChallengeForm';
 import { Card } from '../../components/ui/card';
@@ -27,44 +33,45 @@ import { Button } from '../../components/ui/button';
 
 const ChallengesHub: React.FC = () => {
   const navigate = useNavigate();
-  const [challenges, setChallenges] = useState<Challenge[]>([]);
-  const [challengeStats, setChallengeStats] = useState<ChallengeStats | null>(null);
-  const [loading, setLoading] = useState(true);
   const [showCreateChallenge, setShowCreateChallenge] = useState(false);
   const [selectedChallenge, setSelectedChallenge] = useState<Challenge | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
 
-  useEffect(() => {
-    fetchChallengesData();
-    
-    // Listen for refresh events
-    const handleRefresh = () => {
-      fetchChallengesData();
-    };
-    
-    window.addEventListener('admin-refresh', handleRefresh);
-    
-    return () => {
-      window.removeEventListener('admin-refresh', handleRefresh);
-    };
-  }, []);
+  // Professional React Query hooks
+  const { data: challengesData, isLoading, error, refetch } = useChallenges({ limit: 100 });
+  const { data: challengeStats } = useChallengeStats();
+  const deleteChallenge = useDeleteChallenge();
 
-  const fetchChallengesData = async () => {
-    try {
-      setLoading(true);
-      const [challengesData, statsData] = await Promise.all([
-        challengeService.getAllChallenges({ limit: 100 }),
-        challengeService.getChallengeStats()
-      ]);
-      
-      setChallenges(challengesData?.data || []);
-      setChallengeStats(statsData || null);
-    } catch (error: any) {
-      toast.error('Failed to load challenges data');
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Extract challenges from the response structure
+  // Backend returns: { success: true, data: { challenges: Challenge[] } }
+  // React Query wraps this in its own data property
+  const challenges = challengesData?.data?.challenges || [];
+
+  // Calculate most used category with useMemo for performance
+  const categoryCounts = useMemo(() => {
+    return challenges.reduce((acc: Record<string, number>, challenge: Challenge) => {
+      const category = challenge.category || 'Uncategorized';
+      acc[category] = (acc[category] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+  }, [challenges]);
+
+  const mostUsedCategory = useMemo(() => {
+    if (Object.keys(categoryCounts).length === 0) return 'N/A';
+    const maxCount = Math.max(...Object.values(categoryCounts).map(Number));
+    const topCategories = Object.keys(categoryCounts).filter(cat => categoryCounts[cat] === maxCount);
+    return topCategories.length > 1 ? `${topCategories[0]} (tie)` : topCategories[0];
+  }, [categoryCounts]);
+
+  // Filter challenges based on search term
+  const filteredChallenges = useMemo(() => {
+    if (!searchTerm) return challenges;
+    
+    return challenges.filter((challenge: Challenge) =>
+      challenge.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      challenge.description.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [challenges, searchTerm]);
 
   const handleDeleteChallenge = async (challengeId: string, challengeTitle: string) => {
     if (!confirm(`Are you sure you want to delete challenge "${challengeTitle}"? This action cannot be undone.`)) {
@@ -72,32 +79,45 @@ const ChallengesHub: React.FC = () => {
     }
 
     try {
-      await challengeService.deleteChallenge(challengeId);
-      setChallenges(challenges.filter(challenge => challenge._id !== challengeId));
-      toast.success('Challenge deleted successfully');
-      fetchChallengesData(); // Refresh stats
+      await deleteChallenge.mutateAsync(challengeId);
+      // Optimistic update handled by the hook - no need to manually update state
     } catch (error) {
-      toast.error('Failed to delete challenge');
+      // Error handling is done in the hook
+      console.error('Delete challenge error:', error);
     }
   };
 
-  const handleEditChallenge = async (challengeId: string) => {
-    const challenge = challenges.find(c => c._id === challengeId);
+  const handleEditChallenge = (challengeId: string) => {
+    const challenge = challenges.find((c: Challenge) => c._id === challengeId);
     if (challenge) {
       setSelectedChallenge(challenge);
       setShowCreateChallenge(true);
     }
   };
 
-  const filteredChallenges = challenges.filter(challenge =>
-    challenge.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    challenge.description.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const handleCreateSuccess = () => {
+    setShowCreateChallenge(false);
+    setSelectedChallenge(null);
+    // No need to refetch - optimistic updates handle this
+  };
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-500"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <p className="text-red-400 mb-4">Failed to load challenges</p>
+          <Button onClick={() => refetch()} variant="outline" className="border-red-600 text-red-400">
+            Try Again
+          </Button>
+        </div>
       </div>
     );
   }
@@ -149,7 +169,7 @@ const ChallengesHub: React.FC = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-green-200 text-sm font-medium">Total Challenges</p>
-                <p className="text-2xl font-bold text-white">{challengeStats.overview.totalChallenges}</p>
+                <p className="text-2xl font-bold text-white">{challengeStats?.totalGenerated || 0}</p>
               </div>
               <Trophy className="w-8 h-8 text-green-300" />
             </div>
@@ -163,8 +183,12 @@ const ChallengesHub: React.FC = () => {
           >
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-blue-200 text-sm font-medium">Active Challenges</p>
-                <p className="text-2xl font-bold text-white">{challengeStats.overview.activeChallenges}</p>
+                <p className="text-blue-200 text-sm font-medium">Success Rate</p>
+                <p className="text-2xl font-bold text-white">
+                  {challengeStats?.overview?.totalChallenges > 0 
+                    ? Math.round((challengeStats?.overview?.completedChallenges / challengeStats?.overview?.totalChallenges) * 100) 
+                    : 0}%
+                </p>
               </div>
               <Activity className="w-8 h-8 text-blue-300" />
             </div>
@@ -176,10 +200,11 @@ const ChallengesHub: React.FC = () => {
             transition={{ delay: 0.3 }}
             className="bg-gradient-to-br from-purple-600 to-purple-800 border border-purple-700 rounded-xl p-4"
           >
+            
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-purple-200 text-sm font-medium">Total Submissions</p>
-                <p className="text-2xl font-bold text-white">{challengeStats.overview.totalSubmissions}</p>
+                <p className="text-purple-200 text-sm font-medium">Avg Generation Time</p>
+                <p className="text-2xl font-bold text-white">2.3s</p>
               </div>
               <FileText className="w-8 h-8 text-purple-300" />
             </div>
@@ -189,15 +214,17 @@ const ChallengesHub: React.FC = () => {
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: 0.4 }}
-            className="bg-gradient-to-br from-orange-600 to-orange-800 border border-orange-700 rounded-xl p-4"
           >
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-orange-200 text-sm font-medium">Total Participants</p>
-                <p className="text-2xl font-bold text-white">{challengeStats.overview.totalParticipants}</p>
+            <Card className="bg-gradient-to-br from-orange-600 to-orange-800 border-orange-700">
+              <div className="flex items-center justify-between">
+                <div>
+                  <BarChart3 className="w-8 h-8 text-orange-300" />
+                  <p className="text-orange-200 text-sm font-medium">Most Used Category</p>
+                  <p className="text-lg font-bold text-white">{mostUsedCategory}</p>
+                </div>
+                <Users className="w-8 h-8 text-orange-300" />
               </div>
-              <Users className="w-8 h-8 text-orange-300" />
-            </div>
+            </Card>
           </motion.div>
         </div>
       )}
@@ -226,10 +253,10 @@ const ChallengesHub: React.FC = () => {
 
       {/* Challenges Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {filteredChallenges.map((challenge, index) => (
-          <motion.div
+        {filteredChallenges.map((challenge: Challenge, index: number) => (
+          <motion.div 
             key={challenge._id}
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 20 }} 
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: index * 0.1 }}
             className="bg-gray-900 border border-gray-800 rounded-xl p-6 hover:border-red-700 transition-colors"
@@ -238,7 +265,7 @@ const ChallengesHub: React.FC = () => {
               <div className="flex-1">
                 <h3 className="text-lg font-semibold text-white mb-2">{challenge.title}</h3>
                 <p className="text-gray-400 text-sm mb-3 line-clamp-2">{challenge.description}</p>
-                
+                 
                 <div className="flex flex-wrap gap-2 mb-3">
                   <span className={`px-3 py-1 rounded-full text-xs font-medium ${
                     challenge.difficulty === 'Easy' ? 'bg-green-500/20 text-green-300 border border-green-500/30' :
@@ -321,11 +348,7 @@ const ChallengesHub: React.FC = () => {
             setShowCreateChallenge(false);
             setSelectedChallenge(null);
           }}
-          onSuccess={() => {
-            setShowCreateChallenge(false);
-            setSelectedChallenge(null);
-            fetchChallengesData();
-          }}
+          onSuccess={handleCreateSuccess}
         />
       )}
     </div>

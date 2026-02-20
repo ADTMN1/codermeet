@@ -364,6 +364,15 @@ exports.getUserStats = async (req, res) => {
       }
     });
 
+    // New users today
+    const startOfDay = new Date();
+    startOfDay.setHours(0, 0, 0, 0);
+    const newUsersToday = await User.countDocuments({
+      createdAt: { 
+        $gte: startOfDay
+      }
+    });
+
     // Calculate growth rates
     const monthlyGrowth = newUsersLastMonth > 0 
       ? ((newUsersThisMonth - newUsersLastMonth) / newUsersLastMonth * 100).toFixed(1)
@@ -386,6 +395,7 @@ exports.getUserStats = async (req, res) => {
         adminUsers,
         newUsersThisMonth,
         newUsersLastMonth,
+        newUsersToday,
         monthlyGrowth,
         recentUsers,
         recentActivity: recentUsers.length,

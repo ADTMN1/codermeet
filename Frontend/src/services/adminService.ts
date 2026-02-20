@@ -1,7 +1,6 @@
 import axios from 'axios';
 import { authService } from './auth';
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+import { API_URL } from '../config/api';
 
 const getAuthHeaders = () => {
   const token = authService.getToken();
@@ -56,6 +55,7 @@ export interface UserStats {
   adminUsers: number;
   newUsersThisMonth: number;
   newUsersLastMonth: number;
+  newUsersToday: number;
   monthlyGrowth: string;
   recentUsers: User[];
   recentActivity: number;
@@ -101,7 +101,7 @@ export const adminService = {
   // Admin profile methods
   getProfile: async () => {
     return retryRequest(async () => {
-      const response = await axios.get(`${API_URL}/api/admin/profile`, {
+      const response = await axios.get(`${API_URL}/admin/profile`, {
         headers: getAuthHeaders(),
       });
       return response.data.data;
@@ -110,7 +110,7 @@ export const adminService = {
 
   updateProfile: async (profileData: any) => {
     return retryRequest(async () => {
-      const response = await axios.put(`${API_URL}/api/admin/profile`, profileData, {
+      const response = await axios.put(`${API_URL}/admin/profile`, profileData, {
         headers: getAuthHeaders(),
       });
       return response.data;
@@ -119,7 +119,7 @@ export const adminService = {
 
   changePassword: async (passwordData: { currentPassword: string; newPassword: string }) => {
     return retryRequest(async () => {
-      const response = await axios.put(`${API_URL}/api/admin/change-password`, passwordData, {
+      const response = await axios.put(`${API_URL}/admin/change-password`, passwordData, {
         headers: getAuthHeaders(),
       });
       return response.data;
@@ -128,7 +128,7 @@ export const adminService = {
 
   toggleTwoFactor: async (enabled: boolean) => {
     return retryRequest(async () => {
-      const response = await axios.post(`${API_URL}/api/admin/toggle-2fa`, { enabled }, {
+      const response = await axios.post(`${API_URL}/admin/toggle-2fa`, { enabled }, {
         headers: getAuthHeaders(),
       });
       return response.data;
@@ -138,7 +138,7 @@ export const adminService = {
   // Get all users
   getAllUsers: async (): Promise<User[]> => {
     return retryRequest(async () => {
-      const response = await axios.get(`${API_URL}/api/admin/users`, {
+      const response = await axios.get(`${API_URL}/admin/users`, {
         headers: getAuthHeaders(),
       });
       return response.data.data || response.data; // Handle both response formats
@@ -147,25 +147,21 @@ export const adminService = {
 
   // Get user statistics
   getUserStats: async (): Promise<UserStats> => {
-    const url = `${API_URL}/api/admin/stats`;
-    
-    try {
-      const response = await axios.get(url, {
+    return retryRequest(async () => {
+      const response = await axios.get(`${API_URL}/admin/users/stats`, {
         headers: getAuthHeaders(),
       });
       
       const result = response.data.data || response.data;
       return result;
-    } catch (error) {
-      throw error;
-    }
+    });
   },
 
   // Update user role
   updateUserRole: async (userId: string, role: string): Promise<User> => {
     return retryRequest(async () => {
       const response = await axios.put(
-        `${API_URL}/api/admin/users/${userId}/role`,
+        `${API_URL}/admin/users/${userId}/role`,
         { role },
         {
           headers: getAuthHeaders(),
@@ -178,7 +174,7 @@ export const adminService = {
   // Delete user
   deleteUser: async (userId: string): Promise<void> => {
     return retryRequest(async () => {
-      await axios.delete(`${API_URL}/api/admin/users/${userId}`, {
+      await axios.delete(`${API_URL}/admin/users/${userId}`, {
         headers: getAuthHeaders(),
       });
     });
@@ -187,7 +183,7 @@ export const adminService = {
   // Get system health
   getSystemHealth: async (): Promise<SystemHealth> => {
     return retryRequest(async () => {
-      const response = await axios.get(`${API_URL}/api/admin/system/health`, {
+      const response = await axios.get(`${API_URL}/admin/system/health`, {
         headers: getAuthHeaders(),
       });
       return response.data.data;
@@ -197,7 +193,7 @@ export const adminService = {
   // Get system activity
   getSystemActivity: async (): Promise<SystemActivity> => {
     return retryRequest(async () => {
-      const response = await axios.get(`${API_URL}/api/admin/system/activity`, {
+      const response = await axios.get(`${API_URL}/admin/system/activity`, {
         headers: getAuthHeaders(),
       });
       return response.data.data;

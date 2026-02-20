@@ -9,9 +9,11 @@ router.use(auth);
 
 // Get messages for a challenge
 router.get('/challenges/:challengeId/messages', messageController.getMessages);
+router.get('/weekly-challenges/:challengeId/messages', messageController.getMessages);
 
 // Create a new message
 router.post('/challenges/:challengeId/messages', messageController.createMessage);
+router.post('/weekly-challenges/:challengeId/messages', messageController.createMessage);
 
 // Like/unlike a message
 router.put('/messages/:messageId/like', messageController.toggleLike);

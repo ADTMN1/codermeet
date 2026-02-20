@@ -47,9 +47,10 @@ import {
 } from 'lucide-react';
 import { adminService, User, UserStats, SystemHealth, SystemActivity } from '../../services/adminService';
 import { challengeService, Challenge, ChallengeStats } from '../../services/challengeService';
-import { toast } from 'sonner';
+import { useAdminToast } from '../../utils/adminToast';
 import CreateChallengeForm from '../../components/admin/CreateChallengeForm';
 import { SubmissionsManagement } from '../../components/admin/SubmissionsManagement';
+import AdminConfirmDialog from '../../components/admin/AdminConfirmDialog';
 import { Card } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Label } from '../../components/ui/label';
@@ -58,6 +59,7 @@ import { Avatar, AvatarImage, AvatarFallback } from '../../components/ui/avatar'
 const AdminDashboard: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const adminToast = useAdminToast();
   const [users, setUsers] = useState<User[]>([]);
   const [stats, setStats] = useState<UserStats | null>(null);
   const [systemHealth, setSystemHealth] = useState<SystemHealth | null>(null);
@@ -70,6 +72,15 @@ const AdminDashboard: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterRole, setFilterRole] = useState('all');
   const [filterPlan, setFilterPlan] = useState('all');
+  const [deleteDialog, setDeleteDialog] = useState<{
+    isOpen: boolean;
+    type: 'user' | 'challenge';
+    userName?: string;
+    challengeTitle?: string;
+    userId?: string;
+    onConfirm?: () => void;
+    onClose?: () => void;
+  } | null>(null);
   const [showCreateChallenge, setShowCreateChallenge] = useState(false);
   const [selectedChallenge, setSelectedChallenge] = useState<Challenge | null>(null);
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
@@ -157,7 +168,7 @@ const AdminDashboard: React.FC = () => {
   const handleRefresh = () => {
     fetchDashboardData();
     setLastRefresh(new Date());
-    toast.info('Dashboard data refreshed');
+    adminToast.dashboardRefreshed();
   };
 
   const fetchDashboardData = async () => {
@@ -169,20 +180,38 @@ const AdminDashboard: React.FC = () => {
         usersData,
         statsData,
         challengesData,
+        dailyChallengesData,
         challengeStatsData
       ] = await Promise.all([
         adminService.getAllUsers(),
         adminService.getUserStats(),
         challengeService.getAllChallenges({ limit: 100 }),
+        challengeService.getDailyChallenges({ limit: 100 }),
         challengeService.getChallengeStats()
       ]);
       
       // Update essential states
+      console.log('🔍 Debug - Raw API responses:', {
+        challengesData,
+        dailyChallengesData,
+        challengeStatsData
+      });
+      
+      // Calculate total challenges (main + daily)
+      const totalChallenges = (challengesData?.data?.challenges?.length || 0) + (dailyChallengesData?.data?.length || 0);
+      
       setUsers(usersData || []);
       setStats(statsData || null);
-      setChallenges((challengesData?.data) || []);
-      setChallengeStats(challengeStatsData || null);
+      setChallenges(challengesData?.data?.challenges || []);
+      setChallengeStats(challengeStatsData?.data || null);
       setLastRefresh(new Date());
+      
+      console.log('🔍 Debug - Set states:', {
+        totalChallenges,
+        challenges: (challengesData?.data?.challenges?.length || 0),
+        dailyChallenges: (dailyChallengesData?.data?.length || 0),
+        challengeStats: challengeStatsData?.data ? 'exists' : 'null'
+      });
       
       // Only fetch system data if system tab is active
       if (activeTab === 'system') {
@@ -195,7 +224,7 @@ const AdminDashboard: React.FC = () => {
       }
       
     } catch (error: any) {
-      toast.error(`Failed to load admin dashboard: ${error.response?.data?.message || error.message}`);
+      adminToast.error('load', 'admin dashboard', error);
     } finally {
       setLoading(false);
     }
@@ -211,7 +240,7 @@ const AdminDashboard: React.FC = () => {
       setSystemHealth(healthData);
       setSystemActivity(activityData);
     } catch (error: any) {
-      toast.error('Failed to load system data');
+      adminToast.dataLoadError('system data');
     }
   };
 
@@ -221,52 +250,63 @@ const AdminDashboard: React.FC = () => {
       setUsers(users.map(user => 
         user._id === userId ? { ...user, role: newRole } : user
       ));
-      toast.success(`User role updated to ${newRole}`);
+      adminToast.userUpdated(newRole);
     } catch (error: any) {
-      toast.error('Failed to update user role');
+      adminToast.error('update', 'user role', error);
     }
   };
 
   const handleDeleteUser = async (userId: string, userName: string) => {
-    if (!confirm(`Are you sure you want to delete user "${userName}"? This action cannot be undone.`)) {
-      return;
-    }
-
-    try {
-      await adminService.deleteUser(userId);
-      setUsers(users.filter(user => user._id !== userId));
-      toast.success('User deleted successfully');
-      // Only refresh user stats, not all dashboard data
-      try {
-        const newStats = await adminService.getUserStats();
-        setStats(newStats);
-      } catch (statsError) {
-        toast.error('Failed to refresh user stats');
-      }
-    } catch (error) {
-      toast.error('Failed to delete user');
-    }
+    setDeleteDialog({
+      isOpen: true,
+      type: 'user',
+      userName,
+      userId,
+      onConfirm: async () => {
+        try {
+          await adminService.deleteUser(userId);
+          setUsers(users.filter(user => user._id !== userId));
+          adminToast.userDeleted();
+          // Only refresh user stats, not all dashboard data
+          try {
+            const newStats = await adminService.getUserStats();
+            setStats(newStats);
+          } catch (statsError) {
+            adminToast.statsRefreshError('user');
+          }
+        } catch (error) {
+          adminToast.error('delete', 'user', error);
+        }
+        setDeleteDialog(null);
+      },
+      onClose: () => setDeleteDialog(null)
+    });
   };
 
   const handleDeleteChallenge = async (challengeId: string, challengeTitle: string) => {
-    if (!confirm(`Are you sure you want to delete challenge "${challengeTitle}"? This action cannot be undone.`)) {
-      return;
-    }
-
-    try {
-      await challengeService.deleteChallenge(challengeId);
-      setChallenges(challenges.filter(challenge => challenge._id !== challengeId));
-      toast.success('Challenge deleted successfully');
-      // Only refresh challenge stats, not all dashboard data
-      try {
-        const newStats = await challengeService.getChallengeStats();
-        setChallengeStats(newStats);
-      } catch (statsError) {
-        toast.error('Failed to refresh challenge stats');
-      }
-    } catch (error) {
-      toast.error('Failed to delete challenge');
-    }
+    setDeleteDialog({
+      isOpen: true,
+      type: 'challenge',
+      challengeTitle,
+      onConfirm: async () => {
+        try {
+          await challengeService.deleteChallenge(challengeId);
+          setChallenges(challenges.filter(challenge => challenge._id !== challengeId));
+          adminToast.challengeDeleted();
+          // Only refresh challenge stats, not all dashboard data
+          try {
+            const newStats = await challengeService.getChallengeStats();
+            setChallengeStats(newStats);
+          } catch (statsError) {
+            adminToast.statsRefreshError('challenge');
+          }
+        } catch (error) {
+          adminToast.error('delete', 'challenge', error);
+        }
+        setDeleteDialog(null);
+      },
+      onClose: () => setDeleteDialog(null)
+    });
   };
 
   const handleEditChallenge = async (challengeId: string) => {
@@ -709,20 +749,20 @@ const AdminDashboard: React.FC = () => {
                 <Trophy className="w-8 h-8 text-yellow-300" />
               </div>
             </div>
-            <div className="bg-gradient-to-r from-purple-600 to-purple-800 p-4 rounded-lg">
+            <div className="bg-gradient-to-r from-blue-600 to-blue-800 p-4 rounded-lg">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-purple-200 text-sm">Total Participants</p>
-                  <p className="text-2xl font-bold text-white">{challenges.reduce((sum, c) => sum + (c.currentParticipants || 0), 0)}</p>
+                  <p className="text-blue-200 text-sm">Total Submissions</p>
+                  <p className="text-2xl font-bold text-white">{challengeStats?.overview?.totalSubmissions || 0}</p>
                 </div>
-                <Users className="w-8 h-8 text-purple-300" />
+                <FileText className="w-8 h-8 text-blue-300" />
               </div>
             </div>
             <div className="bg-gradient-to-r from-orange-600 to-orange-800 p-4 rounded-lg">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-orange-200 text-sm">Active Challenges</p>
-                  <p className="text-2xl font-bold text-white">{challenges.filter(c => new Date(c.endDate) > new Date()).length}</p>
+                  <p className="text-2xl font-bold text-white">{challengeStats?.overview?.activeChallenges || challenges.filter(c => c.isActive).length}</p>
                 </div>
                 <Activity className="w-8 h-8 text-orange-300" />
               </div>
@@ -952,7 +992,7 @@ const AdminDashboard: React.FC = () => {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-gray-400 text-sm">Total Challenges</p>
-                      <p className="text-2xl font-bold text-white">{challengeStats.overview.totalChallenges}</p>
+                      <p className="text-2xl font-bold text-white">{challenges?.length || 0}</p>
                     </div>
                     <Trophy className="h-8 w-8 text-yellow-500" />
                   </div>
@@ -967,7 +1007,7 @@ const AdminDashboard: React.FC = () => {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-gray-400 text-sm">Active Challenges</p>
-                      <p className="text-2xl font-bold text-white">{challengeStats.overview.activeChallenges}</p>
+                      <p className="text-2xl font-bold text-white">{challenges.filter(c => c.isActive).length}</p>
                     </div>
                     <Target className="h-8 w-8 text-green-500" />
                   </div>
@@ -982,7 +1022,7 @@ const AdminDashboard: React.FC = () => {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-gray-400 text-sm">Total Submissions</p>
-                      <p className="text-2xl font-bold text-white">{challengeStats.overview.totalSubmissions}</p>
+                      <p className="text-2xl font-bold text-white">{challenges?.length || 0}</p>
                     </div>
                     <FileText className="h-8 w-8 text-blue-500" />
                   </div>
@@ -1345,6 +1385,20 @@ const AdminDashboard: React.FC = () => {
               setSelectedChallenge(null);
               fetchDashboardData();
             }}
+          />
+        )}
+
+        {/* Professional Confirmation Dialog */}
+        {deleteDialog && (
+          <AdminConfirmDialog
+            isOpen={deleteDialog.isOpen}
+            onClose={deleteDialog.onClose}
+            onConfirm={deleteDialog.onConfirm}
+            title={`Delete ${deleteDialog.type === 'user' ? 'User' : 'Challenge'}`}
+            message={`Are you sure you want to delete this ${deleteDialog.type === 'user' ? deleteDialog.userName : deleteDialog.challengeTitle}? This action cannot be undone.`}
+            confirmText="Delete"
+            cancelText="Cancel"
+            type="danger"
           />
         )}
       </motion.div>

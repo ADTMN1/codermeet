@@ -1,5 +1,7 @@
 import React, { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { Toaster } from './components/ui/toast';
 import { ToastProvider } from './context/ToastContext';
 import { useTheme } from './hooks/useTheme';
@@ -38,6 +40,7 @@ import SubmissionsSimple from './pages/Admin/SubmissionsSimple';
 import SystemHealthSimple from './pages/Admin/SystemHealthSimple';
 import AIDailyChallenges from './pages/Admin/AIDailyChallenges';
 import WeeklyContestsSimple from './pages/Admin/WeeklyContestsSimple';
+import CreateWeeklyContest from './pages/Admin/CreateWeeklyContest';
 import AnalyticsSimple from './pages/Admin/AnalyticsSimple';
 import AdminSettingsSimple from './pages/Admin/AdminSettingsSimple';
 import BusinessIdeasManagement from './pages/Admin/BusinessIdeasManagement';
@@ -47,16 +50,36 @@ import Settings from './pages/Dashboard/Settings';
 import Rewards from './pages/Dashboard/Rewards';
 import Leaderboard from './pages/Dashboard/Leaderboard';
 
+// Create a client
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 1000 * 60 * 5, // 5 minutes
+      retry: (failureCount, error: any) => {
+        // Don't retry on 4xx errors
+        if (error?.response?.status >= 400 && error?.response?.status < 500) {
+          return false;
+        }
+        return failureCount < 3;
+      },
+      refetchOnWindowFocus: false,
+    },
+  },
+});
+
 function App() {
   // Apply theme globally on app load
   useTheme();
   
   return (
-    <ToastProvider>
-      <BrowserRouter>
-        <AppContent />
-      </BrowserRouter>
-    </ToastProvider>
+    <QueryClientProvider client={queryClient}>
+      <ToastProvider>
+        <BrowserRouter>
+          <AppContent />
+        </BrowserRouter>
+        <ReactQueryDevtools initialIsOpen={false} />
+      </ToastProvider>
+    </QueryClientProvider>
   );
 }
 
@@ -193,7 +216,7 @@ function AppContent() {
           {/* Dashboard Layout Routes - including profile */}
           <Route path="/*" element={<DashboardLayout />}>
             <Route path="dashboard" element={<Dashboard />} />
-            <Route path="weeklyChallenge" element={<WeeklyChallenge />} />
+            <Route path="weeklyChallenge/:id?" element={<WeeklyChallenge />} />
             <Route path="community" element={<Community />} />
             <Route path="developers" element={<Developers />} />
             <Route path="notifications" element={<Notifications />} />
@@ -228,6 +251,7 @@ function AppContent() {
             <Route path="system" element={<SystemHealth />} />
             <Route path="daily-challenges" element={<AIDailyChallenges />} />
             <Route path="weekly-challenges" element={<WeeklyContestsSimple />} />
+            <Route path="weekly-challenges/create" element={<CreateWeeklyContest />} />
             <Route path="analytics" element={<AnalyticsSimple />} />
             <Route path="settings" element={<AdminSettingsSimple />} />
             <Route path="business-ideas" element={<BusinessIdeasManagement />} />

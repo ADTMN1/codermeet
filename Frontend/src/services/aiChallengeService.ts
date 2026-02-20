@@ -1,5 +1,5 @@
 // AI Challenge Service
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+import { API_URL } from '../config/api';
 
 export interface GenerationOptions {
   difficulty?: 'Easy' | 'Medium' | 'Hard';
@@ -66,7 +66,7 @@ class AIChallengeService {
     message: string;
   }> {
     try {
-      const response = await fetch(`${API_URL}/api/admin/challenges/generate`, {
+      const response = await fetch(`${API_URL}/admin/challenges/generate`, {
         method: 'POST',
         headers: this.getAuthHeaders(),
         body: JSON.stringify(options)
@@ -91,7 +91,7 @@ class AIChallengeService {
     message: string;
   }> {
     try {
-      const response = await fetch(`${API_URL}/api/admin/challenges/generate-and-create`, {
+      const response = await fetch(`${API_URL}/admin/challenges/generate-and-create`, {
         method: 'POST',
         headers: this.getAuthHeaders(),
         body: JSON.stringify(options)
@@ -119,7 +119,7 @@ class AIChallengeService {
     message: string;
   }> {
     try {
-      const response = await fetch(`${API_URL}/api/admin/challenges/generate-weekly`, {
+      const response = await fetch(`${API_URL}/admin/challenges/generate-weekly`, {
         method: 'POST',
         headers: this.getAuthHeaders(),
         body: JSON.stringify(options)
@@ -145,7 +145,7 @@ class AIChallengeService {
     message: string;
   }> {
     try {
-      const response = await fetch(`${API_URL}/api/admin/challenges/generate-topic`, {
+      const response = await fetch(`${API_URL}/admin/challenges/generate-topic`, {
         method: 'POST',
         headers: this.getAuthHeaders(),
         body: JSON.stringify({ topic, difficulty })
@@ -171,7 +171,7 @@ class AIChallengeService {
     message: string;
   }> {
     try {
-      const response = await fetch(`${API_URL}/api/admin/challenges/auto-generate`, {
+      const response = await fetch(`${API_URL}/admin/challenges/auto-generate`, {
         method: 'POST',
         headers: this.getAuthHeaders(),
         body: JSON.stringify({ daysAhead })
@@ -197,7 +197,7 @@ class AIChallengeService {
     message: string;
   }> {
     try {
-      const response = await fetch(`${API_URL}/api/admin/challenges/preview`, {
+      const response = await fetch(`${API_URL}/admin/challenges/preview`, {
         method: 'POST',
         headers: this.getAuthHeaders(),
         body: JSON.stringify(options)
@@ -223,7 +223,7 @@ class AIChallengeService {
     message: string;
   }> {
     try {
-      const response = await fetch(`${API_URL}/api/admin/challenges/stats`, {
+      const response = await fetch(`${API_URL}/admin/challenges/stats`, {
         headers: this.getAuthHeaders()
       });
 
@@ -247,7 +247,7 @@ class AIChallengeService {
     message: string;
   }> {
     try {
-      const response = await fetch(`${API_URL}/api/admin/challenges/bulk-generate`, {
+      const response = await fetch(`${API_URL}/admin/challenges/bulk-generate`, {
         method: 'POST',
         headers: this.getAuthHeaders(),
         body: JSON.stringify({ startDate, endDate, ...options })

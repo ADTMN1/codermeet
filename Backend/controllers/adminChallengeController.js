@@ -335,6 +335,17 @@ class AdminChallengeController {
         mostUsedDifficulty
       });
 
+      console.log('📊 Debug - About to send stats response:', {
+        success: true,
+        data: {
+          totalGenerated: totalChallenges,
+          successRate,
+          avgGenerationTime,
+          mostUsedCategory,
+          mostUsedDifficulty
+        }
+      });
+
       res.status(200).json({
         success: true,
         data: {
@@ -380,6 +391,18 @@ class AdminChallengeController {
       const challengesData = challenges.map(challenge => challenge.toObject());
 
       console.log('📊 Debug - Found challenges:', challengesData.length);
+
+      console.log('📊 Debug - About to send challenges response:', {
+        success: true,
+        data: {
+          challenges: challengesData,
+          pagination: {
+            current: page,
+            pages: Math.ceil(total / limit),
+            total: total
+          }
+        }
+      });
 
       res.status(200).json({
         success: true,

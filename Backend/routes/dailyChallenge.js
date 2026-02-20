@@ -14,9 +14,16 @@ router.get('/today', dailyChallengeController.getTodayChallenge);
 
 // Authenticated routes
 router.post('/submit', authenticate, dailyChallengeController.submitSolution);
-router.get('/stats', authenticate, dailyChallengeController.getUserDailyStats);
+router.get('/user-stats', authenticate, dailyChallengeController.getUserDailyStats);
 
 // Admin routes with enhanced security and logging
+router.get('/admin-stats', 
+  authenticate, 
+  requirePermission('daily_challenges', 'read'),
+  logAdminAction('view_daily_challenge_stats'),
+  dailyChallengeController.getDailyChallengeStats
+);
+
 router.post('/create', 
   authenticate, 
   requirePermission('daily_challenges', 'create'),

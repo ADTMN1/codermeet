@@ -53,6 +53,7 @@ const getJobs = async (req, res) => {
 
     const jobs = await Job.find(query)
       .populate('postedBy', 'fullName username avatar')
+      .populate('applicants.user', 'fullName username avatar')
       .sort(sortOptions)
       .limit(limit * 1)
       .skip((page - 1) * limit)
@@ -225,12 +226,6 @@ const acceptApplicant = async (req, res) => {
     const { applicantId } = req.body;
     const userId = req.user.id;
 
-    console.log('🔍 DEBUG: Accept applicant request:', {
-      jobId,
-      applicantId,
-      userId,
-      body: req.body
-    });
 
     // Validate inputs
     if (!jobId || !applicantId) {
@@ -341,7 +336,6 @@ const acceptApplicant = async (req, res) => {
       }
     });
   } catch (error) {
-    console.log('❌ ERROR: Exception in acceptApplicant:', error);
     res.status(500).json({
       success: false,
       message: 'Error accepting applicant',

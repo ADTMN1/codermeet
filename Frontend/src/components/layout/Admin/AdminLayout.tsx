@@ -7,8 +7,8 @@ const AdminLayout: React.FC = () => {
 
   const handleRefresh = () => {
     setLastRefresh(new Date());
-    // You can add a global refresh event here if needed
-    window.dispatchEvent(new CustomEvent('admin-refresh'));
+    // React Query handles data refresh automatically
+    // No need for global events anymore
   };
 
   return (

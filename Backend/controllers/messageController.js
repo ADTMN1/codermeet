@@ -1,31 +1,54 @@
 // controllers/messageController.js
 const Message = require('../models/message');
 const Challenge = require('../models/challenge');
+const WeeklyChallenge = require('../models/weeklyChallenge');
 const User = require('../models/user');
 
 // Get messages for a challenge
 exports.getMessages = async (req, res) => {
   try {
-    const { id } = req.params;
+    console.log('🔍 Backend Debug - getMessages called');
+    console.log('🔍 Backend Debug - req.params:', req.params);
+    console.log('🔍 Backend Debug - req.query:', req.query);
+    console.log('🔍 Backend Debug - req.originalUrl:', req.originalUrl);
+    
+    const { challengeId: id } = req.params;
     const { page = 1, limit = 50 } = req.query;
+    
+    console.log('🔍 Backend Debug - Extracted params:', { challengeId: id, page, limit });
 
     // Validate challenge ID
     if (!id) {
+      console.log('❌ Backend Debug - No challenge ID provided');
       return res.status(400).json({
         success: false,
         message: 'Challenge ID is required'
       });
     }
 
-    // Verify challenge exists
-    const challenge = await Challenge.findById(id);
+    console.log('🔍 Backend Debug - Looking for challenge with ID:', id);
+    
+    // Check if it's a weekly challenge or regular challenge
+    let challenge;
+    if (req.originalUrl.includes('weekly-challenges')) {
+      console.log('🔍 Backend Debug - Checking WeeklyChallenge model');
+      challenge = await WeeklyChallenge.findById(id);
+    } else {
+      console.log('🔍 Backend Debug - Checking regular Challenge model');
+      challenge = await Challenge.findById(id);
+    }
+    
+    console.log('🔍 Backend Debug - Found challenge:', challenge ? 'YES' : 'NO');
+    
     if (!challenge) {
+      console.log('❌ Backend Debug - Challenge not found');
       return res.status(404).json({
         success: false,
         message: 'Challenge not found'
       });
     }
 
+    console.log('🔍 Backend Debug - Fetching messages...');
     // Try populate with error handling
     let messages;
     try {
@@ -35,6 +58,7 @@ exports.getMessages = async (req, res) => {
         .limit(parseInt(limit))
         .skip((parseInt(page) - 1) * parseInt(limit));
     } catch (populateError) {
+      console.log('⚠️ Backend Debug - Populate failed, using fallback:', populateError.message);
       // Fallback to simple query without populate
       messages = await Message.find({ challengeId: id })
         .sort({ createdAt: -1 })
@@ -43,6 +67,9 @@ exports.getMessages = async (req, res) => {
     }
 
     const total = await Message.countDocuments({ challengeId: id });
+    
+    console.log('✅ Backend Debug - Found messages:', messages.length);
+    console.log('✅ Backend Debug - Total messages:', total);
 
     res.status(200).json({
       success: true,
@@ -55,6 +82,7 @@ exports.getMessages = async (req, res) => {
       }
     });
   } catch (error) {
+    console.error('❌ Backend Debug - Error in getMessages:', error);
     res.status(500).json({
       success: false,
       message: 'Error fetching messages',
@@ -66,28 +94,50 @@ exports.getMessages = async (req, res) => {
 // Create a new message
 exports.createMessage = async (req, res) => {
   try {
-    const { id } = req.params;
+    console.log('🔍 Backend Debug - createMessage called');
+    console.log('🔍 Backend Debug - req.params:', req.params);
+    console.log('🔍 Backend Debug - req.body:', req.body);
+    console.log('🔍 Backend Debug - req.originalUrl:', req.originalUrl);
+    
+    const { challengeId: id } = req.params;
     const { content } = req.body;
     
     const userId = req.user?.id || req.userProfile?._id;
+    
+    console.log('🔍 Backend Debug - Extracted data:', { challengeId: id, content, userId });
 
     // Validate required fields
     if (!content || content.trim().length === 0) {
+      console.log('❌ Backend Debug - No content provided');
       return res.status(400).json({
         success: false,
         message: 'Message content is required'
       });
     }
 
-    // Verify challenge exists
-    const challenge = await Challenge.findById(id);
+    console.log('🔍 Backend Debug - Looking for challenge with ID:', id);
+    
+    // Check if it's a weekly challenge or regular challenge
+    let challenge;
+    if (req.originalUrl.includes('weekly-challenges')) {
+      console.log('🔍 Backend Debug - Checking WeeklyChallenge model');
+      challenge = await WeeklyChallenge.findById(id);
+    } else {
+      console.log('🔍 Backend Debug - Checking regular Challenge model');
+      challenge = await Challenge.findById(id);
+    }
+    
+    console.log('🔍 Backend Debug - Found challenge:', challenge ? 'YES' : 'NO');
+    
     if (!challenge) {
+      console.log('❌ Backend Debug - Challenge not found');
       return res.status(404).json({
         success: false,
         message: 'Challenge not found'
       });
     }
 
+    console.log('🔍 Backend Debug - Creating message...');
     // Create message
     const message = new Message({
       content: content.trim(),
@@ -96,6 +146,7 @@ exports.createMessage = async (req, res) => {
     });
 
     await message.save();
+    console.log('✅ Backend Debug - Message saved:', message._id);
 
     // Populate author info
     await message.populate('author', 'fullName username avatar');
@@ -106,6 +157,7 @@ exports.createMessage = async (req, res) => {
       data: message
     });
   } catch (error) {
+    console.error('❌ Backend Debug - Error in createMessage:', error);
     res.status(500).json({
       success: false,
       message: 'Error creating message',

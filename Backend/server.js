@@ -32,8 +32,6 @@ const pointsRoutes = require('./routes/points');
 
 const paymentRoutes = require('./routes/payment');
 
-const achievementsRoutes = require('./routes/achievements');
-
 
 
 const resourceRoutes = require('./routes/resources');
@@ -49,6 +47,8 @@ const chatRoutes = require('./routes/chat');
 const dailyChallengeRoutes = require('./routes/dailyChallenge');
 
 const adminChallengeRoutes = require('./routes/adminChallenges');
+
+const weeklyChallengeRoutes = require('./routes/weeklyChallenge');
 
 const twoFactorRoutes = require('./routes/twoFactor');
 
@@ -171,60 +171,6 @@ app.use(cors({
   optionsSuccessStatus: 204
 
 }));
-
-
-
-// Security Headers Middleware
-
-app.use((req, res, next) => {
-
-  // Prevent XSS attacks
-
-  res.setHeader('X-Content-Type-Options', 'nosniff');
-
-  res.setHeader('X-XSS-Protection', '1; mode=block');
-
-  
-
-  // Prevent clickjacking
-
-  res.setHeader('X-Frame-Options', 'DENY');
-
-  
-
-  // Prevent MIME type sniffing
-
-  res.setHeader('X-Download-Options', 'noopen');
-
-  res.setHeader('X-Permitted-Cross-Domain-Policies', 'none');
-
-  
-
-  // Referrer policy
-
-  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-
-  
-
-  // Permissions policy
-
-  res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
-
-  
-
-  // HSTS (only in production with HTTPS)
-
-  if (process.env.NODE_ENV === 'production') {
-
-    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
-
-  }
-
-  
-
-  next();
-
-});
 
 
 
@@ -396,8 +342,6 @@ app.use("/api/points", pointsRoutes); // Points awarding system
 
 app.use("/api/payment", paymentLimiter, paymentRoutes);
 
-app.use("/api/achievements", achievementsRoutes); // Achievements routes
-
 app.use("/api/resources", resourceRoutes);
 
 app.use("/api/daily-challenge", dailyChallengeRoutes);
@@ -415,6 +359,8 @@ app.use("/api/messages", messageRoutes); // Message routes (mounted at /api to h
 app.use("/api/chat", chatRoutes); // Chat routes
 
 app.use("/api/daily-challenge", dailyChallengeRoutes);
+
+app.use("/api/weekly-challenges", weeklyChallengeRoutes);
 
 app.use("/api/jobs", jobRoutes); // Job routes
 

@@ -14,6 +14,7 @@ router.get('/', challengeController.getAllChallenges); // Get all challenges (pu
 
 // Admin-only routes (require admin auth)
 router.get('/admin', authenticate, requirePermission('content', 'read'), challengeController.getAllChallenges); // Admin challenge management
+router.get('/admin/challenges/all', authenticate, requirePermission('content', 'read'), challengeController.getAllChallenges); // Admin get all challenges endpoint
 router.post('/', authenticate, requirePermission('content', 'create'), challengeController.createChallenge);
 router.get('/stats', authenticate, requirePermission('content', 'read'), challengeController.getChallengeStats); // Admin stats endpoint
 router.get('/:id', challengeController.getChallengeById); // Get specific challenge

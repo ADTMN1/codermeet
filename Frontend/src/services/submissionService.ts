@@ -4,7 +4,13 @@ import { API_CONFIG } from '../config/api';
 
 export interface SubmissionData {
   githubUrl: string;
+  liveUrl?: string;
   description: string;
+  screenshots?: Array<{
+    filename: string;
+    url: string;
+    size: number;
+  }>;
   files?: Array<{
     filename: string;
     url: string;
@@ -45,7 +51,7 @@ class SubmissionService {
   async submitProject(challengeId: string, submissionData: SubmissionData): Promise<{ success: boolean; data: Submission; message: string }> {
     try {
       const response = await axios.post(
-        `${API_CONFIG.BASE_URL}/challenges/${challengeId}/submit`,
+        `${API_CONFIG.BASE_URL}/weekly-challenges/${challengeId}/submit`,
         submissionData,
         {
           headers: {
@@ -65,7 +71,7 @@ class SubmissionService {
   async getUserSubmission(challengeId: string): Promise<Submission | null> {
     try {
       const response = await axios.get(
-        `${API_CONFIG.BASE_URL}/challenges/${challengeId}/my-submission`,
+        `${API_CONFIG.BASE_URL}/weekly-challenges/${challengeId}/my-submission`,
         {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('auth_token')}`

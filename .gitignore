@@ -111,3 +111,23 @@ Thumbs.db
 # Backup files
 *.bak
 *.backup
+
+# Test files
+*test*.js
+*test*.ts
+*test*.tsx
+test*.js
+test*.ts
+test*.tsx
+**/test*.js
+**/test*.ts
+**/test*.tsx
+
+# Debug files
+debugStats.js
+**/debugStats.js
+
+# Scripts
+**/scripts/challengeStats.js
+**/scripts/compareChallengeTypes.js
+**/scripts/fixDailyChallengesStatus.js

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import { FaLightbulb, FaEye, FaCheck, FaTimes, FaFilter, FaSearch, FaDownload, FaChartBar } from 'react-icons/fa';
+import { API_URL } from '../../config/api';
 
 interface BusinessIdea {
   _id: string;
@@ -75,7 +76,6 @@ const BusinessIdeasManagement: React.FC = () => {
 
   const fetchIdeas = async () => {
     try {
-      const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
       const params = new URLSearchParams({
         page: pagination.page.toString(),
         limit: '10'
@@ -84,7 +84,7 @@ const BusinessIdeasManagement: React.FC = () => {
       if (filter.status) params.append('status', filter.status);
       if (filter.category) params.append('category', filter.category);
 
-      const response = await fetch(`${API_BASE_URL}/api/business-ideas?${params}`, {
+      const response = await fetch(`${API_URL}/business-ideas?${params}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
         }
@@ -109,8 +109,7 @@ const BusinessIdeasManagement: React.FC = () => {
 
   const fetchStats = async () => {
     try {
-      const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-      const response = await fetch(`${API_BASE_URL}/api/business-ideas/stats`, {
+      const response = await fetch(`${API_URL}/business-ideas/stats`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
         }
@@ -127,8 +126,7 @@ const BusinessIdeasManagement: React.FC = () => {
 
   const updateIdeaStatus = async (ideaId: string, status: string, adminNotes?: string) => {
     try {
-      const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-      const response = await fetch(`${API_BASE_URL}/api/business-ideas/${ideaId}`, {
+      const response = await fetch(`${API_URL}/business-ideas/${ideaId}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',

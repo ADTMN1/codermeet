@@ -12,41 +12,30 @@ import {
   CheckCircle
 } from 'lucide-react';
 import { adminService, UserStats } from '../../services/adminService';
-import { challengeService, ChallengeStats } from '../../services/challengeService';
+import { useChallengeStats } from '../../hooks/useChallenges';
+import { useAdminToast } from '../../utils/adminToast';
 import { Card } from '../../components/ui/card';
 
 const DashboardOverview: React.FC = () => {
+  const adminToast = useAdminToast();
   const [userStats, setUserStats] = useState<UserStats | null>(null);
-  const [challengeStats, setChallengeStats] = useState<ChallengeStats | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Use React Query for challenge stats
+  const { data: challengeStats } = useChallengeStats();
+
   useEffect(() => {
-    fetchOverviewData();
-    
-    // Listen for refresh events
-    const handleRefresh = () => {
-      fetchOverviewData();
-    };
-    
-    window.addEventListener('admin-refresh', handleRefresh);
-    
-    return () => {
-      window.removeEventListener('admin-refresh', handleRefresh);
-    };
+    fetchUserStats();
   }, []);
 
-  const fetchOverviewData = async () => {
+  const fetchUserStats = async () => {
     try {
       setLoading(true);
-      const [userStatsData, challengeStatsData] = await Promise.all([
-        adminService.getUserStats(),
-        challengeService.getChallengeStats()
-      ]);
-      
+      const userStatsData = await adminService.getUserStats();
       setUserStats(userStatsData);
-      setChallengeStats(challengeStatsData);
     } catch (error) {
-      console.error('Failed to fetch overview data:', error);
+      console.error('Error fetching user stats:', error);
+      adminToast.error('Failed to load user statistics');
     } finally {
       setLoading(false);
     }
@@ -145,11 +134,11 @@ const DashboardOverview: React.FC = () => {
           <div className="space-y-3">
             <div className="flex justify-between items-center p-3 bg-gray-800 rounded-lg">
               <span className="text-gray-300">New Users (Today)</span>
-              <span className="text-green-400 font-semibold">+{userStats?.newUsersThisMonth || 0}</span>
+              <span className="text-yellow-400 font-semibold">+{userStats?.newUsersToday || 0}</span>
             </div>
             <div className="flex justify-between items-center p-3 bg-gray-800 rounded-lg">
               <span className="text-gray-300">Challenge Completions</span>
-              <span className="text-blue-400 font-semibold">{challengeStats?.overview?.totalParticipants || 0}</span>
+              <span className="text-blue-400 font-semibold">{challengeStats?.overview?.completedChallenges || 0}</span>
             </div>
             <div className="flex justify-between items-center p-3 bg-gray-800 rounded-lg">
               <span className="text-gray-300">System Uptime</span>
@@ -174,7 +163,14 @@ const DashboardOverview: React.FC = () => {
             </div>
             <div className="flex justify-between items-center p-3 bg-gray-800 rounded-lg">
               <span className="text-gray-300">Avg. Completion Rate</span>
-              <span className="text-green-400 font-semibold">87%</span>
+              <span className="text-green-400 font-semibold">
+                {(() => {
+                  const total = challengeStats?.overview?.totalChallenges || 0;
+                  const completed = challengeStats?.overview?.completedChallenges || 0;
+                  const rate = total > 0 ? ((completed / total) * 100).toFixed(1) : '0.0';
+                  return `${rate}%`;
+                })()}
+              </span>
             </div>
           </div>
         </Card>

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { io, Socket } from 'socket.io-client';
-import { API_CONFIG, SOCKET_URL } from '../../config/api';
+import { API_CONFIG } from '../../config/api';
 import {
   FaFolderOpen,
   FaCheckCircle,
@@ -277,7 +277,7 @@ const Community: React.FC = () => {
     const token = localStorage.getItem('auth_token');
     if (token) {
       try {
-        const response = fetch(`${import.meta.env.VITE_API_URL}/users/me`, {
+        const response = fetch(`${API_CONFIG.BASE_URL}/users/me`, {
           headers: {
             'Authorization': `Bearer ${token}`,
           },
@@ -347,7 +347,7 @@ const Community: React.FC = () => {
   const fetchProjects = async () => {
     try {
       const token = localStorage.getItem('auth_token');
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/users/community/projects`, {
+      const response = await fetch(`${API_CONFIG.BASE_URL}/users/community/projects`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -410,7 +410,7 @@ const Community: React.FC = () => {
   const fetchAnnouncements = async () => {
     try {
       const token = localStorage.getItem('auth_token');
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/users/announcements`, {
+      const response = await fetch(`${API_CONFIG.BASE_URL}/users/announcements`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -435,7 +435,7 @@ const Community: React.FC = () => {
   const fetchMembers = async () => {
     try {
       const token = localStorage.getItem('auth_token');
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/users/members`, {
+      const response = await fetch(`${API_CONFIG.BASE_URL}/users/members`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -460,7 +460,7 @@ const Community: React.FC = () => {
   const fetchTeams = async () => {
     try {
       const token = localStorage.getItem('auth_token');
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/users/teams`, {
+      const response = await fetch(`${API_CONFIG.BASE_URL}/users/teams`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -492,7 +492,7 @@ const Community: React.FC = () => {
       if (jobLocationFilter) params.append('location', jobLocationFilter);
       if (searchTerm) params.append('search', searchTerm);
       
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/jobs?${params}`, {
+      const response = await fetch(`${API_CONFIG.BASE_URL}/jobs?${params}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -508,7 +508,7 @@ const Community: React.FC = () => {
         
         // Also fetch user's liked jobs to determine isLiked status
         try {
-          const userResponse = await fetch(`${import.meta.env.VITE_API_URL}/users/profile`, {
+          const userResponse = await fetch(`${API_CONFIG.BASE_URL}/users/profile`, {
             headers: {
               'Authorization': `Bearer ${token}`,
             },
@@ -574,7 +574,6 @@ const Community: React.FC = () => {
   const [socket, setSocket] = useState<Socket | null>(null);
   const [typingUsers, setTypingUsers] = useState<{[key: string]: string}>({});
   const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set());
-  const [roomOnlineUsers, setRoomOnlineUsers] = useState<{[roomId: string]: string[]}>({});
   const [showCreateRoomModal, setShowCreateRoomModal] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
@@ -588,7 +587,6 @@ const Community: React.FC = () => {
     maxMembers: 100
   });
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const messagesContainerRef = useRef<HTMLDivElement>(null);
 
   // Fetch messages when selected room changes
   useEffect(() => {
@@ -613,34 +611,27 @@ const Community: React.FC = () => {
   }, [showEmojiPicker]);
 
   const scrollToBottom = () => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
-    }
-    // Fallback: scroll container to bottom immediately
-    if (messagesContainerRef.current) {
-      messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
-    }
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  // Initialize Socket.IO - only once on component mount
+  // Initialize Socket.IO
   useEffect(() => {
     const token = localStorage.getItem('auth_token');
     if (token) {
-      const newSocket = io(SOCKET_URL, {
+      const newSocket = io('http://localhost:5000', {
         auth: { token }
       });
 
       newSocket.on('connect', () => {
-        console.log('Socket connected');
         fetchChatRooms();
       });
 
       newSocket.on('disconnect', (reason) => {
-        console.log('Socket disconnected:', reason);
+        // Handle disconnect
       });
 
       newSocket.on('connect_error', (error) => {
-        console.error('Socket connection error:', error);
+        // Handle connection error
       });
 
       newSocket.on('roomsList', (rooms: ChatRoom[]) => {
@@ -649,42 +640,25 @@ const Community: React.FC = () => {
 
       newSocket.on('roomJoined', (room: ChatRoom) => {
         setSelectedChatRoom(room);
-        // Don't fetch messages here - let the useEffect handle it
-      });
-
-      newSocket.on('userJoined', (data: any) => {
-        if (data.roomId) {
-          setRoomOnlineUsers(prev => ({
-            ...prev,
-            [data.roomId]: [...(prev[data.roomId] || []), data.userId]
-          }));
-        }
-      });
-
-      newSocket.on('userLeft', (data: any) => {
-        if (data.roomId) {
-          setRoomOnlineUsers(prev => ({
-            ...prev,
-            [data.roomId]: prev[data.roomId]?.filter(id => id !== data.userId) || []
-          }));
-        }
-      });
-
-      newSocket.on('roomUsers', (data: any) => {
-        if (data.roomId && data.users) {
-          setRoomOnlineUsers(prev => ({
-            ...prev,
-            [data.roomId]: data.users.map((user: any) => user.userId)
-          }));
-        }
+        fetchMessages(room._id);
       });
 
       newSocket.on('newMessage', (message: any) => {
         if (selectedChatRoom && message.roomId === selectedChatRoom._id) {
-          // Replace temporary message with real one if it exists
-          setMessages(prev => {
-            const filtered = prev.filter(msg => !msg._id?.startsWith('temp-'));
-            return [...filtered, message];
+          setMessages(prev => [...prev, message]);
+          // Also update filteredMessages to include the new message
+          setFilteredMessages(prev => {
+            const updated = [...prev, message];
+            // Apply current search filter
+            if (!searchQuery.trim()) {
+              return updated;
+            } else {
+              return updated.filter(msg => 
+                msg.content?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                msg.senderId?.fullName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                msg.fileName?.toLowerCase().includes(searchQuery.toLowerCase())
+              );
+            }
           });
           scrollToBottom();
         }
@@ -762,7 +736,7 @@ const Community: React.FC = () => {
         newSocket.close();
       };
     }
-  }, []); // ← Empty dependency array - only run once on mount
+  }, [selectedChatRoom]);
 
   const fetchChatRooms = async () => {
     try {
@@ -772,7 +746,7 @@ const Community: React.FC = () => {
         return;
       }
       
-      const response = await fetch('http://localhost:5000/api/chat/rooms', {
+      const response = await fetch(`${API_CONFIG.BASE_URL}/chat/rooms`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -800,7 +774,7 @@ const Community: React.FC = () => {
         return;
       }
       
-      const response = await fetch(`http://localhost:5000/api/chat/rooms/${roomId}/messages`, {
+      const response = await fetch(`${API_CONFIG.BASE_URL}/chat/rooms/${roomId}/messages`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -809,10 +783,9 @@ const Community: React.FC = () => {
 
       if (response.ok) {
         const data = await response.json();
-        // Reverse messages to show oldest first (newest at bottom)
-        const messages = data.data || [];
-        setMessages(messages.reverse());
+        setMessages(data.data || []);
         setSearchQuery(''); // Clear search when loading new messages
+        scrollToBottom();
       } else {
         setMessages([]);
       }
@@ -821,44 +794,11 @@ const Community: React.FC = () => {
     }
   };
 
-  // Scroll to bottom when messages change
-  useEffect(() => {
-    if (messages.length > 0) {
-      // Immediate scroll for better UX
-      scrollToBottom();
-      // Also scroll after a short delay to ensure DOM is fully rendered
-      setTimeout(scrollToBottom, 50);
-    }
-  }, [messages]);
-
-  // Keep filteredMessages in sync with messages
-  useEffect(() => {
-    if (!searchQuery.trim()) {
-      setFilteredMessages(messages);
-    } else {
-      const filtered = messages.filter(message => 
-        message.content?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        message.senderId?.fullName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        message.fileName?.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-      setFilteredMessages(filtered);
-    }
-  }, [messages, searchQuery]);
-
-  // Scroll to bottom immediately when component mounts with messages
-  useEffect(() => {
-    if (messages.length > 0 && selectedChatRoom) {
-      scrollToBottom();
-    }
-  }, [selectedChatRoom]);
-
   const handleSelectRoom = (room: ChatRoom) => {
     setSelectedChatRoom(room);
     setSearchQuery(''); // Clear search when switching rooms
     if (socket) {
       socket.emit('joinRoom', { roomId: room._id });
-      // Request current room users
-      socket.emit('getRoomUsers', { roomId: room._id });
     }
   };
 
@@ -870,21 +810,8 @@ const Community: React.FC = () => {
           roomId: selectedChatRoom._id,
           type: uploadedFile ? 'file' : 'text',
           fileName: uploadedFile?.name,
-          fileSize: uploadedFile?.size,
-          // Add temporary data for immediate UI display
-          _id: `temp-${Date.now()}`,
-          senderId: {
-            _id: 'temp',
-            fullName: 'You',
-            username: 'you',
-            avatar: currentUserAvatar // ← Add current user avatar
-          },
-          createdAt: new Date().toISOString()
+          fileSize: uploadedFile?.size
         };
-
-        // Add message to UI immediately for sender
-        setMessages(prev => [...prev, message]);
-        scrollToBottom();
 
         socket.emit('sendMessage', message);
         setMessageInput('');
@@ -1010,7 +937,7 @@ const emojiCategories = {
         return;
       }
       
-      const response = await fetch('http://localhost:5000/api/chat/rooms', {
+      const response = await fetch(`${API_CONFIG.BASE_URL}/chat/rooms`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -1052,7 +979,7 @@ const emojiCategories = {
   const handleLikeAnnouncement = async (announcementId: string) => {
     try {
       const token = localStorage.getItem('auth_token');
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/users/announcements/${announcementId}/like`, {
+      const response = await fetch(`${API_CONFIG.BASE_URL}/users/announcements/${announcementId}/like`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -1078,7 +1005,7 @@ const emojiCategories = {
   const handleCommentAnnouncement = async (announcementId: string, comment: string) => {
     try {
       const token = localStorage.getItem('auth_token');
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/users/announcements/${announcementId}/comment`, {
+      const response = await fetch(`${API_CONFIG.BASE_URL}/users/announcements/${announcementId}/comment`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -1105,7 +1032,7 @@ const emojiCategories = {
   const handleLikeProject = async (projectId: string) => {
     try {
       const token = localStorage.getItem('auth_token');
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/users/projects/${projectId}/like`, {
+      const response = await fetch(`${API_CONFIG.BASE_URL}/users/projects/${projectId}/like`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -1131,7 +1058,7 @@ const emojiCategories = {
   const handleCommentProject = async (projectId: string, comment: string) => {
     try {
       const token = localStorage.getItem('auth_token');
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/users/projects/${projectId}/comment`, {
+      const response = await fetch(`${API_CONFIG.BASE_URL}/users/projects/${projectId}/comment`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -1185,7 +1112,7 @@ const emojiCategories = {
         } : undefined
       };
 
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/jobs`, {
+      const response = await fetch(`${API_CONFIG.BASE_URL}/jobs`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -1230,7 +1157,7 @@ const emojiCategories = {
   const handleLikeJob = async (jobId: string) => {
     try {
       const token = localStorage.getItem('auth_token');
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/jobs/${jobId}/like`, {
+      const response = await fetch(`${API_CONFIG.BASE_URL}/jobs/${jobId}/like`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -1287,7 +1214,7 @@ const emojiCategories = {
 
     try {
       const token = localStorage.getItem('auth_token');
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/jobs/${jobId}/apply`, {
+      const response = await fetch(`${API_CONFIG.BASE_URL}/jobs/${jobId}/apply`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -1323,7 +1250,7 @@ const emojiCategories = {
   const handleViewJob = async (jobId: string) => {
     try {
       const token = localStorage.getItem('auth_token');
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/jobs/${jobId}`, {
+      const response = await fetch(`${API_CONFIG.BASE_URL}/jobs/${jobId}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -1346,7 +1273,7 @@ const emojiCategories = {
   const handleViewApplicants = async (jobId: string) => {
     try {
       const token = localStorage.getItem('auth_token');
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/jobs/${jobId}/applicants`, {
+      const response = await fetch(`${API_CONFIG.BASE_URL}/jobs/${jobId}/applicants`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -1370,7 +1297,7 @@ const emojiCategories = {
   const handleAcceptApplicant = async (jobId: string, applicantId: string) => {
     try {
       const token = localStorage.getItem('auth_token');
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/jobs/${jobId}/accept-applicant`, {
+      const response = await fetch(`${API_CONFIG.BASE_URL}/jobs/${jobId}/accept-applicant`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -1398,7 +1325,7 @@ const emojiCategories = {
   const handleRejectApplicant = async (jobId: string, applicantId: string) => {
     try {
       const token = localStorage.getItem('auth_token');
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/jobs/${jobId}/reject-applicant`, {
+      const response = await fetch(`${API_CONFIG.BASE_URL}/jobs/${jobId}/reject-applicant`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -1426,7 +1353,7 @@ const emojiCategories = {
   const fetchAnnouncementComments = async (announcementId: string) => {
     try {
       const token = localStorage.getItem('auth_token');
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/users/announcements/${announcementId}/comments`, {
+      const response = await fetch(`${API_CONFIG.BASE_URL}/users/announcements/${announcementId}/comments`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -1466,7 +1393,7 @@ const emojiCategories = {
     if (comment.trim()) {
       try {
         const token = localStorage.getItem('auth_token');
-        const response = await fetch(`${import.meta.env.VITE_API_URL}/users/announcements/${announcementId}/comment`, {
+        const response = await fetch(`${API_CONFIG.BASE_URL}/users/announcements/${announcementId}/comment`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -1511,7 +1438,7 @@ const emojiCategories = {
   const handleConnectMember = async (memberId: string) => {
     try {
       const token = localStorage.getItem('auth_token');
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/users/connect/${memberId}`, {
+      const response = await fetch(`${API_CONFIG.BASE_URL}/users/connect/${memberId}`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -1561,7 +1488,7 @@ const emojiCategories = {
 
     try {
       const token = localStorage.getItem('auth_token');
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/users/message/${messageRecipient.id}`, {
+      const response = await fetch(`${API_CONFIG.BASE_URL}/users/message/${messageRecipient.id}`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -1601,7 +1528,7 @@ const emojiCategories = {
         status: projectForm.status
       };
 
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/users/projects`, {
+      const response = await fetch(`${API_CONFIG.BASE_URL}/users/projects`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -1661,7 +1588,7 @@ const emojiCategories = {
         expiresAt: expiresAt.toISOString()
       };
 
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/users/teams`, {
+      const response = await fetch(`${API_CONFIG.BASE_URL}/users/teams`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -1735,7 +1662,7 @@ const emojiCategories = {
       // Set loading state for this specific team
       setJoiningTeamId(teamId);
 
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/users/teams/${teamId}/${isMember ? 'leave' : 'join'}`, {
+      const response = await fetch(`${API_CONFIG.BASE_URL}/users/teams/${teamId}/${isMember ? 'leave' : 'join'}`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -1893,10 +1820,7 @@ const emojiCategories = {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-900 flex items-center justify-center">
-        <div className="text-center">
-          <FaSpinner className="animate-spin text-purple-400 w-8 h-8 mx-auto mb-4" />
-          <p className="text-gray-400">Loading community data...</p>
-        </div>
+        <div className="text-white text-xl">Loading community data...</div>
       </div>
     );
   }
@@ -1908,14 +1832,9 @@ const emojiCategories = {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-4">
+        
               <h1 className="text-xl font-bold text-white">Community Hub</h1>
             </div>
-            <button
-              onClick={() => navigate('/dashboard')}
-              className="px-4 py-2 border border-gray-600 text-gray-300 rounded-lg hover:bg-gray-800 transition-colors"
-            >
-              Back to Dashboard
-            </button>
           </div>
         </div>
       </div>
@@ -2515,12 +2434,8 @@ const emojiCategories = {
                             <p className="text-gray-400 text-sm truncate">{room.description}</p>
                           )}
                           <div className="flex items-center gap-2 mt-1">
-                            <span className="text-xs text-green-400">
-                              {roomOnlineUsers[room._id]?.length || 0} online
-                            </span>
-                            <span className="text-xs text-gray-500">•</span>
                             <span className="text-xs text-gray-500">
-                              {room.members?.length || 0}/{room.maxMembers || 100} total
+                              {room.members?.length || 0}/{room.maxMembers || 100} members
                             </span>
                             <span className="text-xs text-gray-500">•</span>
                             <span className="text-xs text-gray-500 capitalize">{room.type}</span>
@@ -2546,9 +2461,6 @@ const emojiCategories = {
                       <h2 className="text-xl font-bold text-white flex items-center gap-3">
                         <FaComments className="w-5 h-5 text-purple-400" />
                         {selectedChatRoom?.name || 'Chat Room'}
-                        <span className="text-sm text-gray-400">
-                          {roomOnlineUsers[selectedChatRoom?._id || '']?.length || 0} online
-                        </span>
                       </h2>
                       <div className="flex items-center gap-3">
                         <div className="relative">
@@ -2577,7 +2489,7 @@ const emojiCategories = {
                   </div>
 
                   {/* Messages */}
-                  <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-4 space-y-4">
+                  <div className="flex-1 overflow-y-auto p-4 space-y-4">
                     {filteredMessages.map((message, index) => {
                       const isCurrentUser = message.senderId?._id === currentUserId;
                       const showDate = index === 0 || new Date(message.createdAt).toDateString() !== new Date(messages[index - 1]?.createdAt).toDateString();

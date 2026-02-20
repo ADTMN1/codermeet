@@ -2,6 +2,7 @@
 const express = require('express');
 const router = express.Router();
 const adminChallengeController = require('../controllers/adminChallengeController');
+const challengeController = require('../controllers/challengeController');
 const auth = require('../middlewares/auth');
 const { requireAdmin } = require('../middlewares/roleBasedAuth');
 
@@ -37,10 +38,13 @@ router.get('/monthly-schedule', adminChallengeController.getMonthlySchedule);
 router.post('/bulk-register', adminChallengeController.bulkRegisterChallenges);
 
 // Get generation statistics
-router.get('/stats', adminChallengeController.getGenerationStats);
+router.get('/stats', challengeController.getChallengeStats);
 
 // Get all challenges for admin
-router.get('/all', adminChallengeController.getAllChallenges);
+router.get('/all', challengeController.getAllChallenges); // Main challenges only
+
+// Get daily challenges for admin  
+router.get('/daily', adminChallengeController.getAllChallenges); // Daily challenges only
 
 // Bulk generate for date range
 router.post('/bulk-generate', adminChallengeController.bulkGenerate);

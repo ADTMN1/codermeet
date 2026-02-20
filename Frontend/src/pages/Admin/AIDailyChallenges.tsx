@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '../../components/ui/button';
+import { useDailyChallengeStats, useDailyChallenges } from '../../hooks/useChallenges';
 
 interface DailyChallenge {
   _id: string;
@@ -82,10 +83,7 @@ interface GenerationStats {
 }
 
 const AIDailyChallenges: React.FC = () => {
-  const [challenges, setChallenges] = useState<DailyChallenge[]>([]);
-  const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
-  const [stats, setStats] = useState<GenerationStats | null>(null);
   const [showGenerateModal, setShowGenerateModal] = useState(false);
   const [showBulkModal, setShowBulkModal] = useState(false);
   const [selectedChallenge, setSelectedChallenge] = useState<DailyChallenge | null>(null);
@@ -137,76 +135,25 @@ const AIDailyChallenges: React.FC = () => {
     'Dynamic Programming', 'Graphs', 'Recursion', 'Sorting', 'Searching'
   ];
 
-  const fetchChallenges = async () => {
-    try {
-      setLoading(true);
-      const token = localStorage.getItem('auth_token');
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/admin/challenges/all`,
-        {
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': token ? `Bearer ${token}` : ''
-          }
-        }
-      );
-
-      if (response.status === 401) {
-        toast.error('Authentication required. Please log in as an admin.');
-        return;
-      }
-      
-      if (response.status === 403) {
-        toast.error('Admin access required. You do not have permission to manage daily challenges.');
-        return;
-      }
-
-      const data = await response.json();
-      console.log('📊 Debug - Response status:', response.status);
-      console.log('📝 Debug - Response data:', data);
-      
-      if (data.success) {
-        // Handle the correct response structure from getAllChallenges
-        const challengesData = data.data?.challenges || data.data || [];
-        console.log('📊 Debug - Challenges data:', challengesData);
-        setChallenges(Array.isArray(challengesData) ? challengesData : []);
-      } else {
-        console.log('❌ Debug - API Error:', data.message);
-        toast.error(data.message || 'Failed to fetch challenges');
-      }
-    } catch (error) {
-      console.error('🚨 Debug - Error fetching challenges:', error);
-      console.error('🚨 Debug - Error details:', (error as Error).message);
-      console.error('🚨 Debug - Error stack:', (error as Error).stack);
-      toast.error(`Failed to fetch challenges: ${(error as Error).message}`);
-    } finally {
-      setLoading(false);
+  const { data: stats, isLoading: statsLoading, error: statsError } = useDailyChallengeStats();
+  const { data: challengesData, isLoading: challengesLoading, error: challengesError } = useDailyChallenges({ limit: 100 });
+  
+  const challenges = challengesData?.challenges || [];
+  
+  // Remove manual loading state - React Query handles it
+  // const isLoading = statsLoading || challengesLoading;
+  
+  // Error handling
+  useEffect(() => {
+    if (statsError) {
+      toast.error('Failed to load daily challenge statistics');
+      console.error('Stats error:', statsError);
     }
-  };
-
-  const fetchStats = async () => {
-    try {
-      const token = localStorage.getItem('auth_token');
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/admin/challenges/stats`,
-        {
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': token ? `Bearer ${token}` : ''
-          }
-        }
-      );
-
-      if (response.ok) {
-        const data = await response.json();
-        if (data.success) {
-          setStats(data.data);
-        }
-      }
-    } catch (error) {
-      console.error('Error fetching stats:', error);
+    if (challengesError) {
+      toast.error('Failed to load daily challenges');
+      console.error('Challenges error:', challengesError);
     }
-  };
+  }, [statsError, challengesError]);
 
   const fetchAvailableDates = async () => {
     try {
@@ -339,8 +286,7 @@ const AIDailyChallenges: React.FC = () => {
           });
         }
         
-        fetchChallenges();
-        fetchMonthlySchedule();
+        // React Query will automatically refetch
         setShowBulkModal(false);
       } else {
         toast.error(data.message || 'Failed to bulk register challenges');
@@ -354,8 +300,6 @@ const AIDailyChallenges: React.FC = () => {
   };
 
   useEffect(() => {
-    fetchChallenges();
-    fetchStats();
     fetchAvailableDates();
     fetchMonthlySchedule();
   }, []);
@@ -418,7 +362,6 @@ const AIDailyChallenges: React.FC = () => {
         toast.success(data.message || (saveImmediately ? 'Challenge created successfully!' : 'Challenge generated successfully!'));
         
         if (saveImmediately) {
-          fetchChallenges();
           setShowGenerateModal(false);
         }
       } else {
@@ -458,7 +401,6 @@ const AIDailyChallenges: React.FC = () => {
       
       if (data.success) {
         toast.success('Weekly challenges generated successfully!');
-        fetchChallenges();
         setShowBulkModal(false);
       } else {
         toast.error(data.message || 'Failed to generate weekly challenges');
@@ -532,7 +474,6 @@ const AIDailyChallenges: React.FC = () => {
 
       if (response.ok) {
         toast.success('Challenge deleted successfully!');
-        fetchChallenges();
       } else {
         toast.error('Failed to delete challenge');
       }
@@ -589,7 +530,7 @@ const AIDailyChallenges: React.FC = () => {
             Bulk Generate
           </Button>
           <Button
-            onClick={fetchChallenges}
+            onClick={() => window.location.reload()}
             variant="outline"
             className="border-gray-600 text-gray-300 hover:bg-gray-800"
           >
@@ -605,8 +546,8 @@ const AIDailyChallenges: React.FC = () => {
           <div className="bg-gradient-to-r from-purple-600 to-purple-800 border border-purple-500/30 rounded-xl p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-purple-200 text-sm">Total Generated</p>
-                <p className="text-2xl font-bold text-white">{stats.totalGenerated || 0}</p>
+                <p className="text-purple-200 text-sm">AI Generated Challenges</p>
+                <p className="text-2xl font-bold text-white">{stats?.totalGenerated || 0}</p>
               </div>
               <TrendingUp className="w-8 h-8 text-purple-300" />
             </div>
@@ -645,7 +586,7 @@ const AIDailyChallenges: React.FC = () => {
       )}
 
       {/* Challenges List */}
-      {loading ? (
+      {(statsLoading || challengesLoading) ? (
         <div className="flex items-center justify-center py-12">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
           <span className="ml-3 text-gray-400">Loading challenges...</span>

@@ -19,7 +19,7 @@ router.post("/toggle-2fa", adminController.toggleTwoFactorAuth);
 // User management routes
 router.get("/users", adminController.getAllUsers);
 router.get("/admins", adminController.getAdminUsers);
-router.get("/stats", adminController.getUserStats);
+router.get("/users/stats", adminController.getUserStats);
 router.put("/users/:userId/role", adminController.updateUserRole);
 router.put("/users/:userId/promote", adminController.promoteToAdmin);
 router.put("/users/:userId/demote", adminController.demoteFromAdmin);

@@ -53,7 +53,7 @@ class MessageService {
       const token = authService.getToken();
       
       const response = await axios.get(
-        `${API_CONFIG.BASE_URL}/challenges/${challengeId}/messages`,
+        `${API_CONFIG.BASE_URL}/messages/weekly-challenges/${challengeId}/messages`,
         {
           params: { page, limit },
           headers: {
@@ -73,7 +73,7 @@ class MessageService {
     try {
       const token = authService.getToken();
       const response = await axios.post(
-        `${API_CONFIG.BASE_URL}/challenges/${challengeId}/messages`,
+        `${API_CONFIG.BASE_URL}/messages/weekly-challenges/${challengeId}/messages`,
         messageData,
         {
           headers: {

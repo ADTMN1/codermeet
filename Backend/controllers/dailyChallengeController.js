@@ -4,6 +4,119 @@ const DailySubmission = require('../models/dailySubmission');
 const User = require('../models/user');
 const pointsService = require('../services/pointsService');
 
+// Get daily challenge statistics (AI-generated only)
+exports.getDailyChallengeStats = async (req, res) => {
+  try {
+    // Get AI-generated daily challenge stats
+    const dailyStats = await DailyChallenge.aggregate([
+      {
+        $group: {
+          _id: null,
+          totalGenerated: { $sum: 1 },
+          activeDailyChallenges: {
+            $sum: { $cond: ['$isActive', 1, 0] }
+          },
+          easyChallenges: {
+            $sum: { $cond: [{ $eq: ['$difficulty', 'Easy'] }, 1, 0] }
+          },
+          mediumChallenges: {
+            $sum: { $cond: [{ $eq: ['$difficulty', 'Medium'] }, 1, 0] }
+          },
+          hardChallenges: {
+            $sum: { $cond: [{ $eq: ['$difficulty', 'Hard'] }, 1, 0] }
+          },
+          avgTimeLimit: { $avg: '$timeLimit' },
+          avgMaxPoints: { $avg: '$maxPoints' },
+          totalWinners: { $sum: { $size: { $ifNull: ['$winners', []] } } }
+        }
+      }
+    ]);
+
+    // Get category breakdown for daily challenges
+    const categoryStats = await DailyChallenge.aggregate([
+      {
+        $group: {
+          _id: '$category',
+          count: { $sum: 1 },
+          avgTimeLimit: { $avg: '$timeLimit' },
+          avgMaxPoints: { $avg: '$maxPoints' }
+        }
+      },
+      { $sort: { count: -1 } }
+    ]);
+
+    // Get recent daily challenges (last 30 days)
+    const recentDailyChallenges = await DailyChallenge.find({
+      createdAt: { $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) }
+    })
+    .select('title difficulty category date isActive createdAt')
+    .sort({ createdAt: -1 })
+    .limit(10);
+
+    // Get generation trends (last 7 days)
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const generationTrends = await DailyChallenge.aggregate([
+      {
+        $match: {
+          createdAt: { $gte: sevenDaysAgo }
+        }
+      },
+      {
+        $group: {
+          _id: {
+            $dateToString: {
+              format: "%Y-%m-%d",
+              date: "$createdAt"
+            }
+          },
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { _id: 1 } }
+    ]);
+
+    const stats = dailyStats[0] || {};
+
+    res.status(200).json({
+      success: true,
+      data: {
+        totalGenerated: stats.totalGenerated || 0,
+        activeDailyChallenges: stats.activeDailyChallenges || 0,
+        easyChallenges: stats.easyChallenges || 0,
+        mediumChallenges: stats.mediumChallenges || 0,
+        hardChallenges: stats.hardChallenges || 0,
+        avgTimeLimit: Math.round(stats.avgTimeLimit || 0),
+        avgMaxPoints: Math.round(stats.avgMaxPoints || 0),
+        totalWinners: stats.totalWinners || 0,
+        successRate: stats.totalGenerated > 0 ? 
+          Math.round((stats.activeDailyChallenges / stats.totalGenerated) * 100) : 0,
+        mostUsedCategory: categoryStats.length > 0 ? categoryStats[0]._id : 'N/A',
+        mostUsedDifficulty: [
+          { name: 'Easy', count: stats.easyChallenges || 0 },
+          { name: 'Medium', count: stats.mediumChallenges || 0 },
+          { name: 'Hard', count: stats.hardChallenges || 0 }
+        ].sort((a, b) => b.count - a.count)[0]?.name || 'N/A',
+        byCategory: categoryStats,
+        recentActivity: recentDailyChallenges,
+        generationTrends,
+        overview: {
+          totalChallenges: stats.totalGenerated || 0,
+          activeChallenges: stats.activeDailyChallenges || 0,
+          avgTimeLimit: Math.round(stats.avgTimeLimit || 0),
+          avgMaxPoints: Math.round(stats.avgMaxPoints || 0)
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching daily challenge stats:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching daily challenge statistics',
+      error: error.message
+    });
+  }
+};
+
 // Helper function to get next challenge time
 function getNextChallengeTime() {
   const now = new Date();

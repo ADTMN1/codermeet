@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { X, Plus, Trash2 } from 'lucide-react';
-import { challengeService } from '../../services/challengeService';
+import { useCreateChallenge, useUpdateChallenge } from '../../hooks/useChallenges';
 import { resourceService } from '../../services/resourceService';
 import { toast } from 'sonner';
 import { Challenge } from '../../services/challengeService';
@@ -30,6 +30,10 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({ onClose, onSu
   });
   const [loading, setLoading] = useState(false);
 
+  // Professional React Query hooks
+  const createChallenge = useCreateChallenge();
+  const updateChallenge = useUpdateChallenge();
+
   // Populate form when editing a challenge
   useEffect(() => {
     if (challenge) {
@@ -41,7 +45,7 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({ onClose, onSu
         tags: challenge.tags || [],
         requirements: challenge.requirements || [''],
         deliverables: challenge.deliverables || [''],
-        resources: challenge.resources?.map(r => ({ ...r, icon: r.icon || 'BookOpen' })) || [{ title: '', url: '', type: 'article', icon: 'BookOpen' }],
+        resources: challenge.resources?.map(r => ({ ...r, icon: 'BookOpen' })) || [{ title: '', url: '', type: 'article', icon: 'BookOpen' }],
         startDate: challenge.startDate ? new Date(challenge.startDate).toISOString().split('T')[0] : '',
         endDate: challenge.endDate ? new Date(challenge.endDate).toISOString().split('T')[0] : '',
         maxParticipants: challenge.maxParticipants?.toString() || '',
@@ -149,13 +153,12 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({ onClose, onSu
 
       if (challenge) {
         // Update existing challenge
-        await challengeService.updateChallenge(challenge._id, challengeData as any);
-        toast.success('Challenge updated successfully!');
+        await updateChallenge.mutateAsync({ id: challenge._id, data: challengeData as unknown as Partial<Challenge> });
       } else {
         // Create new challenge
-        await challengeService.createChallenge(challengeData as any);
+        await createChallenge.mutateAsync(challengeData);
         
-        // Create resources for the challenge
+        // Create resources for challenge (only for new challenges)
         const validResources = formData.resources.filter(res => res.title.trim() !== '' && res.url.trim() !== '');
         if (validResources.length > 0) {
           for (const resource of validResources) {
@@ -178,15 +181,13 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({ onClose, onSu
           }
           toast.success(`${validResources.length} resources created successfully!`);
         }
-        
-        toast.success('Challenge created successfully!');
       }
       
       onSuccess();
       onClose();
     } catch (error: any) {
-      const errorMessage = challenge ? 'Failed to update challenge' : 'Failed to create challenge';
-      toast.error(error.response?.data?.message || errorMessage);
+      // Error handling is done in the hooks, but we'll add a fallback
+      console.error('Form submission error:', error);
     } finally {
       setLoading(false);
     }

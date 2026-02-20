@@ -35,7 +35,7 @@ export function ChallengeOverviewCard({
         let challengeData;
         if (challengeId) {
           // Use public challenges endpoint for regular users
-          const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/challenges/${challengeId}`, {
+          const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/weekly-challenges/${challengeId}`, {
             headers: {
               'Content-Type': 'application/json',
               'Authorization': localStorage.getItem('auth_token') ? `Bearer ${localStorage.getItem('auth_token')}` : ''
@@ -45,7 +45,7 @@ export function ChallengeOverviewCard({
           challengeData = data.data || null;
         } else {
           // Use public challenges endpoint for regular users
-          const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/challenges?status=active&limit=1`, {
+          const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/weekly-challenges?status=active&limit=1`, {
             headers: {
               'Content-Type': 'application/json',
               'Authorization': localStorage.getItem('auth_token') ? `Bearer ${localStorage.getItem('auth_token')}` : ''

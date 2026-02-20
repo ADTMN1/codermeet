@@ -91,7 +91,7 @@ export default function DailyCoding() {
     const fetchChallenge = async () => {
       try {
         const token = localStorage.getItem('auth_token');
-        const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/daily-challenge/today`, {
+        const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/daily-challenge/today`, {
           headers: {
             'Content-Type': 'application/json',
             'Authorization': token ? `Bearer ${token}` : ''
@@ -121,7 +121,7 @@ export default function DailyCoding() {
   useEffect(() => {
     const fetchLeaderboard = async () => {
       try {
-        const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/daily-challenge/leaderboard`);
+        const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/daily-challenge/leaderboard`);
         const data = await response.json();
         
         if (data.success) {
@@ -145,7 +145,7 @@ export default function DailyCoding() {
     
     try {
       const token = localStorage.getItem('auth_token');
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/daily-challenge/submit`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/daily-challenge/submit`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -167,7 +167,7 @@ export default function DailyCoding() {
         setOutput(`Status: ${passed ? 'PASSED' : 'FAILED'}\nScore: ${score}\nTime: ${data.data.completionTime || 'N/A'}`);
         
         // Refresh leaderboard
-        const leaderboardResponse = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/daily-challenge/leaderboard`);
+        const leaderboardResponse = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/daily-challenge/leaderboard`);
         const leaderboardData = await leaderboardResponse.json();
         if (leaderboardData.success) {
           setLeaderboard(leaderboardData.data);

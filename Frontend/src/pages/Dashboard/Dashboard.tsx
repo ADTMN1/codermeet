@@ -79,6 +79,13 @@ const Dashboard: React.FC = () => {
     totalProjects: 0,
   });
 
+  const [weeklyChallenges, setWeeklyChallenges] = useState<any[]>([]);
+
+  // Calculate active weekly challenges
+  const activeWeeklyChallenges = weeklyChallenges.filter(challenge => 
+    challenge.status === 'active' || challenge.status === 'upcoming'
+  );
+
   // Calculate real-time progress based on completed challenges
   const onprogress = stats.totalChallenges > 0 ? Math.round((stats.completedChallenges / stats.totalChallenges) * 100) : 0;
 
@@ -228,8 +235,8 @@ const Dashboard: React.FC = () => {
 
         
 
-        // Fetch leaderboard data, stats, mentorship session, and exact rank
-        const [leaderboardRes, statsRes, mentorshipRes, rankRes, businessRes] = await Promise.all([
+        // Fetch leaderboard data, stats, mentorship session, exact rank, and weekly challenges
+        const [leaderboardRes, statsRes, mentorshipRes, rankRes, businessRes, weeklyChallengesRes] = await Promise.all([
           axios.get(`${API_BASE_URL}/leaderboard`),
           axios.get(`${API_BASE_URL}/users/${user._id}/stats`, {
             headers: {
@@ -246,7 +253,12 @@ const Dashboard: React.FC = () => {
               'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
             }
           }),
-          axios.get(`${API_BASE_URL}/business-ideas/competition/active`)
+          axios.get(`${API_BASE_URL}/business-ideas/competition/active`),
+          axios.get(`${API_BASE_URL}/weekly-challenges`, {
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+            }
+          })
         ]);
         
         setLeaderboard(leaderboardRes.data.users || []);
@@ -263,6 +275,11 @@ const Dashboard: React.FC = () => {
         // Set business competition data
         if (businessRes.data.success) {
           setBusinessCompetition(businessRes.data.data);
+        }
+
+        // Set weekly challenges data
+        if (weeklyChallengesRes.data.success) {
+          setWeeklyChallenges(weeklyChallengesRes.data.data.weeklyChallenges || []);
         }
 
 
@@ -384,63 +401,40 @@ const Dashboard: React.FC = () => {
       };
 
     }
-
   }, [user?._id]);
 
-
-
   const handleJoin = () => {
-
     if (user?.plan?.toLowerCase() === 'trial') {
-
       alert('Upgrade to Basic or Premium plan to participate in challenges!');
-
       return;
-
     }
-
-    navigate('/weeklyChallenge');
-
+    
+    // Navigate to first active weekly challenge
+    if (activeWeeklyChallenges.length > 0) {
+      navigate(`/weeklyChallenge/${activeWeeklyChallenges[0]._id}`);
+    } else {
+      navigate('/weeklyChallenge');
+    }
   };
-
-
 
   const handleSolveChallenge = () => {
-
     if (user?.plan?.toLowerCase() === 'trial') {
-
       alert('Upgrade to Basic or Premium plan to access coding challenges!');
-
       return;
-
     }
-
     navigate('/daily-challenge');
-
   };
 
-
-
   const handleMentorshipAction = () => {
-
     if (mentorshipSession) {
-
       // Join existing session
-
       alert(`Joining session: ${mentorshipSession.topic} with ${mentorshipSession.mentor.username}`);
-
       // In a real app, this would navigate to a video call or session page
-
       // navigate(`/mentorship/session/${mentorshipSession.id}`);
-
     } else {
-
       // Navigate to mentorship dashboard
-
       navigate('/mentorship-dashboard');
-
     }
-
   };
 
 
@@ -761,10 +755,10 @@ const Dashboard: React.FC = () => {
             </div>
 
             <div className="text-gray-400 mb-2">
-              {stats.totalChallenges > 0 ? 'Active challenge available' : 'No active challenges'}
+              {activeWeeklyChallenges.length > 0 ? 'Active challenge available' : 'No active challenges'}
             </div>
             <div className="text-gray-500 mb-4">
-              {stats.totalChallenges > 0 ? 'Join now to compete!' : 'Check back soon for new challenges'}
+              {activeWeeklyChallenges.length > 0 ? 'Join now to compete!' : 'Check back soon for new challenges'}
             </div>
 
             <button
@@ -774,20 +768,14 @@ const Dashboard: React.FC = () => {
               onClick={handleJoin}
 
               className={`text-heading font-medium leading-5 rounded-full text-sm px-6 py-3 focus:outline-none cursor-pointer transition shadow-md min-w-[100px] min-h-[44px] ${
-
-                user?.plan?.toLowerCase() === 'trial' || !stats || stats.totalChallenges === 0 || stats.totalChallenges === undefined
-
+                user?.plan?.toLowerCase() === 'trial' || activeWeeklyChallenges.length === 0
                   ? 'bg-gray-600 text-gray-400 cursor-not-allowed hover:bg-gray-600'
-
                   : 'bg-neutral-primary box-border border border-transparent hover:bg-neutral-secondary-medium focus:ring-4 focus:ring-neutral-tertiary-soft hover:shadow-[0_0_15px_#C27AFF] shadow-md transition'
-
               }`}
 
-              disabled={user?.plan?.toLowerCase() === 'trial' || !stats || stats.totalChallenges === 0 || stats.totalChallenges === undefined}
-
+              disabled={user?.plan?.toLowerCase() === 'trial' || activeWeeklyChallenges.length === 0}
             >
-
-              {user?.plan?.toLowerCase() === 'trial' ? 'Upgrade Required' : (!stats || stats.totalChallenges === 0 || stats.totalChallenges === undefined) ? 'No Challenge' : 'Join'}
+              {user?.plan?.toLowerCase() === 'trial' ? 'Upgrade Required' : activeWeeklyChallenges.length === 0 ? 'No Challenge' : 'Join'}
 
             </button>
 

@@ -30,17 +30,6 @@ const UserManagement: React.FC = () => {
 
   useEffect(() => {
     fetchUserData();
-    
-    // Listen for refresh events
-    const handleRefresh = () => {
-      fetchUserData();
-    };
-    
-    window.addEventListener('admin-refresh', handleRefresh);
-    
-    return () => {
-      window.removeEventListener('admin-refresh', handleRefresh);
-    };
   }, []);
 
   const fetchUserData = async () => {
@@ -51,9 +40,10 @@ const UserManagement: React.FC = () => {
         adminService.getUserStats()
       ]);
       
-      setUsers(usersData || []);
-      setStats(statsData || null);
-    } catch (error: any) {
+      setUsers(usersData);
+      setStats(statsData);
+    } catch (error) {
+      console.error('Error fetching user data:', error);
       toast.error('Failed to load user data');
     } finally {
       setLoading(false);
