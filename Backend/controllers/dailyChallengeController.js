@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const DailyChallenge = require('../models/dailyChallenge');
 const DailySubmission = require('../models/dailySubmission');
 const User = require('../models/user');
+const Notification = require('../models/notification');
 const pointsService = require('../services/pointsService');
 
 // Get daily challenge statistics (AI-generated only)
@@ -266,6 +267,25 @@ exports.submitSolution = async (req, res) => {
     });
 
     await submission.save();
+
+    // Create notification for admin users about new daily challenge submission
+    const adminUsers = await User.find({ role: 'admin' }).select('_id');
+    
+    for (const admin of adminUsers) {
+      await Notification.createNotification({
+        recipient: admin._id,
+        sender: userId,
+        title: 'New Daily Challenge Submission',
+        message: `New solution submitted for daily challenge: ${challenge.title}`,
+        type: 'challenge_submission',
+        metadata: {
+          priority: 'medium',
+          challengeId: challengeId,
+          userId: userId,
+          score: score.total
+        }
+      });
+    }
 
     // Award points for daily challenge completion
     try {

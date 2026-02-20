@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient, UseQueryOptions } from '@tanstack/react-query';
 import { challengeService, Challenge, ChallengeStats } from '../services/challengeService';
-import { toast } from 'sonner';
+import { useToast } from '../context/ToastContext';
 
 // Query keys for consistency
 export const challengeKeys = {
@@ -52,6 +52,7 @@ export const useChallenge = (id: string, options?: UseQueryOptions<Challenge>) =
 // Hook for creating challenges with optimistic updates
 export const useCreateChallenge = () => {
   const queryClient = useQueryClient();
+  const { error, success } = useToast();
 
   return useMutation({
     mutationFn: challengeService.createChallenge,
@@ -104,10 +105,10 @@ export const useCreateChallenge = () => {
       if (context?.previousStats) {
         queryClient.setQueryData(challengeKeys.stats(), context.previousStats);
       }
-      toast.error('Failed to create challenge');
+      error('Failed to create challenge');
     },
     onSuccess: () => {
-      toast.success('Challenge created successfully');
+      success('Challenge created successfully');
     },
     onSettled: () => {
       // Refetch to ensure server state
@@ -120,6 +121,7 @@ export const useCreateChallenge = () => {
 // Hook for updating challenges with optimistic updates
 export const useUpdateChallenge = () => {
   const queryClient = useQueryClient();
+  const { error, success } = useToast();
 
   return useMutation({
     mutationFn: ({ id, data }: { id: string; data: Partial<Challenge> }) =>
@@ -162,10 +164,10 @@ export const useUpdateChallenge = () => {
       if (context?.previousChallenge) {
         queryClient.setQueryData(challengeKeys.detail(variables.id), context.previousChallenge);
       }
-      toast.error('Failed to update challenge');
+      error('Failed to update challenge');
     },
     onSuccess: () => {
-      toast.success('Challenge updated successfully');
+      success('Challenge updated successfully');
     },
     onSettled: (_, __, { id }) => {
       // Refetch to ensure server state
@@ -178,6 +180,7 @@ export const useUpdateChallenge = () => {
 // Hook for deleting challenges with optimistic updates
 export const useDeleteChallenge = () => {
   const queryClient = useQueryClient();
+  const { error, success } = useToast();
 
   return useMutation({
     mutationFn: challengeService.deleteChallenge,
@@ -229,10 +232,10 @@ export const useDeleteChallenge = () => {
       if (context?.previousStats) {
         queryClient.setQueryData(challengeKeys.stats(), context.previousStats);
       }
-      toast.error('Failed to delete challenge');
+      error('Failed to delete challenge');
     },
     onSuccess: () => {
-      toast.success('Challenge deleted successfully');
+      success('Challenge deleted successfully');
     },
     onSettled: () => {
       // Refetch to ensure server state
@@ -258,6 +261,7 @@ export const useChallengeSubmissions = (challengeId: string, params?: {
 // Hook for reviewing submissions
 export const useReviewSubmission = () => {
   const queryClient = useQueryClient();
+  const { success } = useToast();
 
   return useMutation({
     mutationFn: ({ challengeId, submissionId, reviewData }: {
@@ -266,7 +270,7 @@ export const useReviewSubmission = () => {
       reviewData: { status: string; score: number; feedback: string };
     }) => challengeService.reviewSubmission(challengeId, submissionId, reviewData),
     onSuccess: () => {
-      toast.success('Submission reviewed successfully');
+      success('Submission reviewed successfully');
     },
     onSettled: (_, __, { challengeId }) => {
       // Refetch challenge data and submissions

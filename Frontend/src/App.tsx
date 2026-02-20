@@ -251,6 +251,7 @@ function AppContent() {
             <Route path="system" element={<SystemHealth />} />
             <Route path="daily-challenges" element={<AIDailyChallenges />} />
             <Route path="weekly-challenges" element={<WeeklyContestsSimple />} />
+            <Route path="weekly-challenges/:id" element={<ChallengeDetail />} />
             <Route path="weekly-challenges/create" element={<CreateWeeklyContest />} />
             <Route path="analytics" element={<AnalyticsSimple />} />
             <Route path="settings" element={<AdminSettingsSimple />} />

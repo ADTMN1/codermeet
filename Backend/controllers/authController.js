@@ -1,6 +1,7 @@
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const User = require("../models/user");
+const Notification = require("../models/notification");
 const { checkAccountLockout, recordFailedAttempt, recordSuccessfulAttempt } = require("../middlewares/accountLockout");
 
 const INVALID_CREDENTIALS = "Invalid credentials";
@@ -136,7 +137,6 @@ exports.register = async (req, res) => {
     if (!email || typeof email !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       return res.status(400).json({ success: false, message: "Valid email is required" });
     }
-    
     if (!password || !confirmPassword) {
       return res.status(400).json({ success: false, message: "Password and confirm password are required" });
     }
@@ -230,6 +230,44 @@ exports.register = async (req, res) => {
       token, // Include token for automatic login
       user: userResponse, // Include full user data
     });
+
+    // Create notification for admin users about new registration
+    try {
+      const adminUsers = await User.find({ role: 'admin' }).select('_id');
+      
+      for (const admin of adminUsers) {
+        await Notification.createNotification({
+          recipient: admin._id,
+          sender: user._id,
+          title: 'New User Registration',
+          message: `${user.fullName} (${user.email}) has joined the platform`,
+          type: 'system',
+          metadata: { 
+            priority: 'low',
+            userId: user._id,
+            userEmail: user.email
+          }
+        });
+      }
+      
+      // Emit real-time notifications
+      const io = req.app.get('io');
+      if (io) {
+        for (const admin of adminUsers) {
+          io.to(`user_${admin._id}`).emit('new-notification', {
+            type: 'user_signup',
+            title: 'New User Registration',
+            message: `${user.fullName} (${user.email}) has joined the platform`,
+            priority: 'low',
+            userName: user.fullName,
+            userEmail: user.email
+          });
+        }
+      }
+    } catch (notificationError) {
+      console.error('Error creating registration notification:', notificationError);
+      // Don't fail the request if notification fails
+    }
   } catch (err) {
     if (process.env.NODE_ENV === 'development') {
       console.error('Registration error:', err.message);

@@ -8,6 +8,7 @@ router.post('/', authenticate, requireAdmin, weeklyChallengeController.createWee
 router.get('/stats', authenticate, requireAdmin, weeklyChallengeController.getWeeklyChallengeStats);
 router.put('/:id', authenticate, requireAdmin, weeklyChallengeController.updateWeeklyChallenge);
 router.delete('/:id', authenticate, requireAdmin, weeklyChallengeController.deleteWeeklyChallenge);
+router.get('/:id/submissions', authenticate, requireAdmin, weeklyChallengeController.getWeeklyChallengeSubmissions);
 router.put('/:id/submissions/:submissionId/review', authenticate, requireAdmin, weeklyChallengeController.reviewWeeklySubmission);
 router.put('/:id/announce-winners', authenticate, requireAdmin, weeklyChallengeController.announceWinners);
 

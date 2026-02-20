@@ -145,6 +145,7 @@ const WeeklyContestsSimple: React.FC = () => {
 
   const handleDelete = async (id: string, title: string) => {
     if (!confirm(`Are you sure you want to delete "${title}"?`)) return;
+    
 
     try {
       await challengeService.deleteWeeklyChallenge(id);
@@ -391,7 +392,7 @@ const WeeklyContestsSimple: React.FC = () => {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => navigate(`/admin/weekly-challenges/${challenge._id}/edit`)}
+                    onClick={() => navigate(`/admin/weekly-challenges/create`, { state: { editingChallenge: challenge } })}
                   >
                     <Edit className="w-4 h-4 mr-1" />
                     Edit

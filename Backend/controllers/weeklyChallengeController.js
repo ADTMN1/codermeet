@@ -1,5 +1,7 @@
 const WeeklyChallenge = require('../models/weeklyChallenge');
 const User = require('../models/user');
+const Notification = require('../models/notification');
+const mongoose = require('mongoose');
 
 // Get all weekly challenges
 exports.getAllWeeklyChallenges = async (req, res) => {
@@ -120,6 +122,42 @@ exports.createWeeklyChallenge = async (req, res) => {
 
     // Populate the created challenge
     await weeklyChallenge.populate('createdBy', 'username fullName avatar');
+
+    // Create notification for admin users about new challenge
+    try {
+      const adminUsers = await User.find({ role: 'admin' }).select('_id');
+      
+      for (const admin of adminUsers) {
+        await Notification.createNotification({
+          recipient: admin._id,
+          sender: req.userProfile._id,
+          title: 'New Weekly Challenge Created',
+          message: `${weeklyChallenge.title} has been created for ${weeklyChallenge.category}`,
+          type: 'challenge',
+          metadata: { 
+            priority: 'medium',
+            challengeId: weeklyChallenge._id,
+            category: weeklyChallenge.category
+          }
+        });
+      }
+      
+      // Emit real-time notifications
+      const io = req.app.get('io');
+      if (io) {
+        for (const admin of adminUsers) {
+          io.to(`user_${admin._id}`).emit('new-notification', {
+            type: 'challenge_creation',
+            title: 'New Weekly Challenge Created',
+            message: `${weeklyChallenge.title} has been created for ${weeklyChallenge.category}`,
+            priority: 'medium'
+          });
+        }
+      }
+    } catch (notificationError) {
+      console.error('Error creating challenge notification:', notificationError);
+      // Don't fail the request if notification fails
+    }
 
     res.status(201).json({
       success: true,
@@ -343,6 +381,24 @@ exports.submitWeeklyChallenge = async (req, res) => {
     });
 
     await weeklyChallenge.save();
+
+    // Create notification for admin users about new submission
+    const adminUsers = await User.find({ role: 'admin' }).select('_id');
+    
+    for (const admin of adminUsers) {
+      await Notification.createNotification({
+        recipient: admin._id,
+        sender: userId,
+        title: 'New Challenge Submission',
+        message: `New project submitted for weekly challenge: ${weeklyChallenge.title}`,
+        type: 'project_submission',
+        metadata: {
+          priority: 'medium',
+          challengeId: weeklyChallenge._id,
+          userId: userId
+        }
+      });
+    }
 
     res.status(200).json({
       success: true,
@@ -589,6 +645,67 @@ exports.getWeeklyChallengeStats = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error fetching weekly challenge statistics',
+      error: error.message
+    });
+  }
+};
+
+// Get all submissions for a weekly challenge (admin only)
+exports.getWeeklyChallengeSubmissions = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const {
+      page = 1,
+      limit = 10,
+      status
+    } = req.query;
+
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+    const skip = (pageNum - 1) * limitNum;
+
+    // Find the weekly challenge and populate submissions
+    const challenge = await WeeklyChallenge.findById(id)
+      .populate({
+        path: 'submissions.user',
+        select: 'username fullName avatar email'
+      });
+
+    if (!challenge) {
+      return res.status(404).json({
+        success: false,
+        message: 'Weekly challenge not found'
+      });
+    }
+
+    // Filter submissions by status if provided
+    let submissions = challenge.submissions || [];
+    if (status) {
+      submissions = submissions.filter(sub => sub.status === status);
+    }
+
+    // Sort by submission date (newest first)
+    submissions.sort((a, b) => new Date(b.submittedAt) - new Date(a.submittedAt));
+
+    // Apply pagination
+    const total = submissions.length;
+    const paginatedSubmissions = submissions.slice(skip, skip + limitNum);
+
+    res.status(200).json({
+      success: true,
+      data: paginatedSubmissions,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        total,
+        pages: Math.ceil(total / limitNum)
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching weekly challenge submissions:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching weekly challenge submissions',
       error: error.message
     });
   }

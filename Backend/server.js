@@ -88,27 +88,19 @@ const fs = require('fs');
 
 const path = require('path');
 
-
-
 const app = express();
 
 const server = http.createServer(app);
 
 const io = socketIo(server, {
-
   cors: {
-
     origin: process.env.FRONTEND_URL?.split(',') || ["http://localhost:3000", "http://localhost:5173"],
-
     methods: ["GET", "POST"],
-
     credentials: true
-
-  }
-
+  },
+  transports: ['websocket', 'polling'],
+  allowEIO3: true
 });
-
-
 
 const PORT = process.env.PORT || 5000;
 

@@ -1,6 +1,7 @@
 // controllers/challengeController.js
 const Challenge = require('../models/challenge');
 const User = require('../models/user');
+const Notification = require('../models/notification');
 const pointsService = require('../services/pointsService');
 
 // Create new challenge
@@ -396,6 +397,25 @@ exports.submitProject = async (req, res) => {
     challenge.submissions.push(submissionData);
 
     await challenge.save();
+
+    // Create notification for admin users about new project submission
+    const adminUsers = await User.find({ role: 'admin' }).select('_id');
+    
+    for (const admin of adminUsers) {
+      await Notification.createNotification({
+        recipient: admin._id,
+        sender: userId,
+        title: 'New Project Submission',
+        message: `New project submitted for challenge: ${challenge.title}`,
+        type: 'project_submission',
+        metadata: {
+          priority: 'medium',
+          challengeId: id,
+          userId: userId,
+          submissionId: challenge.submissions[challenge.submissions.length - 1]._id
+        }
+      });
+    }
 
     // Award points for challenge completion
     try {

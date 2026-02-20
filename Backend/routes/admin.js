@@ -29,4 +29,12 @@ router.delete("/users/:userId", adminController.deleteUser);
 router.get("/system/health", adminController.getSystemHealth);
 router.get("/system/activity", adminController.getSystemActivity);
 
+// Notification routes
+const adminNotificationController = require("../controllers/adminNotificationController");
+router.get("/notifications", adminNotificationController.getAdminNotifications);
+router.post("/notifications", adminNotificationController.createSystemNotification);
+router.put("/notifications/:id/read", adminNotificationController.markAdminNotificationAsRead);
+router.put("/notifications/read-all", adminNotificationController.markAllAdminNotificationsAsRead);
+router.delete("/notifications/:id", adminNotificationController.deleteAdminNotification);
+
 module.exports = router;

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { 
   ArrowLeft,
@@ -26,10 +26,14 @@ import { Button } from '../../components/ui/button';
 const ChallengeDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const [challenge, setChallenge] = useState<Challenge | null>(null);
   const [loading, setLoading] = useState(true);
   const [submissions, setSubmissions] = useState<any[]>([]);
   const [showEditForm, setShowEditForm] = useState(false);
+
+  // Check if this is a weekly challenge based on route
+  const isWeeklyChallenge = location.pathname.includes('/weekly-challenges/');
 
   useEffect(() => {
     if (id) {
@@ -41,15 +45,19 @@ const ChallengeDetail: React.FC = () => {
     try {
       setLoading(true);
       const [challengeData, submissionsData] = await Promise.all([
-        challengeService.getChallengeById(challengeId),
-        challengeService.getChallengeSubmissions(challengeId)
+        isWeeklyChallenge 
+          ? challengeService.getWeeklyChallengeById(challengeId)
+          : challengeService.getChallengeById(challengeId),
+        isWeeklyChallenge
+          ? challengeService.getWeeklyChallengeSubmissions(challengeId)
+          : challengeService.getChallengeSubmissions(challengeId)
       ]);
       
       setChallenge(challengeData);
       setSubmissions(submissionsData?.data || []);
     } catch (error: any) {
       toast.error('Failed to load challenge details');
-      navigate('/admin/challenges');
+      navigate(isWeeklyChallenge ? '/admin/weekly-challenges' : '/admin/challenges');
     } finally {
       setLoading(false);
     }
@@ -63,7 +71,7 @@ const ChallengeDetail: React.FC = () => {
     try {
       await challengeService.deleteChallenge(challenge._id);
       toast.success('Challenge deleted successfully');
-      navigate('/admin/challenges');
+      navigate(isWeeklyChallenge ? '/admin/weekly-challenges' : '/admin/challenges');
     } catch (error) {
       toast.error('Failed to delete challenge');
     }

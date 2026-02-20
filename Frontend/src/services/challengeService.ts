@@ -183,6 +183,16 @@ export const challengeService = {
     });
   },
 
+  // Get weekly challenge by ID
+  getWeeklyChallengeById: async (id: string): Promise<Challenge> => {
+    return retryRequest(async () => {
+      const response = await axios.get(`${API_URL}/weekly-challenges/${id}`, {
+        headers: getAuthHeaders(),
+      });
+      return response.data.data;
+    });
+  },
+
   // Update challenge
   updateChallenge: async (id: string, challengeData: Partial<Challenge>): Promise<Challenge> => {
     return retryRequest(async () => {
@@ -219,6 +229,19 @@ export const challengeService = {
     limit?: number;
   }): Promise<{ data: any[]; pagination: any }> => {
     const response = await axios.get(`${API_URL}/admin/challenges/${id}/submissions`, {
+      params,
+      headers: getAuthHeaders(),
+    });
+    return response.data;
+  },
+
+  // Get weekly challenge submissions
+  getWeeklyChallengeSubmissions: async (id: string, params?: {
+    status?: string;
+    page?: number;
+    limit?: number;
+  }): Promise<{ data: any[]; pagination: any }> => {
+    const response = await axios.get(`${API_URL}/weekly-challenges/${id}/submissions`, {
       params,
       headers: getAuthHeaders(),
     });
@@ -268,13 +291,6 @@ export const challengeService = {
   }): Promise<{ data: any[]; pagination: any }> => {
     const response = await axios.get(`${API_URL}/weekly-challenges`, {
       params,
-      headers: getAuthHeaders(),
-    });
-    return response.data.data;
-  },
-
-  getWeeklyChallengeById: async (id: string): Promise<any> => {
-    const response = await axios.get(`${API_URL}/weekly-challenges/${id}`, {
       headers: getAuthHeaders(),
     });
     return response.data.data;

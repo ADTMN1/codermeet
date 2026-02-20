@@ -3,7 +3,8 @@ import { motion } from 'framer-motion';
 import { X, Plus, Trash2 } from 'lucide-react';
 import { useCreateChallenge, useUpdateChallenge } from '../../hooks/useChallenges';
 import { resourceService } from '../../services/resourceService';
-import { toast } from 'sonner';
+import { challengeService } from '../../services/challengeService';
+import { useToast } from '../../context/ToastContext';
 import { Challenge } from '../../services/challengeService';
 
 interface CreateChallengeFormProps {
@@ -13,6 +14,7 @@ interface CreateChallengeFormProps {
 }
 
 const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({ onClose, onSuccess, challenge }) => {
+  const { success, error, warning } = useToast();
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -134,8 +136,37 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({ onClose, onSu
     setLoading(true);
 
     try {
+      // Calculate week number and year for weekly challenges
+      const now = new Date();
+      const startOfYear = new Date(now.getFullYear(), 0, 1);
+      let weekNumber = Math.ceil((((now.getTime() - startOfYear.getTime()) / 86400000) + startOfYear.getDay() + 1) / 7);
+      const year = now.getFullYear();
+
+      // Check for existing challenge first
+      try {
+        const existingChallenges = await challengeService.getAllWeeklyChallenges({
+          page: 1,
+          limit: 100
+        });
+        
+        const existingForWeek = existingChallenges.data?.find(
+          (c: any) => c.weekNumber === weekNumber && c.year === year
+        );
+        
+        if (existingForWeek) {
+          error(`A weekly challenge for week ${weekNumber} already exists: "${existingForWeek.title}". Please update the existing challenge or choose a different week.`);
+          setLoading(false);
+          return;
+        }
+      } catch (checkError) {
+        console.warn('Could not check existing challenges:', checkError);
+      }
+
+      // If there's a conflict, try next week
       const challengeData = {
         ...formData,
+        weekNumber,
+        year,
         tags: formData.tags.filter((tag: string) => tag.trim() !== ''),
         requirements: formData.requirements.filter((req: string) => req.trim() !== ''),
         deliverables: formData.deliverables.filter((del: string) => del.trim() !== ''),
@@ -155,8 +186,8 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({ onClose, onSu
         // Update existing challenge
         await updateChallenge.mutateAsync({ id: challenge._id, data: challengeData as unknown as Partial<Challenge> });
       } else {
-        // Create new challenge
-        await createChallenge.mutateAsync(challengeData);
+        // Create new weekly challenge
+        await challengeService.createWeeklyChallenge(challengeData);
         
         // Create resources for challenge (only for new challenges)
         const validResources = formData.resources.filter(res => res.title.trim() !== '' && res.url.trim() !== '');
@@ -176,18 +207,24 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({ onClose, onSu
               });
             } catch (resourceError) {
               console.error('Failed to create resource:', resourceError);
-              toast.warning(`Resource "${resource.title}" could not be created`);
+              warning(`Resource "${resource.title}" could not be created`);
             }
           }
-          toast.success(`${validResources.length} resources created successfully!`);
+          success(`${validResources.length} resources created successfully!`);
         }
       }
       
+      success('Weekly challenge created successfully!');
       onSuccess();
       onClose();
     } catch (error: any) {
-      // Error handling is done in the hooks, but we'll add a fallback
+      // Error handling is done in hooks, but we'll add a fallback
       console.error('Form submission error:', error);
+      if (error.response?.data?.message) {
+        error(error.response.data.message);
+      } else {
+        error('Failed to create weekly challenge. Please try again.');
+      }
     } finally {
       setLoading(false);
     }

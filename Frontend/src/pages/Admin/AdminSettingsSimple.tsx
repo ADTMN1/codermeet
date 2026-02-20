@@ -157,6 +157,7 @@ const AdminSettingsSimple: React.FC = () => {
       return;
     }
 
+    setSaving(true);
     try {
       const response = await adminService.changePassword({
         currentPassword: passwordData.currentPassword,
@@ -173,6 +174,8 @@ const AdminSettingsSimple: React.FC = () => {
     } catch (error: any) {
       console.error('Password change error:', error);
       toast.error(error.response?.data?.message || 'Failed to change password');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -661,9 +664,17 @@ const AdminSettingsSimple: React.FC = () => {
               </Button>
               <Button
                 onClick={handlePasswordChange}
-                className="bg-blue-600 hover:bg-blue-700 text-white"
+                disabled={saving}
+                className="bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
               >
-                Change Password
+                {saving ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                    Changing...
+                  </>
+                ) : (
+                  'Change Password'
+                )}
               </Button>
             </div>
           </div>

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { 
@@ -26,6 +26,7 @@ import {
   useDeleteChallenge
 } from '../../hooks/useChallenges';
 import { Challenge } from '../../services/challengeService';
+import { challengeService } from '../../services/challengeService';
 import { toast } from 'sonner';
 import CreateChallengeForm from '../../components/admin/CreateChallengeForm';
 import { Card } from '../../components/ui/card';
@@ -36,42 +37,83 @@ const ChallengesHub: React.FC = () => {
   const [showCreateChallenge, setShowCreateChallenge] = useState(false);
   const [selectedChallenge, setSelectedChallenge] = useState<Challenge | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [challenges, setChallenges] = useState<Challenge[]>([]);
+  const [challengeStats, setChallengeStats] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
 
-  // Professional React Query hooks
-  const { data: challengesData, isLoading, error, refetch } = useChallenges({ limit: 100 });
-  const { data: challengeStats } = useChallengeStats();
-  const deleteChallenge = useDeleteChallenge();
-
-  // Extract challenges from the response structure
-  // Backend returns: { success: true, data: { challenges: Challenge[] } }
-  // React Query wraps this in its own data property
-  const challenges = challengesData?.data?.challenges || [];
-
-  // Calculate most used category with useMemo for performance
-  const categoryCounts = useMemo(() => {
-    return challenges.reduce((acc: Record<string, number>, challenge: Challenge) => {
-      const category = challenge.category || 'Uncategorized';
-      acc[category] = (acc[category] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
-  }, [challenges]);
-
-  const mostUsedCategory = useMemo(() => {
-    if (Object.keys(categoryCounts).length === 0) return 'N/A';
-    const maxCount = Math.max(...Object.values(categoryCounts).map(Number));
-    const topCategories = Object.keys(categoryCounts).filter(cat => categoryCounts[cat] === maxCount);
-    return topCategories.length > 1 ? `${topCategories[0]} (tie)` : topCategories[0];
-  }, [categoryCounts]);
-
-  // Filter challenges based on search term
-  const filteredChallenges = useMemo(() => {
-    if (!searchTerm) return challenges;
+  // Delete challenge function
+  const deleteChallenge = async (challengeId: string) => {
+    if (!confirm('Are you sure you want to delete this challenge?')) return;
     
-    return challenges.filter((challenge: Challenge) =>
-      challenge.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      challenge.description.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-  }, [challenges, searchTerm]);
+    try {
+      await challengeService.deleteChallenge(challengeId);
+      toast.success('Challenge deleted successfully');
+      fetchChallengesData(); // Refresh data
+    } catch (error) {
+      toast.error('Failed to delete challenge');
+    }
+  };
+
+  // Calculate most used category
+  const categoryCounts = challenges.reduce((acc, challenge) => {
+    const category = challenge.category || 'Uncategorized';
+    acc[category] = (acc[category] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+
+  // Debug: Log the category counts
+  console.log('Category counts:', categoryCounts);
+  console.log('Challenges:', challenges.map(c => ({ title: c.title, category: c.category })));
+
+  const mostUsedCategory = Object.keys(categoryCounts).length > 0 
+    ? (() => {
+        const maxCount = Math.max(...Object.values(categoryCounts));
+        const topCategories = Object.keys(categoryCounts).filter(cat => categoryCounts[cat] === maxCount);
+        return topCategories.length > 1 ? `${topCategories[0]} (tie)` : topCategories[0];
+      })()
+    : 'N/A';
+
+  useEffect(() => {
+    fetchChallengesData();
+    
+    // Listen for refresh events
+    const handleRefresh = () => {
+      fetchChallengesData();
+    };
+    
+    window.addEventListener('admin-refresh', handleRefresh);
+    
+    return () => {
+      window.removeEventListener('admin-refresh', handleRefresh);
+    };
+  }, []);
+
+  const fetchChallengesData = async () => {
+    try {
+      setLoading(true);
+      const [challengesData, statsData] = await Promise.all([
+        challengeService.getAllChallenges({ limit: 100 }),
+        challengeService.getChallengeStats()
+      ]);
+      
+      const challengesArray = challengesData?.data?.challenges || challengesData?.data || [];
+      setChallenges(challengesArray);
+      setChallengeStats(statsData || null);
+      
+      // Debug: Log the actual data being received
+      console.log('🔍 Debug - Challenges data:', {
+        challengesCount: challengesArray.length,
+        totalGenerated: statsData?.totalGenerated || 0,
+        overview: statsData?.overview,
+        statsData
+      });
+    } catch (error: any) {
+      console.error('Error fetching challenges data:', error);
+      toast.error('Failed to load challenges data');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleDeleteChallenge = async (challengeId: string, challengeTitle: string) => {
     if (!confirm(`Are you sure you want to delete challenge "${challengeTitle}"? This action cannot be undone.`)) {
@@ -79,8 +121,8 @@ const ChallengesHub: React.FC = () => {
     }
 
     try {
-      await deleteChallenge.mutateAsync(challengeId);
-      // Optimistic update handled by the hook - no need to manually update state
+      await deleteChallenge(challengeId);
+      // Optimistic update handled by hook - no need to manually update state
     } catch (error) {
       // Error handling is done in the hook
       console.error('Delete challenge error:', error);
@@ -95,29 +137,16 @@ const ChallengesHub: React.FC = () => {
     }
   };
 
-  const handleCreateSuccess = () => {
-    setShowCreateChallenge(false);
-    setSelectedChallenge(null);
-    // No need to refetch - optimistic updates handle this
-  };
+  const filteredChallenges = challenges.filter(challenge =>
+    // Filter by search term only (show all challenges regardless of status)
+    challenge.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    challenge.description.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
-  if (isLoading) {
+  if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-500"></div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-center">
-          <p className="text-red-400 mb-4">Failed to load challenges</p>
-          <Button onClick={() => refetch()} variant="outline" className="border-red-600 text-red-400">
-            Try Again
-          </Button>
-        </div>
       </div>
     );
   }
@@ -201,6 +230,7 @@ const ChallengesHub: React.FC = () => {
             className="bg-gradient-to-br from-purple-600 to-purple-800 border border-purple-700 rounded-xl p-4"
           >
             
+            
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-purple-200 text-sm font-medium">Avg Generation Time</p>
@@ -216,6 +246,7 @@ const ChallengesHub: React.FC = () => {
             transition={{ delay: 0.4 }}
           >
             <Card className="bg-gradient-to-br from-orange-600 to-orange-800 border-orange-700">
+            <Card className="bg-gradient-to-br from-orange-600 to-orange-800 border-orange-700">
               <div className="flex items-center justify-between">
                 <div>
                   <BarChart3 className="w-8 h-8 text-orange-300" />
@@ -224,6 +255,7 @@ const ChallengesHub: React.FC = () => {
                 </div>
                 <Users className="w-8 h-8 text-orange-300" />
               </div>
+            </Card>
             </Card>
           </motion.div>
         </div>
@@ -254,9 +286,9 @@ const ChallengesHub: React.FC = () => {
       {/* Challenges Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {filteredChallenges.map((challenge: Challenge, index: number) => (
-          <motion.div 
+          <motion.div
             key={challenge._id}
-            initial={{ opacity: 0, y: 20 }} 
+            initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: index * 0.1 }}
             className="bg-gray-900 border border-gray-800 rounded-xl p-6 hover:border-red-700 transition-colors"
@@ -265,7 +297,7 @@ const ChallengesHub: React.FC = () => {
               <div className="flex-1">
                 <h3 className="text-lg font-semibold text-white mb-2">{challenge.title}</h3>
                 <p className="text-gray-400 text-sm mb-3 line-clamp-2">{challenge.description}</p>
-                 
+                
                 <div className="flex flex-wrap gap-2 mb-3">
                   <span className={`px-3 py-1 rounded-full text-xs font-medium ${
                     challenge.difficulty === 'Easy' ? 'bg-green-500/20 text-green-300 border border-green-500/30' :
@@ -299,7 +331,7 @@ const ChallengesHub: React.FC = () => {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => navigate(`/admin/challenges/${challenge._id}`)}
+                onClick={() => navigate(`/admin/weekly-challenges/${challenge._id}`)}
                 className="border-blue-600 text-blue-400 hover:bg-blue-600/10"
               >
                 <Eye className="w-4 h-4 mr-1" />

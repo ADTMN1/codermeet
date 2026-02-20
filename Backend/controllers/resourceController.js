@@ -94,6 +94,7 @@ exports.updateResource = async (req, res) => {
         icon,
         color,
         bgColor,
+        
         category,
         isActive,
         order
