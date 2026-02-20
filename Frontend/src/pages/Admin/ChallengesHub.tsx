@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { 
@@ -20,12 +20,7 @@ import {
   Activity,
   BarChart3
 } from 'lucide-react';
-import { 
-  useChallenges, 
-  useChallengeStats, 
-  useDeleteChallenge
-} from '../../hooks/useChallenges';
-import { Challenge } from '../../services/challengeService';
+import { challengeService, Challenge, ChallengeStats } from '../../services/challengeService';
 import { challengeService } from '../../services/challengeService';
 import { toast } from 'sonner';
 import CreateChallengeForm from '../../components/admin/CreateChallengeForm';
@@ -34,25 +29,18 @@ import { Button } from '../../components/ui/button';
 
 const ChallengesHub: React.FC = () => {
   const navigate = useNavigate();
+  const [challenges, setChallenges] = useState<Challenge[]>([]);
+  const [challengeStats, setChallengeStats] = useState<ChallengeStats | null>(null);
+  const [loading, setLoading] = useState(true);
   const [showCreateChallenge, setShowCreateChallenge] = useState(false);
   const [selectedChallenge, setSelectedChallenge] = useState<Challenge | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [challenges, setChallenges] = useState<Challenge[]>([]);
-  const [challengeStats, setChallengeStats] = useState<any>(null);
-  const [loading, setLoading] = useState(false);
-
-  // Delete challenge function
-  const deleteChallenge = async (challengeId: string) => {
-    if (!confirm('Are you sure you want to delete this challenge?')) return;
-    
-    try {
-      await challengeService.deleteChallenge(challengeId);
-      toast.success('Challenge deleted successfully');
-      fetchChallengesData(); // Refresh data
-    } catch (error) {
-      toast.error('Failed to delete challenge');
-    }
-  };
+  const [deleteDialog, setDeleteDialog] = useState<{
+    isOpen: boolean;
+    challengeTitle?: string;
+    challengeId?: string;
+    isDeleting?: boolean;
+  } | null>(null);
 
   // Calculate most used category
   const categoryCounts = challenges.reduce((acc, challenge) => {
@@ -116,21 +104,32 @@ const ChallengesHub: React.FC = () => {
   };
 
   const handleDeleteChallenge = async (challengeId: string, challengeTitle: string) => {
-    if (!confirm(`Are you sure you want to delete challenge "${challengeTitle}"? This action cannot be undone.`)) {
-      return;
-    }
+    setDeleteDialog({
+      isOpen: true,
+      challengeTitle,
+      challengeId,
+      isDeleting: false
+    });
+  };
+
+  const confirmDeleteChallenge = async () => {
+    if (!deleteDialog?.challengeId) return;
 
     try {
-      await deleteChallenge(challengeId);
-      // Optimistic update handled by hook - no need to manually update state
+      setDeleteDialog(prev => prev ? { ...prev, isDeleting: true } : null);
+      await challengeService.deleteChallenge(deleteDialog.challengeId);
+      setChallenges(challenges.filter(challenge => challenge._id !== deleteDialog.challengeId));
+      toast.success('Challenge deleted successfully');
+      fetchChallengesData(); // Refresh stats
+      setDeleteDialog(null);
     } catch (error) {
-      // Error handling is done in the hook
-      console.error('Delete challenge error:', error);
+      toast.error('Failed to delete challenge');
+      setDeleteDialog(prev => prev ? { ...prev, isDeleting: false } : null);
     }
   };
 
-  const handleEditChallenge = (challengeId: string) => {
-    const challenge = challenges.find((c: Challenge) => c._id === challengeId);
+  const handleEditChallenge = async (challengeId: string) => {
+    const challenge = challenges.find(c => c._id === challengeId);
     if (challenge) {
       setSelectedChallenge(challenge);
       setShowCreateChallenge(true);
@@ -285,7 +284,7 @@ const ChallengesHub: React.FC = () => {
 
       {/* Challenges Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {filteredChallenges.map((challenge: Challenge, index: number) => (
+        {filteredChallenges.map((challenge, index) => (
           <motion.div
             key={challenge._id}
             initial={{ opacity: 0, y: 20 }}
@@ -380,8 +379,65 @@ const ChallengesHub: React.FC = () => {
             setShowCreateChallenge(false);
             setSelectedChallenge(null);
           }}
-          onSuccess={handleCreateSuccess}
+          onSuccess={() => {
+            setShowCreateChallenge(false);
+            setSelectedChallenge(null);
+            fetchChallengesData();
+          }}
         />
+      )}
+
+      {/* Professional Delete Confirmation Dialog */}
+      {deleteDialog && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-gray-900 border border-gray-700 rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
+            <div className="flex items-center mb-4">
+              <div className="w-12 h-12 bg-red-900/20 rounded-full flex items-center justify-center mr-4">
+                <Trash2 className="h-6 w-6 text-red-400" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-white">Confirm Challenge Deletion</h3>
+                <p className="text-sm text-gray-400">This action is permanent and cannot be undone</p>
+              </div>
+            </div>
+            
+            <div className="mb-6">
+              <p className="text-gray-300">
+                Are you sure you want to delete challenge <span className="font-semibold text-white">"{deleteDialog.challengeTitle}"</span>?
+              </p>
+              <p className="text-sm text-gray-500 mt-2">
+                This will permanently remove the challenge and all associated data including submissions, participants, and statistics.
+              </p>
+            </div>
+
+            <div className="flex justify-end space-x-3">
+              <button
+                onClick={() => setDeleteDialog(null)}
+                disabled={deleteDialog.isDeleting}
+                className="px-4 py-2 text-gray-300 bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDeleteChallenge}
+                disabled={deleteDialog.isDeleting}
+                className="px-4 py-2 text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors font-medium flex items-center disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+              >
+                {deleteDialog.isDeleting ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    Deleting...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Delete Challenge
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

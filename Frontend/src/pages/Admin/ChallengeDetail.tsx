@@ -31,6 +31,11 @@ const ChallengeDetail: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [submissions, setSubmissions] = useState<any[]>([]);
   const [showEditForm, setShowEditForm] = useState(false);
+  const [deleteDialog, setDeleteDialog] = useState<{
+    isOpen: boolean;
+    challengeTitle?: string;
+    isDeleting?: boolean;
+  } | null>(null);
 
   // Check if this is a weekly challenge based on route
   const isWeeklyChallenge = location.pathname.includes('/weekly-challenges/');
@@ -44,19 +49,55 @@ const ChallengeDetail: React.FC = () => {
   const fetchChallengeDetails = async (challengeId: string) => {
     try {
       setLoading(true);
-      const [challengeData, submissionsData] = await Promise.all([
-        isWeeklyChallenge 
-          ? challengeService.getWeeklyChallengeById(challengeId)
-          : challengeService.getChallengeById(challengeId),
-        isWeeklyChallenge
-          ? challengeService.getWeeklyChallengeSubmissions(challengeId)
-          : challengeService.getChallengeSubmissions(challengeId)
-      ]);
+      
+      // First try to determine the actual challenge type by attempting both endpoints
+      let challengeData;
+      let submissionsData;
+      let actualIsWeekly = isWeeklyChallenge;
+      
+      try {
+        // Try the expected endpoint first based on route
+        if (isWeeklyChallenge) {
+          challengeData = await challengeService.getWeeklyChallengeById(challengeId);
+          submissionsData = await challengeService.getWeeklyChallengeSubmissions(challengeId);
+        } else {
+          challengeData = await challengeService.getChallengeById(challengeId);
+          submissionsData = await challengeService.getChallengeSubmissions(challengeId);
+        }
+      } catch (error: any) {
+        // If the expected endpoint fails, try the other one
+        console.log('Primary endpoint failed, trying alternative...', error.response?.status);
+        
+        if (isWeeklyChallenge && error.response?.status === 404) {
+          // Try regular challenge instead
+          try {
+            challengeData = await challengeService.getChallengeById(challengeId);
+            submissionsData = await challengeService.getChallengeSubmissions(challengeId);
+            actualIsWeekly = false;
+            console.log('Challenge found in regular challenges collection');
+          } catch (fallbackError) {
+            throw fallbackError;
+          }
+        } else if (!isWeeklyChallenge && error.response?.status === 404) {
+          // Try weekly challenge instead
+          try {
+            challengeData = await challengeService.getWeeklyChallengeById(challengeId);
+            submissionsData = await challengeService.getWeeklyChallengeSubmissions(challengeId);
+            actualIsWeekly = true;
+            console.log('Challenge found in weekly challenges collection');
+          } catch (fallbackError) {
+            throw fallbackError;
+          }
+        } else {
+          throw error;
+        }
+      }
       
       setChallenge(challengeData);
       setSubmissions(submissionsData?.data || []);
     } catch (error: any) {
-      toast.error('Failed to load challenge details');
+      console.error('Failed to load challenge details:', error);
+      toast.error('Failed to load challenge details - Challenge not found');
       navigate(isWeeklyChallenge ? '/admin/weekly-challenges' : '/admin/challenges');
     } finally {
       setLoading(false);
@@ -64,16 +105,26 @@ const ChallengeDetail: React.FC = () => {
   };
 
   const handleDeleteChallenge = async () => {
-    if (!challenge || !confirm(`Are you sure you want to delete "${challenge.title}"?`)) {
-      return;
-    }
+    if (!challenge) return;
+    
+    setDeleteDialog({
+      isOpen: true,
+      challengeTitle: challenge.title,
+      isDeleting: false
+    });
+  };
+
+  const confirmDeleteChallenge = async () => {
+    if (!deleteDialog?.challengeTitle || !challenge) return;
 
     try {
+      setDeleteDialog(prev => prev ? { ...prev, isDeleting: true } : null);
       await challengeService.deleteChallenge(challenge._id);
       toast.success('Challenge deleted successfully');
       navigate(isWeeklyChallenge ? '/admin/weekly-challenges' : '/admin/challenges');
     } catch (error) {
       toast.error('Failed to delete challenge');
+      setDeleteDialog(prev => prev ? { ...prev, isDeleting: false } : null);
     }
   };
 
@@ -277,6 +328,59 @@ const ChallengeDetail: React.FC = () => {
             fetchChallengeDetails(challenge._id);
           }}
         />
+      )}
+
+      {/* Professional Delete Confirmation Dialog */}
+      {deleteDialog && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-gray-900 border border-gray-700 rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
+            <div className="flex items-center mb-4">
+              <div className="w-12 h-12 bg-red-900/20 rounded-full flex items-center justify-center mr-4">
+                <Trash2 className="h-6 w-6 text-red-400" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-white">Confirm Challenge Deletion</h3>
+                <p className="text-sm text-gray-400">This action is permanent and cannot be undone</p>
+              </div>
+            </div>
+            
+            <div className="mb-6">
+              <p className="text-gray-300">
+                Are you sure you want to delete challenge <span className="font-semibold text-white">"{deleteDialog.challengeTitle}"</span>?
+              </p>
+              <p className="text-sm text-gray-500 mt-2">
+                This will permanently remove the challenge and all associated data including submissions, participants, and statistics.
+              </p>
+            </div>
+
+            <div className="flex justify-end space-x-3">
+              <button
+                onClick={() => setDeleteDialog(null)}
+                disabled={deleteDialog.isDeleting}
+                className="px-4 py-2 text-gray-300 bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDeleteChallenge}
+                disabled={deleteDialog.isDeleting}
+                className="px-4 py-2 text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors font-medium flex items-center disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {deleteDialog.isDeleting ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    Deleting...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Delete Challenge
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

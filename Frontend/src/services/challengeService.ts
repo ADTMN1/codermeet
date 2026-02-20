@@ -206,7 +206,7 @@ export const challengeService = {
   // Delete challenge
   deleteChallenge: async (id: string): Promise<void> => {
     return retryRequest(async () => {
-      await axios.delete(`${API_URL}/admin/challenges/${id}`, {
+      await axios.delete(`${API_URL}/challenges/${id}`, {
         headers: getAuthHeaders(),
       });
     });

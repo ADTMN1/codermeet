@@ -80,6 +80,7 @@ const AdminDashboard: React.FC = () => {
     userId?: string;
     onConfirm?: () => void;
     onClose?: () => void;
+    isDeleting?: boolean;
   } | null>(null);
   const [showCreateChallenge, setShowCreateChallenge] = useState(false);
   const [selectedChallenge, setSelectedChallenge] = useState<Challenge | null>(null);
@@ -288,8 +289,10 @@ const AdminDashboard: React.FC = () => {
       isOpen: true,
       type: 'challenge',
       challengeTitle,
+      isDeleting: false,
       onConfirm: async () => {
         try {
+          setDeleteDialog(prev => prev ? { ...prev, isDeleting: true } : null);
           await challengeService.deleteChallenge(challengeId);
           setChallenges(challenges.filter(challenge => challenge._id !== challengeId));
           adminToast.challengeDeleted();
@@ -300,10 +303,11 @@ const AdminDashboard: React.FC = () => {
           } catch (statsError) {
             adminToast.statsRefreshError('challenge');
           }
+          setDeleteDialog(null);
         } catch (error) {
           adminToast.error('delete', 'challenge', error);
+          setDeleteDialog(prev => prev ? { ...prev, isDeleting: false } : null);
         }
-        setDeleteDialog(null);
       },
       onClose: () => setDeleteDialog(null)
     });
@@ -1394,6 +1398,7 @@ const AdminDashboard: React.FC = () => {
             isOpen={deleteDialog.isOpen}
             onClose={deleteDialog.onClose}
             onConfirm={deleteDialog.onConfirm}
+            isConfirming={deleteDialog.isDeleting}
             title={`Delete ${deleteDialog.type === 'user' ? 'User' : 'Challenge'}`}
             message={`Are you sure you want to delete this ${deleteDialog.type === 'user' ? deleteDialog.userName : deleteDialog.challengeTitle}? This action cannot be undone.`}
             confirmText="Delete"

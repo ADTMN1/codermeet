@@ -11,6 +11,7 @@ interface ConfirmDialogProps {
   confirmText?: string;
   cancelText?: string;
   type?: 'danger' | 'warning' | 'info';
+  isConfirming?: boolean;
 }
 
 const AdminConfirmDialog: React.FC<ConfirmDialogProps> = ({
@@ -21,7 +22,8 @@ const AdminConfirmDialog: React.FC<ConfirmDialogProps> = ({
   message,
   confirmText = 'Confirm',
   cancelText = 'Cancel',
-  type = 'danger'
+  type = 'danger',
+  isConfirming = false
 }) => {
   if (!isOpen) return null;
 
@@ -39,14 +41,14 @@ const AdminConfirmDialog: React.FC<ConfirmDialogProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl p-6 max-w-md mx-4">
+      <div className="bg-gray-900 border border-gray-700 rounded-lg shadow-xl p-6 max-w-md mx-4">
         <div className="flex items-center mb-4">
           <div className={`rounded-full p-3 ${typeStyles[type]}`}>
             <AlertTriangle className={`h-6 w-6 ${iconColors[type]}`} />
           </div>
           <div>
-            <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
-            <p className="text-gray-600 mt-2">{message}</p>
+            <h3 className="text-lg font-semibold text-white">{title}</h3>
+            <p className="text-gray-300 mt-2">{message}</p>
           </div>
         </div>
         
@@ -54,15 +56,24 @@ const AdminConfirmDialog: React.FC<ConfirmDialogProps> = ({
           <Button
             variant="outline"
             onClick={onClose}
-            className="border-gray-300 text-gray-700 hover:bg-gray-50"
+            disabled={isConfirming}
+            className="border-gray-600 text-gray-300 hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {cancelText}
           </Button>
           <Button
             onClick={onConfirm}
-            className={`${typeStyles[type]} text-white`}
+            disabled={isConfirming}
+            className={`${typeStyles[type]} text-white flex items-center disabled:opacity-50 disabled:cursor-not-allowed`}
           >
-            {confirmText}
+            {isConfirming ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                {confirmText}
+              </>
+            ) : (
+              confirmText
+            )}
           </Button>
         </div>
       </div>
