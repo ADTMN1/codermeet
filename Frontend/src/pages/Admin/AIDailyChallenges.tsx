@@ -290,8 +290,12 @@ const AIDailyChallenges: React.FC = () => {
           });
         }
         
-        // React Query will automatically refetch
+        toast.success(data.message);
         setShowBulkModal(false);
+        // Refresh available dates after bulk registration
+        await fetchAvailableDates();
+        // Also refresh monthly schedule
+        await fetchMonthlySchedule();
       } else {
         toast.error(data.message || 'Failed to bulk register challenges');
       }
@@ -317,7 +321,7 @@ const AIDailyChallenges: React.FC = () => {
       console.log('🔑 Debug - Token length:', token?.length || 0);
       console.log('🔑 Debug - Token preview:', token?.substring(0, 20) + '...');
       
-      const endpoint = saveImmediately ? '/api/admin/challenges/generate-and-create' : '/api/admin/challenges/generate';
+      const endpoint = saveImmediately ? '/admin/challenges/generate-and-create' : '/admin/challenges/generate';
       console.log('🎯 Debug - Endpoint:', endpoint);
       console.log('🎯 Debug - Save immediately:', saveImmediately);
       console.log('🎯 Debug - Generation options:', generationOptions);
@@ -367,6 +371,8 @@ const AIDailyChallenges: React.FC = () => {
         
         if (saveImmediately) {
           setShowGenerateModal(false);
+          // Refresh available dates after successful save
+          await fetchAvailableDates();
         }
       } else {
         console.log('❌ Debug - API Error:', data.message);
@@ -406,6 +412,10 @@ const AIDailyChallenges: React.FC = () => {
       if (data.success) {
         toast.success('Weekly challenges generated successfully!');
         setShowBulkModal(false);
+        // Refresh available dates after weekly generation
+        await fetchAvailableDates();
+        // Also refresh monthly schedule
+        await fetchMonthlySchedule();
       } else {
         toast.error(data.message || 'Failed to generate weekly challenges');
       }
@@ -482,6 +492,10 @@ const AIDailyChallenges: React.FC = () => {
         toast.success('Challenge deleted successfully!');
         setDeleteModal({ open: false, challenge: null });
         // React Query will automatically refetch the challenges
+        // Also refresh available dates to make the date available again
+        await fetchAvailableDates();
+        // Also refresh monthly schedule
+        await fetchMonthlySchedule();
       } else {
         toast.error('Failed to delete challenge');
       }
@@ -751,7 +765,7 @@ const AIDailyChallenges: React.FC = () => {
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-2">Schedule Date</label>
                 <div className="grid grid-cols-7 gap-2 mb-2">
-                  {availableDates.slice(0, 21).map((dateInfo, index) => (
+                  {availableDates.map((dateInfo, index) => (
                     <button
                       key={index}
                       onClick={() => dateInfo.isAvailable && setSelectedDate(dateInfo.dateStr)}
@@ -785,12 +799,17 @@ const AIDailyChallenges: React.FC = () => {
                 </div>
                 {selectedDate && (
                   <div className="mt-2 text-sm text-purple-400">
-                    Selected: {new Date(selectedDate).toLocaleDateString('en-US', { 
-                      weekday: 'long', 
-                      year: 'numeric', 
-                      month: 'long', 
-                      day: 'numeric' 
-                    })}
+                    Selected: {(() => {
+                      const [year, month, day] = selectedDate.split('-').map(Number);
+                      const date = new Date(Date.UTC(year, month - 1, day));
+                      return date.toLocaleDateString('en-US', { 
+                        weekday: 'long', 
+                        year: 'numeric', 
+                        month: 'long', 
+                        day: 'numeric',
+                        timeZone: 'UTC'
+                      });
+                    })()}
                   </div>
                 )}
               </div>

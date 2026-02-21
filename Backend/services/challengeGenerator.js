@@ -1,4 +1,5 @@
 const Groq = require('groq-sdk');
+const DailyChallenge = require('../models/dailyChallenge');
 
 class ChallengeGenerator {
   constructor() {
@@ -193,12 +194,11 @@ Return the response in this exact JSON format:
         date = new Date();
         date.setDate(date.getDate() + 1); // Schedule for tomorrow
       }
-      date.setHours(0, 0, 0, 0); // Set to start of day
-      
-      console.log(`📅 Scheduling challenge for ${date.toDateString()}`);
+      // Don't set hours - keep the date as-is since it's already at midnight UTC
       
       // Check if challenge already exists for this date
-      const existing = await collection.findOne({ date });
+      const dateStr = date.toISOString().split('T')[0];
+      const existing = await DailyChallenge.findOne({ date });
       
       // Find next available date efficiently
       let availableDate = date;
@@ -207,11 +207,9 @@ Return the response in this exact JSON format:
         console.log(`⚠️ Challenge already exists for ${date.toDateString()}: ${existing.title}`);
         
         // Find all existing dates in one query and calculate next available
-        const existingDates = await collection.aggregate([
-          { $match: { date: { $gte: new Date() } } },
-          { $project: { date: 1, _id: 0 } },
-          { $sort: { date: 1 } }
-        ]).toArray();
+        const existingDates = await DailyChallenge.find({
+          date: { $gte: new Date() }
+        }).select('date').sort({ date: 1 });
         
         const existingDateSet = new Set(existingDates.map(d => d.date.toISOString().split('T')[0]));
         
@@ -222,13 +220,13 @@ Return the response in this exact JSON format:
         while (attempts < 30 && !found) {
           const checkDate = new Date(date);
           checkDate.setDate(date.getDate() + attempts);
-          checkDate.setHours(0, 0, 0, 0);
+          // Don't set hours - keep the date as-is since it's already at midnight UTC
           
           const dateStr = checkDate.toISOString().split('T')[0];
+          
           if (!existingDateSet.has(dateStr)) {
             availableDate = checkDate;
             found = true;
-            console.log(`✅ Found available date: ${availableDate.toDateString()}`);
             break;
           }
           attempts++;
@@ -263,20 +261,20 @@ Return the response in this exact JSON format:
         updatedAt: new Date()
       };
 
-      const result = await collection.insertOne(challengeDoc);
-      console.log(`✅ Saved challenge: ${challengeData.title} for ${availableDate.toDateString()}`);
-      console.log(`📊 Inserted ID: ${result.insertedId}`);
-      
-      // Return with _id
-      const savedChallenge = {
+      // Use Mongoose to save for consistency
+      const savedChallenge = new DailyChallenge({
         ...challengeDoc,
-        _id: result.insertedId
-      };
+        date: availableDate
+      });
       
-      console.log(`📊 Returning saved challenge:`, savedChallenge.title, savedChallenge.date.toDateString());
+      const result = await savedChallenge.save();
+      console.log(`✅ Saved challenge: ${challengeData.title} for ${availableDate.toDateString()}`);
+      console.log(`📊 Inserted ID: ${result._id}`);
+      
+      console.log(`📊 Returning saved challenge:`, result.title, result.date.toDateString());
       
       await client.close();
-      return savedChallenge;
+      return result;
     } catch (error) {
       console.error('Database Creation Error:', error);
       throw new Error(`Failed to save challenge: ${error.message}`);

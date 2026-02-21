@@ -118,7 +118,6 @@ class AdminChallengeController {
       let scheduledDate = null;
       if (scheduleFor) {
         scheduledDate = new Date(scheduleFor);
-        scheduledDate.setHours(0, 0, 0, 0);
       }
 
       console.log('📅 Debug - Saving to database...');
@@ -457,13 +456,14 @@ class AdminChallengeController {
         const dateStr = checkDate.toISOString().split('T')[0];
         const isAvailable = !existingDateSet.has(dateStr);
         
+                
         availableDates.push({
           date: checkDate,
           dateStr: dateStr,
           isAvailable: isAvailable,
-          dayName: checkDate.toLocaleDateString('en-US', { weekday: 'short' }),
-          month: checkDate.toLocaleDateString('en-US', { month: 'short' }),
-          day: checkDate.getDate()
+          dayName: checkDate.toLocaleDateString('en-US', { weekday: 'short', timeZone: 'UTC' }),
+          month: checkDate.toLocaleDateString('en-US', { month: 'short', timeZone: 'UTC' }),
+          day: checkDate.getUTCDate()  // Use UTC date to ensure consistency
         });
       }
       
@@ -531,6 +531,7 @@ class AdminChallengeController {
       
       console.log('📅 Debug - Target date:', { year, month, targetDate: targetDate.toISOString() });
       
+            
       // Get all challenges for the month
       const startDate = new Date(year, month - 1, 1);
       const endDate = new Date(year, month, 0); // Last day of the month
@@ -547,6 +548,7 @@ class AdminChallengeController {
         }
       }).sort({ date: 1 });
       
+      console.log('📊 Debug - Found challenges:', challenges.length);
       console.log('📅 Debug - Found challenges:', challenges.length);
       
       // Create calendar days
