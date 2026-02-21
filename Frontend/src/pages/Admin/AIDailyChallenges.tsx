@@ -90,6 +90,10 @@ const AIDailyChallenges: React.FC = () => {
   const [generatedChallenge, setGeneratedChallenge] = useState<any>(null);
   const [availableDates, setAvailableDates] = useState<any[]>([]);
   const [selectedDate, setSelectedDate] = useState<string>('');
+  const [deleteModal, setDeleteModal] = useState<{ open: boolean; challenge: DailyChallenge | null }>({
+    open: false,
+    challenge: null
+  });
   const [bulkPreferences, setBulkPreferences] = useState({
     difficulties: ['Easy', 'Medium', 'Hard'],
     categories: ['Algorithms', 'Data Structures', 'Strings', 'Arrays', 'Trees', 'Dynamic Programming', 'Graphs', 'Recursion'],
@@ -457,14 +461,16 @@ const AIDailyChallenges: React.FC = () => {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this challenge? This will also delete all submissions.')) {
-      return;
-    }
+  const handleDelete = (challenge: DailyChallenge) => {
+    setDeleteModal({ open: true, challenge });
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteModal.challenge) return;
 
     try {
       const token = localStorage.getItem('auth_token');
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/daily-challenge/${id}`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/daily-challenge/${deleteModal.challenge._id}`, {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
@@ -474,6 +480,8 @@ const AIDailyChallenges: React.FC = () => {
 
       if (response.ok) {
         toast.success('Challenge deleted successfully!');
+        setDeleteModal({ open: false, challenge: null });
+        // React Query will automatically refetch the challenges
       } else {
         toast.error('Failed to delete challenge');
       }
@@ -481,6 +489,10 @@ const AIDailyChallenges: React.FC = () => {
       console.error('Error deleting challenge:', error);
       toast.error('Failed to delete challenge');
     }
+  };
+
+  const cancelDelete = () => {
+    setDeleteModal({ open: false, challenge: null });
   };
 
   const getDifficultyColor = (difficulty: string) => {
@@ -660,7 +672,7 @@ const AIDailyChallenges: React.FC = () => {
                     <Eye className="w-4 h-4" />
                   </Button>
                   <Button
-                    onClick={() => handleDelete(challenge._id)}
+                    onClick={() => handleDelete(challenge)}
                     className="bg-red-600 hover:bg-red-700 text-white p-2"
                     size="sm"
                   >
@@ -1092,6 +1104,313 @@ const AIDailyChallenges: React.FC = () => {
                 className="bg-gray-600 hover:bg-gray-700 text-white"
               >
                 Cancel
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Challenge View Modal */}
+      {selectedChallenge && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-gray-900 border border-gray-800 rounded-xl p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                <Eye className="w-5 h-5 text-blue-400" />
+                Challenge Details
+              </h3>
+              <Button
+                onClick={() => setSelectedChallenge(null)}
+                className="bg-gray-600 hover:bg-gray-700 text-white p-2"
+                size="sm"
+              >
+                <XCircle className="w-4 h-4" />
+              </Button>
+            </div>
+            
+            <div className="space-y-6">
+              {/* Header */}
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <div className="flex items-center gap-3 mb-3">
+                    <h4 className="text-2xl font-bold text-white">{selectedChallenge.title}</h4>
+                    <span className={`px-3 py-1 rounded-full text-sm font-medium ${getDifficultyColor(selectedChallenge.difficulty)}`}>
+                      {selectedChallenge.difficulty}
+                    </span>
+                    <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+                      selectedChallenge.isActive 
+                        ? 'bg-green-500/20 text-green-300 border border-green-500/30' 
+                        : 'bg-gray-500/20 text-gray-300 border border-gray-500/30'
+                    }`}>
+                      {selectedChallenge.isActive ? 'Active' : 'Inactive'}
+                    </span>
+                    <span className="px-3 py-1 rounded-full text-sm font-medium bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                      AI Generated
+                    </span>
+                  </div>
+                  
+                  <p className="text-gray-300 text-lg mb-4">{selectedChallenge.description}</p>
+                  
+                  <div className="flex items-center gap-6 text-sm text-gray-400">
+                    <div className="flex items-center gap-2">
+                      <Calendar className="w-4 h-4" />
+                      <span>{formatDate(selectedChallenge.date)}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Clock className="w-4 h-4" />
+                      <span>{selectedChallenge.timeLimit} minutes</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Trophy className="w-4 h-4" />
+                      <span>{selectedChallenge.maxPoints} points</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Target className="w-4 h-4" />
+                      <span>{selectedChallenge.category}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Hint */}
+              {selectedChallenge.hint && (
+                <div className="bg-yellow-900/20 border border-yellow-500/30 rounded-lg p-4">
+                  <h5 className="text-lg font-semibold text-yellow-300 mb-2 flex items-center gap-2">
+                    <AlertCircle className="w-5 h-5" />
+                    Hint
+                  </h5>
+                  <p className="text-yellow-200">{selectedChallenge.hint}</p>
+                </div>
+              )}
+
+              {/* Examples */}
+              {selectedChallenge.examples && selectedChallenge.examples.length > 0 && (
+                <div className="bg-blue-900/20 border border-blue-500/30 rounded-lg p-4">
+                  <h5 className="text-lg font-semibold text-blue-300 mb-3">Examples</h5>
+                  <div className="space-y-3">
+                    {selectedChallenge.examples.map((example, index) => (
+                      <div key={index} className="bg-gray-800 rounded-lg p-3">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <div>
+                            <span className="text-blue-400 text-sm font-medium">Input:</span>
+                            <pre className="text-gray-300 text-sm mt-1 whitespace-pre-wrap">{example.input}</pre>
+                          </div>
+                          <div>
+                            <span className="text-green-400 text-sm font-medium">Output:</span>
+                            <pre className="text-gray-300 text-sm mt-1 whitespace-pre-wrap">{example.output}</pre>
+                          </div>
+                        </div>
+                        {example.explanation && (
+                          <div className="mt-2">
+                            <span className="text-yellow-400 text-sm font-medium">Explanation:</span>
+                            <p className="text-gray-300 text-sm mt-1">{example.explanation}</p>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Constraints */}
+              {selectedChallenge.constraints && selectedChallenge.constraints.length > 0 && (
+                <div className="bg-orange-900/20 border border-orange-500/30 rounded-lg p-4">
+                  <h5 className="text-lg font-semibold text-orange-300 mb-3">Constraints</h5>
+                  <ul className="space-y-2">
+                    {selectedChallenge.constraints.map((constraint, index) => (
+                      <li key={index} className="text-orange-200 flex items-start gap-2">
+                        <span className="text-orange-400 mt-1">•</span>
+                        <span>{constraint}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Test Cases */}
+              {selectedChallenge.testCases && selectedChallenge.testCases.length > 0 && (
+                <div className="bg-green-900/20 border border-green-500/30 rounded-lg p-4">
+                  <h5 className="text-lg font-semibold text-green-300 mb-3">Test Cases ({selectedChallenge.testCases.length})</h5>
+                  <div className="space-y-2 max-h-60 overflow-y-auto">
+                    {selectedChallenge.testCases.map((testCase, index) => (
+                      <div key={index} className="bg-gray-800 rounded-lg p-3">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-green-400 text-sm font-medium">Test Case {index + 1}</span>
+                          <span className="text-gray-400 text-xs">Weight: {testCase.weight}</span>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <div>
+                            <span className="text-blue-400 text-xs font-medium">Input:</span>
+                            <pre className="text-gray-300 text-xs mt-1 whitespace-pre-wrap">{testCase.input}</pre>
+                          </div>
+                          <div>
+                            <span className="text-green-400 text-xs font-medium">Expected Output:</span>
+                            <pre className="text-gray-300 text-xs mt-1 whitespace-pre-wrap">{testCase.expectedOutput}</pre>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Solution */}
+              {selectedChallenge.solution && (
+                <div className="bg-purple-900/20 border border-purple-500/30 rounded-lg p-4">
+                  <h5 className="text-lg font-semibold text-purple-300 mb-3">Solution</h5>
+                  <pre className="text-purple-200 text-sm whitespace-pre-wrap bg-gray-800 rounded-lg p-3 overflow-x-auto">
+                    {selectedChallenge.solution}
+                  </pre>
+                </div>
+              )}
+
+              {/* Prizes */}
+              {selectedChallenge.prizes && selectedChallenge.prizes.first && (
+                <div className="bg-yellow-900/20 border border-yellow-500/30 rounded-lg p-4">
+                  <h5 className="text-lg font-semibold text-yellow-300 mb-3">Prizes</h5>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="text-center">
+                      <div className="text-yellow-400 font-bold text-lg">🥇 First Place</div>
+                      <div className="text-yellow-200">{selectedChallenge.prizes.first?.amount || 0} {selectedChallenge.prizes.first?.currency || 'USD'}</div>
+                    </div>
+                    {selectedChallenge.prizes.second && (
+                      <div className="text-center">
+                        <div className="text-gray-300 font-bold text-lg">🥈 Second Place</div>
+                        <div className="text-gray-200">{selectedChallenge.prizes.second.amount} {selectedChallenge.prizes.second.currency}</div>
+                      </div>
+                    )}
+                    {selectedChallenge.prizes.third && (
+                      <div className="text-center">
+                        <div className="text-orange-400 font-bold text-lg">🥉 Third Place</div>
+                        <div className="text-orange-200">{selectedChallenge.prizes.third.amount} {selectedChallenge.prizes.third.currency}</div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Scoring Criteria */}
+              {selectedChallenge.scoringCriteria && selectedChallenge.scoringCriteria.speed && (
+                <div className="bg-indigo-900/20 border border-indigo-500/30 rounded-lg p-4">
+                  <h5 className="text-lg font-semibold text-indigo-300 mb-3">Scoring Criteria</h5>
+                  <div className="space-y-3">
+                    {selectedChallenge.scoringCriteria.speed && (
+                      <div>
+                        <span className="text-indigo-400 font-medium">Speed ({selectedChallenge.scoringCriteria.speed.weight || 0}%):</span>
+                        <p className="text-indigo-200 text-sm mt-1">{selectedChallenge.scoringCriteria.speed.description || 'N/A'}</p>
+                      </div>
+                    )}
+                    {selectedChallenge.scoringCriteria.efficiency && (
+                      <div>
+                        <span className="text-indigo-400 font-medium">Efficiency ({selectedChallenge.scoringCriteria.efficiency.weight || 0}%):</span>
+                        <p className="text-indigo-200 text-sm mt-1">{selectedChallenge.scoringCriteria.efficiency.description || 'N/A'}</p>
+                      </div>
+                    )}
+                    {selectedChallenge.scoringCriteria.correctness && (
+                      <div>
+                        <span className="text-indigo-400 font-medium">Correctness ({selectedChallenge.scoringCriteria.correctness.weight || 0}%):</span>
+                        <p className="text-indigo-200 text-sm mt-1">{selectedChallenge.scoringCriteria.correctness.description || 'N/A'}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Winners */}
+              {selectedChallenge.winners && selectedChallenge.winners.length > 0 && (
+                <div className="bg-green-900/20 border border-green-500/30 rounded-lg p-4">
+                  <h5 className="text-lg font-semibold text-green-300 mb-3 flex items-center gap-2">
+                    <Trophy className="w-5 h-5" />
+                    Winners ({selectedChallenge.winners.length})
+                  </h5>
+                  <div className="space-y-2">
+                    {selectedChallenge.winners.map((winner, index) => (
+                      <div key={index} className="bg-gray-800 rounded-lg p-3 flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="text-green-400 font-bold">
+                            {index === 0 ? '🥇' : index === 1 ? '🥈' : '🥉'}
+                          </div>
+                          <div>
+                            <div className="text-white font-medium">{winner.userId?.username || winner.userId?.name}</div>
+                            <div className="text-gray-400 text-sm">Score: {winner.score}</div>
+                          </div>
+                        </div>
+                        <div className="text-gray-400 text-sm">
+                          {new Date(winner.completedAt).toLocaleDateString()}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Submissions Count */}
+              {selectedChallenge.submissions && (
+                <div className="bg-gray-800 rounded-lg p-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-300">Total Submissions:</span>
+                    <span className="text-white font-bold">{selectedChallenge.submissions}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteModal.open && deleteModal.challenge && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-gray-900 border border-gray-800 rounded-xl p-6 max-w-md w-full">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-12 h-12 bg-red-500/20 rounded-full flex items-center justify-center">
+                <Trash2 className="w-6 h-6 text-red-400" />
+              </div>
+              <div>
+                <h3 className="text-xl font-bold text-white">Delete Challenge</h3>
+                <p className="text-gray-400 text-sm">This action cannot be undone</p>
+              </div>
+            </div>
+            
+            <div className="mb-6">
+              <div className="bg-gray-800 rounded-lg p-4 mb-4">
+                <h4 className="text-white font-semibold mb-2">{deleteModal.challenge.title}</h4>
+                <div className="flex items-center gap-3 text-sm text-gray-400">
+                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${getDifficultyColor(deleteModal.challenge.difficulty)}`}>
+                    {deleteModal.challenge.difficulty}
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <Calendar className="w-3 h-3" />
+                    {formatDate(deleteModal.challenge.date)}
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <Trophy className="w-3 h-3" />
+                    {deleteModal.challenge.maxPoints} pts
+                  </span>
+                </div>
+              </div>
+              
+              <div className="bg-red-900/20 border border-red-500/30 rounded-lg p-3">
+                <p className="text-red-300 text-sm">
+                  <strong>Warning:</strong> This will permanently delete the challenge and all associated submissions, winners, and data.
+                </p>
+              </div>
+            </div>
+            
+            <div className="flex justify-end gap-3">
+              <Button
+                onClick={cancelDelete}
+                variant="outline"
+                className="border-gray-600 text-gray-300 hover:bg-gray-800"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={confirmDelete}
+                className="bg-red-600 hover:bg-red-700 text-white"
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                Delete Challenge
               </Button>
             </div>
           </div>
