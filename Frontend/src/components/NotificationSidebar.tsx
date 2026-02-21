@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { Bell, X, Check, Trash2, User, Upload, Award, Calendar, AlertTriangle, Shield, BarChart3 } from 'lucide-react';
+import { SOCKET_URL } from '../config/api';
 
 interface Notification {
   id: string;
@@ -68,7 +69,7 @@ const NotificationSidebar: React.FC<NotificationSidebarProps> = ({ isOpen, onClo
 
     // Set up Socket.IO for real-time updates
     const token = localStorage.getItem('token') || localStorage.getItem('auth_token');
-    const socket: Socket = io('http://localhost:5000', {
+    const socket: Socket = io(SOCKET_URL, {
       transports: ['websocket', 'polling'],
       withCredentials: true,
       auth: {
@@ -257,7 +258,7 @@ const NotificationSidebar: React.FC<NotificationSidebarProps> = ({ isOpen, onClo
             </div>
             <button
               onClick={onClose}
-              className="p-2 rounded-lg hover:bg-gray-800 text-gray-400 hover:text-white transition-colors"
+              className="p-2 rounded-lg hover:bg-red-800 text-white-400 hover:text-white transition-colors cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>

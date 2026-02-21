@@ -152,14 +152,7 @@ const ChallengeDetail: React.FC = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Button
-            variant="outline"
-            onClick={() => navigate('/admin/challenges')}
-            className="border-gray-600 text-gray-300 hover:bg-gray-800"
-          >
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Challenges
-          </Button>
+          
           <div>
             <h1 className="text-2xl font-bold text-white">{challenge.title}</h1>
             <p className="text-gray-400">Challenge Details and Management</p>
@@ -169,7 +162,7 @@ const ChallengeDetail: React.FC = () => {
           <Button
             variant="outline"
             onClick={() => setShowEditForm(true)}
-            className="border-green-600 text-green-400 hover:bg-green-600/10"
+            className="border-green-600 text-green-400 hover:bg-green-600/10 cursor-pointer"
           >
             <Edit className="w-4 h-4 mr-2" />
             Edit Challenge
@@ -177,7 +170,7 @@ const ChallengeDetail: React.FC = () => {
           <Button
             variant="outline"
             onClick={handleDeleteChallenge}
-            className="border-red-600 text-red-400 hover:bg-red-600/10"
+            className="border-red-600 text-red-400 hover:bg-red-600/10 cursor-pointer"
           >
             <Trash2 className="w-4 h-4 mr-2" />
             Delete

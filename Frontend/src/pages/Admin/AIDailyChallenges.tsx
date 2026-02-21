@@ -99,34 +99,53 @@ const AIDailyChallenges: React.FC = () => {
     categories: ['Algorithms', 'Data Structures', 'Strings', 'Arrays', 'Trees', 'Dynamic Programming', 'Graphs', 'Recursion'],
     timeLimit: 30,
     maxPoints: 100,
-    skipReserved: true,
+    skipReserved: true, // Skip existing challenges
     notifyOnSkip: true,
     startDate: new Date().toISOString().split('T')[0],
     selectedMonth: new Date().getMonth(),
     selectedYear: new Date().getFullYear(),
-    targetDate: '', // Specific date for manual selection
-    previewDifficulty: 'Medium',
-    challengesPerMonth: 20,
-    preferredDays: ['Monday', 'Wednesday', 'Friday'],
-    excludeWeekends: true,
+    challengesPerMonth: 30, // Generate for all days in month
+    // Mixed comprehensive curriculum - each month covers multiple topics
     monthlyThemes: {
-      0: 'Algorithms & Data Structures', // January
-      1: 'String Manipulation & Arrays', // February
-      2: 'Trees & Graphs', // March
-      3: 'Dynamic Programming', // April
-      4: 'Recursion & Backtracking', // May
-      5: 'Sorting & Searching', // June
-      6: 'Mathematical Algorithms', // July
-      7: 'System Design', // August
-      8: 'Database Problems', // September
-      9: 'Web Development', // October
-      10: 'Machine Learning', // November
-      11: 'Advanced Topics' // December
+      0: 'Foundations & Core Algorithms', // January - Mix of basic algorithms, data structures, problem-solving
+      1: 'Data Structures Deep Dive', // February - Arrays, strings, linked lists, stacks, queues
+      2: 'Tree Structures & Graphs', // March - Binary trees, BST, graphs, traversal algorithms
+      3: 'Algorithmic Problem Solving', // April - DP, greedy, backtracking mixed
+      4: 'Advanced Data Structures', // May - Heaps, tries, advanced trees, segment trees
+      5: 'Algorithm Optimization', // June - Advanced sorting, searching, complexity analysis
+      6: 'Mathematical Computing', // July - Number theory, geometry, statistical algorithms
+      7: 'System Design & Architecture', // August - Design patterns, scalability, distributed systems
+      8: 'Database & Data Processing', // September - SQL, NoSQL, data pipelines, optimization
+      9: 'Full-Stack Development', // October - Frontend/backend integration, APIs, web algorithms
+      10: 'Machine Learning & AI', // November - ML algorithms, data science, neural networks basics
+      11: 'Capstone & Advanced Topics' // December - Complex problem-solving, contest-level challenges
+    },
+    // Difficulty distribution per month (percentage-based)
+    difficultyDistribution: {
+      easy: 30,    // 30% easy challenges
+      medium: 50,  // 50% medium challenges  
+      hard: 20     // 20% hard challenges
+    },
+    // Topic mix for each month (ensures comprehensive coverage)
+    topicMix: {
+      algorithms: true,
+      dataStructures: true, 
+      problemSolving: true,
+      optimization: true,
+      realWorldApplications: true
     }
+    
   });
   const [monthlySchedule, setMonthlySchedule] = useState<any>(null);
-  const [previewChallenge, setPreviewChallenge] = useState<any>(null);
+  const [previewChallenge, setPreviewChallenge] = useState<any[]>([]); // Array for bulk preview
   const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewProgress, setPreviewProgress] = useState({ 
+    current: 0, 
+    total: 28, // Will be updated based on actual month
+    currentChallenge: null as any 
+  });
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [confirmAction, setConfirmAction] = useState<'preview' | 'register' | null>(null);
   const [generationOptions, setGenerationOptions] = useState<GenerationOptions>({
     difficulty: 'Medium',
     category: 'Algorithms',
@@ -217,10 +236,29 @@ const AIDailyChallenges: React.FC = () => {
 
   const generatePreviewChallenge = async () => {
     setPreviewLoading(true);
+    setPreviewChallenge([]);
+    
+    // Calculate actual days in the selected month
+    const year = bulkPreferences.selectedYear;
+    const month = bulkPreferences.selectedMonth;
+    const daysInMonth = new Date(year, month + 1, 0).getDate(); // Gets last day of month
+    
+    setPreviewProgress({ current: 0, total: daysInMonth, currentChallenge: null as any });
+    
+    // Check if challenges already exist for this month
+    if (monthlySchedule && monthlySchedule.reservedCount > 0) {
+      setConfirmAction('preview');
+      setShowConfirmModal(true);
+      setPreviewLoading(false);
+      return;
+    }
+    
     try {
       const token = localStorage.getItem('auth_token');
+      
+      // Use fetch with streaming for real-time progress
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/admin/challenges/generate`,
+        `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/admin/challenges/bulk-preview-stream`,
         {
           method: 'POST',
           headers: {
@@ -228,32 +266,81 @@ const AIDailyChallenges: React.FC = () => {
             'Authorization': token ? `Bearer ${token}` : ''
           },
           body: JSON.stringify({
-            difficulty: bulkPreferences.previewDifficulty,
-            category: bulkPreferences.monthlyThemes[bulkPreferences.selectedMonth],
-            timeLimit: bulkPreferences.timeLimit,
-            maxPoints: bulkPreferences.maxPoints,
-            topic: `${bulkPreferences.monthlyThemes[bulkPreferences.selectedMonth]} - ${bulkPreferences.previewDifficulty} Challenge`
+            preferences: bulkPreferences
           })
         }
       );
 
-      const data = await response.json();
-      if (data.success) {
-        setPreviewChallenge(data.data);
-        toast.success('Preview generated successfully!');
-      } else {
-        toast.error(data.message || 'Failed to generate preview');
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
+
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+
+      if (!reader) {
+        throw new Error('Response body is not readable');
+      }
+
+      while (true) {
+        const { done, value } = await reader.read();
+        
+        if (done) {
+          setPreviewLoading(false);
+          toast.success(`Generated preview for ${previewProgress.current} challenges!`);
+          break;
+        }
+
+        const chunk = decoder.decode(value);
+        const lines = chunk.split('\n').filter(line => line.trim());
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(line.substring(6));
+              
+              if (data.type === 'progress') {
+                setPreviewProgress({
+                  current: data.current,
+                  total: data.total,
+                  currentChallenge: data.challenge
+                });
+                
+                // Add the new challenge to the preview list
+                setPreviewChallenge(prev => [...prev, data.challenge]);
+              } else if (data.type === 'complete') {
+                setPreviewLoading(false);
+                toast.success(`Generated preview for ${data.total} challenges!`);
+                return;
+              } else if (data.type === 'error') {
+                setPreviewLoading(false);
+                toast.error(data.message || 'Failed to generate preview');
+                return;
+              }
+            } catch (parseError) {
+              console.error('Error parsing SSE data:', parseError);
+            }
+          }
+        }
+      }
+
     } catch (error) {
       console.error('Error generating preview:', error);
-      toast.error('Failed to generate preview');
-    } finally {
       setPreviewLoading(false);
+      toast.error('Failed to generate preview');
     }
   };
 
   const bulkRegisterChallenges = async () => {
     setGenerating(true);
+    
+    // Check if challenges already exist for this month
+    if (monthlySchedule && monthlySchedule.reservedCount > 0) {
+      setConfirmAction('register');
+      setShowConfirmModal(true);
+      setGenerating(false);
+      return;
+    }
     
     try {
       const token = localStorage.getItem('auth_token');
@@ -526,6 +613,160 @@ const AIDailyChallenges: React.FC = () => {
       month: 'short', 
       day: 'numeric' 
     });
+  };
+
+  // Handler functions for confirmation modal
+  const handleConfirmAction = () => {
+    if (confirmAction === 'preview') {
+      setShowConfirmModal(false);
+      setConfirmAction(null);
+      // Proceed with preview generation
+      generatePreviewInternal();
+    } else if (confirmAction === 'register') {
+      setShowConfirmModal(false);
+      setConfirmAction(null);
+      // Proceed with bulk registration
+      bulkRegisterChallengesInternal();
+    }
+  };
+
+  const handleCancelAction = () => {
+    setShowConfirmModal(false);
+    setConfirmAction(null);
+    setPreviewLoading(false);
+    setGenerating(false);
+  };
+
+  const generatePreviewInternal = async () => {
+    setPreviewLoading(true);
+    setPreviewChallenge([]);
+    
+    // Calculate actual days in the selected month
+    const year = bulkPreferences.selectedYear;
+    const month = bulkPreferences.selectedMonth;
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    
+    setPreviewProgress({ current: 0, total: daysInMonth, currentChallenge: null as any });
+    
+    try {
+      const token = localStorage.getItem('auth_token');
+      
+      // Use fetch with streaming for real-time progress
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/admin/challenges/bulk-preview-stream`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': token ? `Bearer ${token}` : ''
+          },
+          body: JSON.stringify({
+            preferences: bulkPreferences
+          })
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+
+      if (!reader) {
+        throw new Error('Response body is not readable');
+      }
+
+      while (true) {
+        const { done, value } = await reader.read();
+        
+        if (done) {
+          setPreviewLoading(false);
+          toast.success(`Generated preview for ${previewProgress.current} challenges!`);
+          break;
+        }
+
+        const chunk = decoder.decode(value);
+        const lines = chunk.split('\n').filter(line => line.trim());
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(line.substring(6));
+              
+              if (data.type === 'progress') {
+                setPreviewProgress({
+                  current: data.current,
+                  total: data.total,
+                  currentChallenge: data.challenge
+                });
+                
+                // Debug: Log the challenge data structure
+                console.log('🔍 Challenge data received:', data.challenge);
+                
+                // Add new challenge to the preview list
+                setPreviewChallenge(prev => [...prev, data.challenge]);
+              } else if (data.type === 'complete') {
+                setPreviewLoading(false);
+                toast.success(`Generated preview for ${data.total} challenges!`);
+                return;
+              } else if (data.type === 'error') {
+                setPreviewLoading(false);
+                toast.error(data.message || 'Failed to generate preview');
+                return;
+              }
+            } catch (parseError) {
+              console.error('Error parsing SSE data:', parseError);
+            }
+          }
+        }
+      }
+
+    } catch (error) {
+      console.error('Error generating preview:', error);
+      setPreviewLoading(false);
+      toast.error('Failed to generate preview');
+    }
+  };
+
+  const bulkRegisterChallengesInternal = async () => {
+    setGenerating(true);
+    
+    try {
+      const token = localStorage.getItem('auth_token');
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/admin/challenges/bulk-register`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': token ? `Bearer ${token}` : ''
+          },
+          body: JSON.stringify({
+            startDate: bulkPreferences.startDate,
+            preferences: bulkPreferences
+          })
+        }
+      );
+
+      const data = await response.json();
+      
+      if (data.success) {
+        toast.success(data.message);
+        setShowBulkModal(false);
+        // Refresh available dates after bulk registration
+        await fetchAvailableDates();
+        // Also refresh monthly schedule
+        await fetchMonthlySchedule();
+      } else {
+        toast.error(data.message || 'Failed to bulk register challenges');
+      }
+    } catch (error) {
+      console.error('Error bulk registering challenges:', error);
+      toast.error('Failed to bulk register challenges');
+    } finally {
+      setGenerating(false);
+    }
   };
 
   return (
@@ -874,48 +1115,36 @@ const AIDailyChallenges: React.FC = () => {
               Advanced Bulk Registration
             </h3>
             
-            {/* Monthly Schedule Overview */}
-            {monthlySchedule && (
-              <div className="mb-6 p-4 bg-gray-800 rounded-lg">
-                <h4 className="text-lg font-semibold text-white mb-3">
-                  {new Date(bulkPreferences.selectedYear, bulkPreferences.selectedMonth).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })} Schedule
-                </h4>
-                <div className="grid grid-cols-7 gap-1 text-xs mb-3">
-                  {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-                    <div key={day} className="text-center text-gray-400 font-medium p-1">
-                      {day}
-                    </div>
-                  ))}
-                </div>
-                <div className="grid grid-cols-7 gap-1">
-                  {monthlySchedule.calendarDays.map((day: any, index: number) => (
-                    <div 
-                      key={index} 
-                      className={`p-2 text-center rounded border ${
-                        day.isReserved 
-                          ? 'bg-red-900/30 border-red-500/50' 
-                          : 'bg-green-900/30 border-green-500/50'
-                      }`}
-                    >
-                      <div className="text-xs font-medium">{day.day}</div>
-                      {day.isReserved && (
-                        <div className="text-xs text-red-400 truncate" title={day.challenge?.title}>
-                          {day.challenge?.difficulty?.[0]}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-                <div className="flex justify-between text-sm mt-4">
-                  <span className="text-green-400">Available: {monthlySchedule.availableCount}</span>
-                  <span className="text-red-400">Reserved: {monthlySchedule.reservedCount}</span>
-                  <span className="text-purple-400">Theme: {bulkPreferences.monthlyThemes[bulkPreferences.selectedMonth as keyof typeof bulkPreferences.monthlyThemes]}</span>
-                </div>
-              </div>
-            )}
+           
 
             {/* Preferences */}
             <div className="space-y-4">
+              {/* Month Overview */}
+              <div className="bg-gray-800/50 rounded-lg p-4 mb-4">
+                <h4 className="text-sm font-medium text-white mb-3">
+                  {new Date(bulkPreferences.selectedYear, bulkPreferences.selectedMonth).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })} Curriculum Overview
+                </h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span className="text-gray-400">Theme:</span>
+                    <span className="text-white ml-2 font-medium">
+                      {bulkPreferences.monthlyThemes[bulkPreferences.selectedMonth as keyof typeof bulkPreferences.monthlyThemes]}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-gray-400">Difficulty Mix:</span>
+                    <span className="text-white ml-2">
+                      {bulkPreferences.difficultyDistribution.easy}% Easy • {bulkPreferences.difficultyDistribution.medium}% Medium • {bulkPreferences.difficultyDistribution.hard}% Hard
+                    </span>
+                  </div>
+                </div>
+                <div className="mt-3 text-xs text-gray-400">
+                  <span className="inline-block mr-3">📚 Mixed Topics</span>
+                  <span className="inline-block mr-3">🎯 Progressive Difficulty</span>
+                  <span className="inline-block">🔄 Comprehensive Coverage</span>
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-2">Select Month</label>
@@ -951,57 +1180,50 @@ const AIDailyChallenges: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">Target Date (Optional)</label>
-                  <input
-                    type="date"
-                    value={bulkPreferences.targetDate}
-                    onChange={(e) => setBulkPreferences(prev => ({ ...prev, targetDate: e.target.value }))}
-                    className="w-full bg-gray-800 border border-gray-700 text-white px-4 py-2 rounded-lg focus:outline-none focus:border-blue-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">Preview Difficulty</label>
-                  <select
-                    value={bulkPreferences.previewDifficulty}
-                    onChange={(e) => setBulkPreferences(prev => ({ ...prev, previewDifficulty: e.target.value }))}
-                    className="w-full bg-gray-800 border border-gray-700 text-white px-4 py-2 rounded-lg focus:outline-none focus:border-blue-500"
-                  >
-                    <option value="Easy">Easy</option>
-                    <option value="Medium">Medium</option>
-                    <option value="Hard">Hard</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">Time Limit (minutes)</label>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">Challenges per Month</label>
                   <input
                     type="number"
-                    value={bulkPreferences.timeLimit}
-                    onChange={(e) => setBulkPreferences(prev => ({ ...prev, timeLimit: parseInt(e.target.value) }))}
+                    value={bulkPreferences.challengesPerMonth}
+                    onChange={(e) => setBulkPreferences(prev => ({ ...prev, challengesPerMonth: parseInt(e.target.value) }))}
                     className="w-full bg-gray-800 border border-gray-700 text-white px-4 py-2 rounded-lg focus:outline-none focus:border-blue-500"
-                    min="5"
-                    max="120"
+                    min="20"
+                    max="31"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">Max Points</label>
-                  <input
-                    type="number"
-                    value={bulkPreferences.maxPoints}
-                    onChange={(e) => setBulkPreferences(prev => ({ ...prev, maxPoints: parseInt(e.target.value) }))}
-                    className="w-full bg-gray-800 border border-gray-700 text-white px-4 py-2 rounded-lg focus:outline-none focus:border-blue-500"
-                    min="10"
-                    max="200"
-                  />
+                  <label className="block text-sm font-medium text-gray-300 mb-2">Skip Reserved Dates</label>
+                  <label className="flex items-center gap-2 p-3 bg-gray-800 rounded-lg cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={bulkPreferences.skipReserved}
+                      onChange={(e) => setBulkPreferences(prev => ({ ...prev, skipReserved: e.target.checked }))}
+                      className="rounded border-gray-600 bg-gray-800 text-blue-500 focus:ring-blue-500 focus:ring-offset-gray-900"
+                    />
+                    <span className="text-sm text-gray-300">
+                      {bulkPreferences.skipReserved ? 'Yes - Skip existing challenges' : 'No - Override existing'}
+                    </span>
+                  </label>
                 </div>
               </div>
 
               {/* Challenge Preview */}
               <div className="border border-gray-700 rounded-lg p-4">
                 <div className="flex items-center justify-between mb-3">
-                  <h4 className="text-md font-medium text-white">Challenge Preview</h4>
+                  <div className="flex items-center gap-3">
+                    <h4 className="text-md font-medium text-white">Challenge Preview</h4>
+                    {previewLoading && (
+                      <div className="flex items-center gap-2 text-xs text-gray-400">
+                        <div className="w-32 bg-gray-700 rounded-full h-2">
+                          <div 
+                            className="bg-purple-600 h-2 rounded-full transition-all duration-300"
+                            style={{ width: `${(previewProgress.current / previewProgress.total) * 100}%` }}
+                          />
+                        </div>
+                        <span>{previewProgress.current}/{previewProgress.total}</span>
+                      </div>
+                    )}
+                  </div>
                   <Button
                     onClick={generatePreviewChallenge}
                     disabled={previewLoading}
@@ -1011,108 +1233,91 @@ const AIDailyChallenges: React.FC = () => {
                   </Button>
                 </div>
                 
-                {previewChallenge ? (
-                  <div className="bg-gray-800 rounded-lg p-3">
-                    <h5 className="text-sm font-semibold text-white mb-2">{previewChallenge.title}</h5>
-                    <p className="text-xs text-gray-400 mb-2">{previewChallenge.description?.substring(0, 150)}...</p>
-                    <div className="flex items-center gap-3 text-xs">
-                      <span className={`px-2 py-1 rounded-full ${getDifficultyColor(previewChallenge.difficulty)}`}>
-                        {previewChallenge.difficulty}
+                {/* Month and Theme Info */}
+                <div className="mb-3 p-2 bg-gray-800 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-white">
+                      {new Date(bulkPreferences.selectedYear, bulkPreferences.selectedMonth).toLocaleDateString('en-US', { 
+                        month: 'long', 
+                        year: 'numeric' 
+                      })}
+                    </span>
+                    <span className="text-xs text-gray-400">
+                      {bulkPreferences.monthlyThemes[bulkPreferences.selectedMonth as keyof typeof bulkPreferences.monthlyThemes]}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Real-time Generation Display */}
+                {previewLoading && previewProgress.currentChallenge && (
+                  <div className="mb-3 p-3 bg-purple-900/30 border border-purple-700 rounded-lg">
+                    <div className="text-xs text-purple-300 mb-1">Currently Generating:</div>
+                    <div className="text-sm text-white font-medium">
+                      {previewProgress.currentChallenge.title}
+                    </div>
+                    <div className="flex items-center gap-3 mt-1 text-xs text-gray-400">
+                      <span className={`px-1.5 py-0.5 rounded-full ${getDifficultyColor(previewProgress.currentChallenge.difficulty)}`}>
+                        {previewProgress.currentChallenge.difficulty}
                       </span>
-                      <span className="text-gray-400">{previewChallenge.timeLimit} min</span>
-                      <span className="text-gray-400">{previewChallenge.maxPoints} pts</span>
+                      <span>{previewProgress.currentChallenge.timeLimit} min</span>
+                      <span>{previewProgress.currentChallenge.maxPoints} pts</span>
+                    </div>
+                  </div>
+                )}
+                
+                {previewChallenge && previewChallenge.length > 0 ? (
+                  <div className="bg-gray-800 rounded-lg p-3 max-h-60 overflow-y-auto">
+                    <div className="flex items-center justify-between mb-3">
+                      <h5 className="text-sm font-semibold text-white">
+                        Preview: {previewChallenge.length} Challenges
+                      </h5>
+                      <span className="text-xs text-gray-400">
+                        {previewLoading ? 'Generating...' : 'Complete'}
+                      </span>
+                    </div>
+                    <div className="space-y-2">
+                      {previewChallenge.slice(0, 10).map((challenge, index) => (
+                        <div key={index} className="bg-gray-700 rounded p-2 text-xs">
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-white font-medium truncate flex-1">
+                              {index + 1}. {challenge.title || 'Untitled Challenge'}
+                            </span>
+                            <span className={`px-1.5 py-0.5 rounded-full text-xs ${getDifficultyColor(challenge.difficulty || 'Medium')}`}>
+                              {challenge.difficulty || 'Medium'}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 text-gray-400">
+                            <span>{challenge.timeLimit || 30} min</span>
+                            <span>•</span>
+                            <span>{challenge.maxPoints || 100} pts</span>
+                          </div>
+                          {challenge.category && (
+                            <div className="text-gray-500 text-xs mt-1 truncate">
+                              {challenge.category}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                      {previewChallenge.length > 10 && (
+                        <div className="text-center text-gray-400 text-xs py-2">
+                          ... and {previewChallenge.length - 10} more challenges
+                        </div>
+                      )}
                     </div>
                   </div>
                 ) : (
                   <div className="text-center text-gray-500 py-4">
-                    <p className="text-sm">Click "Generate Preview" to see a sample challenge</p>
+                    <p className="text-sm">Click "Generate Preview" to see all {bulkPreferences.challengesPerMonth} challenges</p>
                   </div>
                 )}
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">Difficulty Rotation</label>
-                <div className="space-y-2">
-                  {['Easy', 'Medium', 'Hard'].map(difficulty => (
-                    <label key={difficulty} className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={bulkPreferences.difficulties.includes(difficulty)}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setBulkPreferences(prev => ({ ...prev, difficulties: [...prev.difficulties, difficulty] }));
-                          } else {
-                            setBulkPreferences(prev => ({ ...prev, difficulties: prev.difficulties.filter(d => d !== difficulty) }));
-                          }
-                        }}
-                        className="rounded border-gray-600 bg-gray-800 text-blue-500 focus:ring-blue-500 focus:ring-offset-gray-900"
-                      />
-                      <span className="text-sm text-gray-300">{difficulty}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">Preferred Days</label>
-                <div className="grid grid-cols-7 gap-2">
-                  {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(day => (
-                    <label key={day} className="flex items-center gap-1">
-                      <input
-                        type="checkbox"
-                        checked={bulkPreferences.preferredDays.includes(day)}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setBulkPreferences(prev => ({ ...prev, preferredDays: [...prev.preferredDays, day] }));
-                          } else {
-                            setBulkPreferences(prev => ({ ...prev, preferredDays: prev.preferredDays.filter(d => d !== day) }));
-                          }
-                        }}
-                        className="rounded border-gray-600 bg-gray-800 text-blue-500 focus:ring-blue-500 focus:ring-offset-gray-900"
-                      />
-                      <span className="text-xs text-gray-300">{day.slice(0, 3)}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              <div className="flex items-center gap-4">
-                <label className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={bulkPreferences.skipReserved}
-                    onChange={(e) => setBulkPreferences(prev => ({ ...prev, skipReserved: e.target.checked }))}
-                    className="rounded border-gray-600 bg-gray-800 text-blue-500 focus:ring-blue-500 focus:ring-offset-gray-900"
-                  />
-                  <span className="text-sm text-gray-300">Skip reserved dates</span>
-                </label>
-
-                <label className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={bulkPreferences.excludeWeekends}
-                    onChange={(e) => setBulkPreferences(prev => ({ ...prev, excludeWeekends: e.target.checked }))}
-                    className="rounded border-gray-600 bg-gray-800 text-blue-500 focus:ring-blue-500 focus:ring-offset-gray-900"
-                  />
-                  <span className="text-sm text-gray-300">Exclude weekends</span>
-                </label>
-
-                <label className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={bulkPreferences.notifyOnSkip}
-                    onChange={(e) => setBulkPreferences(prev => ({ ...prev, notifyOnSkip: e.target.checked }))}
-                    className="rounded border-gray-600 bg-gray-800 text-blue-500 focus:ring-blue-500 focus:ring-offset-gray-900"
-                  />
-                  <span className="text-sm text-gray-300">Notify on skip</span>
-                </label>
-              </div>
             </div>
 
             <div className="flex justify-end space-x-3 mt-6">
               <Button
                 onClick={bulkRegisterChallenges}
-                disabled={generating || bulkPreferences.difficulties.length === 0 || bulkPreferences.categories.length === 0}
+                disabled={generating}
                 className="bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50"
               >
                 <CalendarDays className="w-4 h-4 mr-2" />
@@ -1430,6 +1635,57 @@ const AIDailyChallenges: React.FC = () => {
               >
                 <Trash2 className="w-4 h-4 mr-2" />
                 Delete Challenge
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmation Modal */}
+      {showConfirmModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4">
+            <div className="flex items-center mb-4">
+              <AlertCircle className="w-6 h-6 text-yellow-400 mr-3" />
+              <h3 className="text-lg font-semibold text-white">
+                Confirm Action
+              </h3>
+            </div>
+            
+            <div className="mb-6">
+              <p className="text-gray-300 mb-4">
+                {confirmAction === 'preview' ? (
+                  <>
+                    ⚠️ Challenges already exist for {new Date(bulkPreferences.selectedYear, bulkPreferences.selectedMonth).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}.
+                    <br /><br />
+                    Found {monthlySchedule?.reservedCount || 0} existing challenges.
+                    <br /><br />
+                    Do you want to generate a new preview and potentially override existing challenges?
+                  </>
+                ) : (
+                  <>
+                    ⚠️ Challenges already exist for {new Date(bulkPreferences.selectedYear, bulkPreferences.selectedMonth).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}.
+                    <br /><br />
+                    Found {monthlySchedule?.reservedCount || 0} existing challenges.
+                    <br /><br />
+                    Do you want to register new challenges and potentially override existing ones?
+                  </>
+                )}
+              </p>
+            </div>
+            
+            <div className="flex justify-end gap-3">
+              <Button
+                onClick={handleCancelAction}
+                className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleConfirmAction}
+                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2"
+              >
+                {confirmAction === 'preview' ? 'Generate Preview' : 'Register Challenges'}
               </Button>
             </div>
           </div>

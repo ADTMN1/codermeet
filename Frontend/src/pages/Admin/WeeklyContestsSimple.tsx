@@ -203,7 +203,7 @@ const WeeklyContestsSimple: React.FC = () => {
           <p className="text-gray-400">Manage weekly coding competitions</p>
         </div>
         <Button 
-          className="bg-red-600 hover:bg-red-700 text-white"
+          className="bg-red-600 hover:bg-red-700 text-white cursor-pointer"
           onClick={() => navigate('/admin/weekly-challenges/create')}
         >
           <Plus className="w-4 h-4 mr-2" />
@@ -385,6 +385,7 @@ const WeeklyContestsSimple: React.FC = () => {
                     variant="outline"
                     size="sm"
                     onClick={() => navigate(`/admin/weekly-challenges/${challenge._id}`)}
+                    className='cursor-pointer'
                   >
                     <Eye className="w-4 h-4 mr-1" />
                     View
@@ -393,6 +394,7 @@ const WeeklyContestsSimple: React.FC = () => {
                     variant="outline"
                     size="sm"
                     onClick={() => navigate(`/admin/weekly-challenges/create`, { state: { editingChallenge: challenge } })}
+                   className='cursor-pointer'
                   >
                     <Edit className="w-4 h-4 mr-1" />
                     Edit
@@ -401,7 +403,7 @@ const WeeklyContestsSimple: React.FC = () => {
                     variant="outline"
                     size="sm"
                     onClick={() => handleDelete(challenge._id, challenge.title)}
-                    className="border-red-600 text-red-400 hover:bg-red-600/10"
+                    className="border-red-600 text-red-400 hover:bg-red-600/10 cursor-pointer"
                   >
                     <Trash2 className="w-4 h-4 mr-1" />
                     Delete

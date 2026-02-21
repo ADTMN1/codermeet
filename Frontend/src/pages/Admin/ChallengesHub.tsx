@@ -4,13 +4,11 @@ import { motion } from 'framer-motion';
 import { 
   Trophy, 
   Code,
-  Plus,
   Calendar,
   Target,
   Award,
   FileText,
   Eye,
-  Edit,
   Trash2,
   Filter,
   Search,
@@ -21,9 +19,7 @@ import {
   BarChart3
 } from 'lucide-react';
 import { challengeService, Challenge, ChallengeStats } from '../../services/challengeService';
-import { challengeService } from '../../services/challengeService';
 import { toast } from 'sonner';
-import CreateChallengeForm from '../../components/admin/CreateChallengeForm';
 import { Card } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 
@@ -32,8 +28,6 @@ const ChallengesHub: React.FC = () => {
   const [challenges, setChallenges] = useState<Challenge[]>([]);
   const [challengeStats, setChallengeStats] = useState<ChallengeStats | null>(null);
   const [loading, setLoading] = useState(true);
-  const [showCreateChallenge, setShowCreateChallenge] = useState(false);
-  const [selectedChallenge, setSelectedChallenge] = useState<Challenge | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [deleteDialog, setDeleteDialog] = useState<{
     isOpen: boolean;
@@ -84,8 +78,39 @@ const ChallengesHub: React.FC = () => {
         challengeService.getChallengeStats()
       ]);
       
-      const challengesArray = challengesData?.data?.challenges || challengesData?.data || [];
-      setChallenges(challengesArray);
+      console.log('🔍 Raw challenges data from API:', challengesData);
+      console.log('🔍 challengesData structure:', {
+        hasData: !!challengesData?.data,
+        hasChallenges: !!challengesData?.data?.challenges,
+        challengesType: typeof challengesData?.data?.challenges,
+        challengesLength: Array.isArray(challengesData?.data?.challenges) ? challengesData.data.challenges.length : 'N/A',
+        directDataType: typeof challengesData?.data,
+        directDataLength: Array.isArray(challengesData?.data) ? challengesData.data.length : 'N/A'
+      });
+      
+      let challengesArray: Challenge[] = [];
+      
+      // Try different possible data structures based on the API response
+      if (challengesData?.data?.challenges && Array.isArray(challengesData.data.challenges)) {
+        challengesArray = challengesData.data.challenges;
+      } else if (challengesData?.data && Array.isArray(challengesData.data)) {
+        challengesArray = challengesData.data;
+      } else {
+        console.warn('⚠️ Unexpected challenges data structure:', challengesData);
+        challengesArray = [];
+      }
+      
+      console.log('🔍 Processed challenges array:', challengesArray);
+      console.log('🔍 First challenge details:', challengesArray[0]);
+      
+      // Only update state if we have valid data
+      if (Array.isArray(challengesArray)) {
+        setChallenges(challengesArray);
+      } else {
+        console.error('❌ challengesArray is not an array:', challengesArray);
+        setChallenges([]);
+      }
+      
       setChallengeStats(statsData || null);
       
       // Debug: Log the actual data being received
@@ -98,6 +123,7 @@ const ChallengesHub: React.FC = () => {
     } catch (error: any) {
       console.error('Error fetching challenges data:', error);
       toast.error('Failed to load challenges data');
+      setChallenges([]); // Set empty array on error to prevent undefined issues
     } finally {
       setLoading(false);
     }
@@ -128,13 +154,6 @@ const ChallengesHub: React.FC = () => {
     }
   };
 
-  const handleEditChallenge = async (challengeId: string) => {
-    const challenge = challenges.find(c => c._id === challengeId);
-    if (challenge) {
-      setSelectedChallenge(challenge);
-      setShowCreateChallenge(true);
-    }
-  };
 
   const filteredChallenges = challenges.filter(challenge =>
     // Filter by search term only (show all challenges regardless of status)
@@ -162,7 +181,7 @@ const ChallengesHub: React.FC = () => {
           <Button
             onClick={() => navigate('/admin/daily-challenges')}
             variant="outline"
-            className="border-green-600 text-green-400 hover:bg-green-600/10"
+            className="border-green-600 text-green-400 hover:bg-green-600/10 cursor-pointer"
           >
             <Calendar className="w-4 h-4 mr-2" />
             Daily Challenges
@@ -170,17 +189,10 @@ const ChallengesHub: React.FC = () => {
           <Button
             onClick={() => navigate('/admin/weekly-challenges')}
             variant="outline"
-            className="border-yellow-600 text-yellow-400 hover:bg-yellow-600/10"
+            className="border-yellow-600 text-yellow-400 hover:bg-yellow-600/10 cursor-pointer"
           >
             <Award className="w-4 h-4 mr-2" />
             Weekly Challenges
-          </Button>
-          <Button
-            onClick={() => setShowCreateChallenge(true)}
-            className="bg-red-600 hover:bg-red-700 text-white"
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            Create Challenge
           </Button>
         </div>
       </div>
@@ -330,8 +342,8 @@ const ChallengesHub: React.FC = () => {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => navigate(`/admin/weekly-challenges/${challenge._id}`)}
-                className="border-blue-600 text-blue-400 hover:bg-blue-600/10"
+                onClick={() => navigate(`/admin/challenges/${challenge._id}`)}
+                className="border-blue-600 text-blue-400 hover:bg-blue-600/10 cursor-pointer"
               >
                 <Eye className="w-4 h-4 mr-1" />
                 View
@@ -339,17 +351,8 @@ const ChallengesHub: React.FC = () => {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => handleEditChallenge(challenge._id)}
-                className="border-green-600 text-green-400 hover:bg-green-600/10"
-              >
-                <Edit className="w-4 h-4 mr-1" />
-                Edit
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
                 onClick={() => handleDeleteChallenge(challenge._id, challenge.title)}
-                className="border-red-600 text-red-400 hover:bg-red-600/10"
+                className="border-red-600 text-red-400 hover:bg-red-600/10 cursor-pointer"
               >
                 <Trash2 className="w-4 h-4 mr-1" />
                 Delete
@@ -363,29 +366,10 @@ const ChallengesHub: React.FC = () => {
         <div className="text-center py-12">
           <Trophy className="w-16 h-16 text-gray-600 mx-auto mb-4" />
           <h3 className="text-xl font-medium text-gray-400 mb-2">No Challenges Found</h3>
-          <p className="text-gray-500 mb-4">Create your first challenge to get started</p>
-          <Button onClick={() => setShowCreateChallenge(true)} className="bg-red-600 hover:bg-red-700">
-            <Plus className="w-4 h-4 mr-2" />
-            Create Challenge
-          </Button>
+          <p className="text-gray-500">No challenges are available at the moment.</p>
         </div>
       )}
 
-      {/* Create/Edit Challenge Modal */}
-      {showCreateChallenge && (
-        <CreateChallengeForm
-          challenge={selectedChallenge}
-          onClose={() => {
-            setShowCreateChallenge(false);
-            setSelectedChallenge(null);
-          }}
-          onSuccess={() => {
-            setShowCreateChallenge(false);
-            setSelectedChallenge(null);
-            fetchChallengesData();
-          }}
-        />
-      )}
 
       {/* Professional Delete Confirmation Dialog */}
       {deleteDialog && (

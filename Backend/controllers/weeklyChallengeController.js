@@ -69,6 +69,104 @@ exports.getAllWeeklyChallenges = async (req, res) => {
   }
 };
 
+// Get next available week number for a given year
+exports.getNextAvailableWeek = async (req, res) => {
+  try {
+    const { year } = req.query;
+    
+    if (!year) {
+      return res.status(400).json({
+        success: false,
+        message: 'Year is required'
+      });
+    }
+    
+    const targetYear = parseInt(year);
+    
+    // Get all existing weeks for the year
+    const existingChallenges = await WeeklyChallenge.find({
+      year: targetYear
+    }).select('weekNumber').sort({ weekNumber: 1 });
+    
+    const existingWeeks = existingChallenges.map(ch => ch.weekNumber);
+    
+    // Find the first available week (1-52)
+    let nextAvailableWeek = 1;
+    for (let i = 1; i <= 52; i++) {
+      if (!existingWeeks.includes(i)) {
+        nextAvailableWeek = i;
+        break;
+      }
+    }
+    
+    // If all weeks are taken, suggest next year
+    if (existingWeeks.includes(nextAvailableWeek)) {
+      return res.status(200).json({
+        success: true,
+        data: {
+          nextAvailableWeek: null,
+          year: targetYear,
+          allWeeksTaken: true,
+          suggestion: `All weeks for ${targetYear} are taken. Try year ${targetYear + 1}`,
+          nextYear: targetYear + 1
+        }
+      });
+    }
+    
+    res.status(200).json({
+      success: true,
+      data: {
+        nextAvailableWeek,
+        year: targetYear,
+        allWeeksTaken: false,
+        existingWeeks
+      }
+    });
+  } catch (error) {
+    console.error('Error getting next available week:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error getting next available week',
+      error: error.message
+    });
+  }
+};
+
+// Check if weekly challenge exists for specific week and year
+exports.checkWeeklyChallengeExists = async (req, res) => {
+  try {
+    const { weekNumber, year } = req.query;
+    
+    if (!weekNumber || !year) {
+      return res.status(400).json({
+        success: false,
+        message: 'Week number and year are required'
+      });
+    }
+    
+    const existingChallenge = await WeeklyChallenge.findOne({
+      weekNumber: parseInt(weekNumber),
+      year: parseInt(year)
+    }).populate('createdBy', 'username fullName avatar')
+      .select('title status weekNumber year createdBy createdAt');
+    
+    res.status(200).json({
+      success: true,
+      data: {
+        exists: !!existingChallenge,
+        challenge: existingChallenge
+      }
+    });
+  } catch (error) {
+    console.error('Error checking weekly challenge existence:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error checking weekly challenge existence',
+      error: error.message
+    });
+  }
+};
+
 // Get weekly challenge by ID
 exports.getWeeklyChallengeById = async (req, res) => {
   try {
@@ -173,9 +271,26 @@ exports.createWeeklyChallenge = async (req, res) => {
     
     if (error.code === 11000) {
       // Duplicate key error (week number + year)
+      const duplicateField = Object.keys(error.keyPattern)[0];
+      const duplicateValue = error.keyValue;
+      
+      if (duplicateField === 'weekNumber' && duplicateField in error.keyPattern) {
+        return res.status(409).json({
+          success: false,
+          message: `A weekly challenge for week ${duplicateValue.weekNumber} of ${duplicateValue.year} already exists`,
+          error: 'DUPLICATE_WEEK',
+          weekNumber: duplicateValue.weekNumber,
+          year: duplicateValue.year,
+          suggestion: 'You can update the existing challenge or choose a different week'
+        });
+      }
+      
       return res.status(400).json({
         success: false,
-        message: 'A weekly challenge for this week already exists'
+        message: 'A duplicate record already exists',
+        error: 'DUPLICATE_RECORD',
+        duplicateField,
+        duplicateValue
       });
     }
     res.status(500).json({
@@ -213,9 +328,27 @@ exports.updateWeeklyChallenge = async (req, res) => {
   } catch (error) {
     console.error('Error updating weekly challenge:', error);
     if (error.code === 11000) {
+      // Duplicate key error (week number + year)
+      const duplicateField = Object.keys(error.keyPattern)[0];
+      const duplicateValue = error.keyValue;
+      
+      if (duplicateField === 'weekNumber' && 'year' in error.keyPattern) {
+        return res.status(409).json({
+          success: false,
+          message: `A weekly challenge for week ${duplicateValue.weekNumber} of ${duplicateValue.year} already exists`,
+          error: 'DUPLICATE_WEEK',
+          weekNumber: duplicateValue.weekNumber,
+          year: duplicateValue.year,
+          suggestion: 'You can update the existing challenge or choose a different week'
+        });
+      }
+      
       return res.status(400).json({
         success: false,
-        message: 'A weekly challenge for this week already exists'
+        message: 'A duplicate record already exists',
+        error: 'DUPLICATE_RECORD',
+        duplicateField,
+        duplicateValue
       });
     }
     res.status(500).json({

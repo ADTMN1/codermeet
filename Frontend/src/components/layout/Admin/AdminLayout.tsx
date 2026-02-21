@@ -41,7 +41,7 @@ const AdminLayout: React.FC = () => {
                 <div>
                   <button
                     onClick={handleBellClick}
-                    className="relative p-2 rounded-lg hover:bg-gray-800 transition-colors"
+                    className="relative p-2 rounded-lg hover:bg-gray-800 transition-colors cursor-pointer"
                   >
                     <Bell className="w-5 h-5 text-red-400" />
                     {(() => {
@@ -60,7 +60,7 @@ const AdminLayout: React.FC = () => {
                 </div>
                 <button
                   onClick={handleRefresh}
-                  className="flex items-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm"
+                  className="flex items-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm cursor-pointer"
                 >
                   <RefreshCw className="h-4 w-4 mr-2" />
                   Refresh

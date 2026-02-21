@@ -281,48 +281,197 @@ Return the response in this exact JSON format:
     }
   }
 
+  // Parse AI response and extract challenge data
+  parseAIResponse(responseText, difficulty, category, timeLimit, maxPoints) {
+    try {
+      // Look for JSON in the response
+      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        throw new Error('No JSON found in AI response');
+      }
+
+      const challengeData = JSON.parse(jsonMatch[0]);
+      
+      // Ensure required fields
+      challengeData.difficulty = difficulty;
+      challengeData.category = category;
+      challengeData.timeLimit = timeLimit;
+      challengeData.maxPoints = maxPoints;
+      
+      // Ensure arrays exist
+      challengeData.testCases = challengeData.testCases || [];
+      challengeData.examples = challengeData.examples || [];
+      challengeData.constraints = challengeData.constraints || [];
+      challengeData.tags = challengeData.tags || [];
+      challengeData.prizes = challengeData.prizes || [];
+      
+      // Ensure scoring criteria
+      challengeData.scoringCriteria = {
+        correctness: {
+          weight: challengeData.scoringCriteria?.correctness?.weight || 0.6,
+          description: challengeData.scoringCriteria?.correctness?.description || 'All test cases pass correctly'
+        },
+        speed: {
+          weight: challengeData.scoringCriteria?.speed?.weight || 0.2,
+          description: challengeData.scoringCriteria?.speed?.description || 'Efficient time complexity implementation'
+        },
+        efficiency: {
+          weight: challengeData.scoringCriteria?.efficiency?.weight || 0.2,
+          description: challengeData.scoringCriteria?.efficiency?.description || 'Optimal space complexity'
+        }
+      };
+      
+      return challengeData;
+    } catch (error) {
+      throw new Error(`Failed to parse AI response: ${error.message}`);
+    }
+  }
+
+  // Create challenge in database (OPTIMIZED)
+  async createChallengeInDatabase(challengeData, scheduledDate = null) {
+  try {
+    const { MongoClient } = require('mongodb');
+    const client = new MongoClient(process.env.MONGODB_URI || process.env.MONGO_URI);
+    
+    await client.connect();
+    const db = client.db('codermeet');
+    const collection = db.collection('dailychallenges');
+    
+    // If no specific date provided, schedule for tomorrow to avoid conflicts
+    let date = scheduledDate || new Date();
+    if (!scheduledDate) {
+      date = new Date();
+      date.setDate(date.getDate() + 1); // Schedule for tomorrow
+    }
+    // Don't set hours - keep the date as-is since it's already at midnight UTC
+    
+    // Check if challenge already exists for this date
+    const dateStr = date.toISOString().split('T')[0];
+    const existing = await DailyChallenge.findOne({ date });
+    
+    // Find next available date efficiently
+    let availableDate = date;
+    
+    if (existing) {
+      console.log(`⚠️ Challenge already exists for ${date.toDateString()}: ${existing.title}`);
+      
+      // Find all existing dates in one query and calculate next available
+      const existingDates = await DailyChallenge.find({
+        date: { $gte: new Date() }
+      }).select('date').sort({ date: 1 });
+      
+      const existingDateSet = new Set(existingDates.map(d => d.date.toISOString().split('T')[0]));
+      
+      // Find next available date (check up to 30 days ahead)
+      let attempts = 0;
+      let found = false;
+      
+      while (attempts < 30 && !found) {
+        const checkDate = new Date(date);
+        checkDate.setDate(date.getDate() + attempts);
+        // Don't set hours - keep the date as-is since it's already at midnight UTC
+        
+        const dateStr = checkDate.toISOString().split('T')[0];
+        
+        if (!existingDateSet.has(dateStr)) {
+          availableDate = checkDate;
+          found = true;
+          break;
+        }
+        attempts++;
+      }
+      
+      if (!found) {
+        console.log(`❌ No available dates found in next 30 days, returning existing challenge`);
+        await client.close();
+        return existing;
+      }
+    }
+    
+    // Create challenge document
+    const challengeDoc = {
+      date: availableDate,
+      title: challengeData.title,
+      description: challengeData.description,
+      difficulty: challengeData.difficulty,
+      category: challengeData.category,
+      timeLimit: challengeData.timeLimit,
+      maxPoints: challengeData.maxPoints,
+      hint: challengeData.hint,
+      examples: challengeData.examples,
+      constraints: challengeData.constraints,
+      testCases: challengeData.testCases,
+      scoringCriteria: challengeData.scoringCriteria,
+      prizes: challengeData.prizes,
+      tags: challengeData.tags,
+      solutionApproach: challengeData.solutionApproach,
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+
+    // Use Mongoose to save for consistency
+    const savedChallenge = new DailyChallenge({
+      ...challengeDoc,
+      date: availableDate
+    });
+    
+    const result = await savedChallenge.save();
+    console.log(`✅ Saved challenge: ${challengeData.title} for ${availableDate.toDateString()}`);
+    console.log(`📊 Inserted ID: ${result._id}`);
+    
+    console.log(`📊 Returning saved challenge:`, result.title, result.date.toDateString());
+    
+    await client.close();
+    return result;
+  } catch (error) {
+    console.error('Database Creation Error:', error);
+    throw new Error(`Failed to save challenge: ${error.message}`);
+  }
+}
+
   // Get weekly schedule with advanced features
   async getWeeklySchedule(startDate, preferences = {}) {
-    try {
-      const { MongoClient } = require('mongodb');
-      const client = new MongoClient(process.env.MONGODB_URI || process.env.MONGO_URI);
+  try {
+    const { MongoClient } = require('mongodb');
+    const client = new MongoClient(process.env.MONGODB_URI || process.env.MONGO_URI);
+    
+    await client.connect();
+    const db = client.db('codermeet');
+    const collection = db.collection('dailychallenges');
+    
+    const start = new Date(startDate);
+    const end = new Date(start);
+    end.setDate(start.getDate() + 7);
+    
+    // Get challenges for the week
+    const weeklyChallenges = await collection.find({
+      date: { $gte: start, $lt: end }
+    }).sort({ date: 1 }).toArray();
+    
+    // Get all available dates for the week
+    const availableDates = [];
+    const reservedDates = [];
+    
+    for (let i = 0; i < 7; i++) {
+      const checkDate = new Date(start);
+      checkDate.setDate(start.getDate() + i);
+      checkDate.setHours(0, 0, 0, 0);
       
-      await client.connect();
-      const db = client.db('codermeet');
-      const collection = db.collection('dailychallenges');
+      const hasChallenge = weeklyChallenges.some(c => 
+        c.date.toDateString() === checkDate.toDateString()
+      );
       
-      const start = new Date(startDate);
-      const end = new Date(start);
-      end.setDate(start.getDate() + 7);
-      
-      // Get challenges for the week
-      const weeklyChallenges = await collection.find({
-        date: { $gte: start, $lt: end }
-      }).sort({ date: 1 }).toArray();
-      
-      // Get all available dates for the week
-      const availableDates = [];
-      const reservedDates = [];
-      
-      for (let i = 0; i < 7; i++) {
-        const checkDate = new Date(start);
-        checkDate.setDate(start.getDate() + i);
-        checkDate.setHours(0, 0, 0, 0);
-        
-        const hasChallenge = weeklyChallenges.some(c => 
+      const dateInfo = {
+        date: checkDate,
+        dateStr: checkDate.toISOString().split('T')[0],
+        dayName: checkDate.toLocaleDateString('en-US', { weekday: 'long' }),
+        month: checkDate.toLocaleDateString('en-US', { month: 'short' }),
+        day: checkDate.getDate(),
+        isReserved: hasChallenge,
+        challenge: hasChallenge ? weeklyChallenges.find(c => 
           c.date.toDateString() === checkDate.toDateString()
-        );
-        
-        const dateInfo = {
-          date: checkDate,
-          dateStr: checkDate.toISOString().split('T')[0],
-          dayName: checkDate.toLocaleDateString('en-US', { weekday: 'long' }),
-          month: checkDate.toLocaleDateString('en-US', { month: 'short' }),
-          day: checkDate.getDate(),
-          isReserved: hasChallenge,
-          challenge: hasChallenge ? weeklyChallenges.find(c => 
-            c.date.toDateString() === checkDate.toDateString()
-          ) : null
+        ) : null
         };
         
         if (hasChallenge) {
@@ -393,6 +542,317 @@ Return the response in this exact JSON format:
     } catch (error) {
       throw new Error(`Failed to generate topic challenge: ${error.message}`);
     }
+  }
+
+  // Bulk register challenges with mixed curriculum approach
+  async bulkRegisterChallenges(startDate, preferences) {
+    try {
+      console.log('🚀 Starting mixed curriculum bulk registration...');
+      
+      const {
+        selectedMonth,
+        selectedYear,
+        preferredDays = [],
+        excludeWeekends = false,
+        skipReserved = true,
+        monthlyThemes,
+        difficultyDistribution,
+        topicMix,
+        timeLimit = 30,
+        maxPoints = 100
+      } = preferences;
+
+      // Calculate actual days in the selected month
+      const daysInMonth = new Date(selectedYear, selectedMonth + 1, 0).getDate();
+
+      // Get the theme for the selected month
+      const monthTheme = monthlyThemes[selectedMonth];
+      console.log(`📚 Theme for ${new Date(selectedYear, selectedMonth).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}: ${monthTheme} (${daysInMonth} days)`);
+
+      // Calculate date range for the month
+      const firstDay = new Date(selectedYear, selectedMonth, 1);
+      const lastDay = new Date(selectedYear, selectedMonth + 1, 0);
+      
+      const challenges = [];
+      const notifications = [];
+      let skippedDates = [];
+      const sessionTitles = []; // Track titles in current session
+
+      // Generate challenges for each day in the month
+      for (let date = new Date(firstDay); date <= lastDay; date.setDate(date.getDate() + 1)) {
+        const currentDate = new Date(date);
+        
+        // Check if date should be skipped
+        if (this.shouldSkipDate(currentDate, preferredDays, excludeWeekends)) {
+          continue;
+        }
+
+        // Check if date is already reserved
+        if (skipReserved && await this.isDateReserved(currentDate)) {
+          skippedDates.push(currentDate.toISOString().split('T')[0]);
+          continue;
+        }
+
+        try {
+          // Generate challenge with mixed approach
+          const challengeData = await this.generateMixedChallenge(
+            monthTheme,
+            difficultyDistribution,
+            topicMix,
+            timeLimit,
+            maxPoints
+          );
+
+          // Check for duplicate and generate unique title if needed
+          const uniqueTitle = await this.generateUniqueTitle(
+            challengeData.title, 
+            challengeData.category, 
+            challengeData.difficulty,
+            sessionTitles
+          );
+          
+          challengeData.title = uniqueTitle;
+          sessionTitles.push(uniqueTitle); // Add to session tracking
+
+          // Save to database (use bulk method)
+          const savedChallenge = await this.createBulkChallengeInDatabase(challengeData, currentDate);
+          challenges.push(savedChallenge);
+          
+          console.log(`✅ Generated: ${challengeData.title} for ${currentDate.toDateString()}`);
+          
+        } catch (error) {
+          console.error(`❌ Failed to generate challenge for ${currentDate.toDateString()}:`, error.message);
+          notifications.push({
+            type: 'warning',
+            message: `Failed to generate challenge for ${currentDate.toDateString()}: ${error.message}`
+          });
+        }
+
+        // Stop if we've reached the desired number of challenges (all days in month)
+        if (challenges.length >= daysInMonth) {
+          break;
+        }
+      }
+
+      // Add notifications for skipped dates
+      if (skippedDates.length > 0) {
+        notifications.push({
+          type: 'info',
+          message: `Skipped ${skippedDates.length} reserved dates: ${skippedDates.join(', ')}`
+        });
+      }
+
+      console.log(`🎉 Bulk registration complete: ${challenges.length} challenges created`);
+
+      return {
+        success: true,
+        message: `Successfully registered ${challenges.length} challenges for ${monthTheme}`,
+        data: {
+          challenges,
+          month: selectedMonth,
+          year: selectedYear,
+          theme: monthTheme,
+          totalRequested: challengesPerMonth,
+          totalCreated: challenges.length,
+          skippedDates,
+          notifications
+        }
+      };
+
+    } catch (error) {
+      console.error('🚨 Error in bulk registration:', error);
+      return {
+        success: false,
+        error: error.message,
+        message: 'Bulk registration failed'
+      };
+    }
+  }
+
+  // Check if a date should be skipped based on preferences
+  shouldSkipDate(date, preferredDays, excludeWeekends) {
+    const dayName = date.toLocaleDateString('en-US', { weekday: 'long' });
+    
+    // Skip weekends if enabled
+    if (excludeWeekends && (dayName === 'Saturday' || dayName === 'Sunday')) {
+      return true;
+    }
+    
+    // Only generate on preferred days if specified (if empty, generate every day)
+    if (preferredDays.length > 0 && !preferredDays.includes(dayName)) {
+      return true;
+    }
+    
+    return false;
+  }
+
+  // Check if date is already reserved
+  async isDateReserved(date) {
+    try {
+      const existing = await DailyChallenge.findOne({
+        date: {
+          $gte: new Date(date.setHours(0, 0, 0, 0)),
+          $lt: new Date(date.setHours(23, 59, 59, 999))
+        }
+      });
+      return !!existing;
+    } catch (error) {
+      console.error('Error checking reserved date:', error);
+      return false;
+    }
+  }
+
+  // Generate challenge with mixed approach
+  async generateMixedChallenge(theme, difficultyDistribution, topicMix, timeLimit, maxPoints) {
+    // Select difficulty based on distribution
+    const difficulty = this.selectDifficultyByDistribution(difficultyDistribution);
+    
+    // Build comprehensive topic prompt
+    const topicPrompt = this.buildMixedTopicPrompt(theme, topicMix, difficulty);
+    
+    // Generate the challenge
+    const challengeData = await this.generateDailyChallenge({
+      difficulty,
+      category: theme,
+      timeLimit,
+      maxPoints,
+      topic: topicPrompt
+    });
+
+    return challengeData;
+  }
+
+  // Simplified bulk database creation
+  async createBulkChallengeInDatabase(challengeData, scheduledDate) {
+    try {
+      const challengeDoc = {
+        date: scheduledDate,
+        title: challengeData.title,
+        description: challengeData.description,
+        difficulty: challengeData.difficulty,
+        category: challengeData.category,
+        timeLimit: challengeData.timeLimit,
+        maxPoints: challengeData.maxPoints,
+        hint: challengeData.hint,
+        examples: challengeData.examples,
+        constraints: challengeData.constraints,
+        testCases: challengeData.testCases,
+        scoringCriteria: challengeData.scoringCriteria,
+        prizes: challengeData.prizes,
+        tags: challengeData.tags,
+        solutionApproach: challengeData.solutionApproach,
+        isActive: true,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
+
+      // Use Mongoose directly for consistency
+      const savedChallenge = new DailyChallenge(challengeDoc);
+      const result = await savedChallenge.save();
+      
+      console.log(`✅ Bulk saved: ${challengeData.title} for ${scheduledDate.toDateString()}`);
+      return result;
+    } catch (error) {
+      console.error('Bulk Database Creation Error:', error);
+      throw error;
+    }
+  }
+
+  // Select difficulty based on distribution percentages
+  selectDifficultyByDistribution(distribution) {
+    const random = Math.random() * 100;
+    
+    if (random < distribution.easy) {
+      return 'Easy';
+    } else if (random < distribution.easy + distribution.medium) {
+      return 'Medium';
+    } else {
+      return 'Hard';
+    }
+  }
+
+  // Build comprehensive topic prompt for mixed approach
+  buildMixedTopicPrompt(theme, topicMix, difficulty) {
+    const topicAreas = [];
+    
+    if (topicMix.algorithms) topicAreas.push('algorithmic problem-solving');
+    if (topicMix.dataStructures) topicAreas.push('data structure implementation');
+    if (topicMix.problemSolving) topicAreas.push('problem-solving techniques');
+    if (topicMix.optimization) topicAreas.push('performance optimization');
+    if (topicMix.realWorldApplications) topicAreas.push('real-world applications');
+
+    const topicAreasText = topicAreas.join(', ');
+    
+    return `Create a ${difficulty.toLowerCase()} ${theme} challenge that combines ${topicAreasText}. The challenge should be practical, educational, and suitable for the ${difficulty} difficulty level.`;
+  }
+
+  // Check if a challenge with similar title already exists
+  async isDuplicateChallenge(title, category) {
+    try {
+      const { MongoClient } = require('mongodb');
+      const client = new MongoClient(process.env.MONGODB_URI);
+      await client.connect();
+      
+      const db = client.db();
+      const collection = db.collection('dailychallenges');
+      
+      // Check for exact title match or similar titles
+      const existingChallenge = await collection.findOne({
+        $or: [
+          { title: { $regex: new RegExp(title, 'i') } },
+          { title: title }
+        ]
+      });
+      
+      await client.close();
+      return existingChallenge;
+    } catch (error) {
+      console.error('Error checking duplicate challenge:', error);
+      return false;
+    }
+  }
+
+  // Check for duplicate within current generation session
+  isDuplicateInSession(title, sessionTitles) {
+    return sessionTitles.some(existingTitle => 
+      existingTitle.toLowerCase() === title.toLowerCase() ||
+      existingTitle.toLowerCase().includes(title.toLowerCase()) ||
+      title.toLowerCase().includes(existingTitle.toLowerCase())
+    );
+  }
+
+  // Generate a unique title if duplicate exists
+  async generateUniqueTitle(baseTitle, category, difficulty, sessionTitles = []) {
+    let title = baseTitle;
+    let attempts = 0;
+    const maxAttempts = 5;
+    
+    while (attempts < maxAttempts) {
+      // Check database duplicates
+      const isDbDuplicate = await this.isDuplicateChallenge(title, category);
+      
+      // Check session duplicates
+      const isSessionDuplicate = this.isDuplicateInSession(title, sessionTitles);
+      
+      if (!isDbDuplicate && !isSessionDuplicate) {
+        return title;
+      }
+      
+      // Add variation to make it unique
+      const variations = [
+        `Advanced ${baseTitle}`,
+        `${baseTitle} - ${difficulty} Edition`,
+        `${baseTitle} - Challenge ${attempts + 1}`,
+        `${baseTitle} - ${category} Focus`,
+        `${baseTitle} - Variant ${attempts + 1}`
+      ];
+      
+      title = variations[attempts % variations.length];
+      attempts++;
+    }
+    
+    // If still duplicate after attempts, add timestamp
+    return `${baseTitle} - ${Date.now()}`;
   }
 }
 

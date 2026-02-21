@@ -13,10 +13,16 @@ class AdminChallengeController {
     this.generateTopicChallenge = this.generateTopicChallenge.bind(this);
     this.autoGenerateChallenges = this.autoGenerateChallenges.bind(this);
     this.bulkGenerate = this.bulkGenerate.bind(this);
+    this.bulkRegisterChallenges = this.bulkRegisterChallenges.bind(this);
+    this.bulkPreviewChallenges = this.bulkPreviewChallenges.bind(this);
+    this.bulkPreviewChallengesStream = this.bulkPreviewChallengesStream.bind(this);
     this.getGenerationStats = this.getGenerationStats.bind(this);
     this.getAllChallenges = this.getAllChallenges.bind(this);
     this.getAvailableDates = this.getAvailableDates.bind(this);
     this.previewChallenge = this.previewChallenge.bind(this);
+    this.getMonthlySchedule = this.getMonthlySchedule.bind(this);
+    this.selectDifficultyByDistribution = this.selectDifficultyByDistribution.bind(this);
+    this.buildMixedTopicPrompt = this.buildMixedTopicPrompt.bind(this);
   }
 
   // Generate single challenge (preview only)
@@ -652,6 +658,231 @@ class AdminChallengeController {
         error: error.message
       });
     }
+  }
+
+  // Bulk preview challenges (generate without saving)
+  async bulkPreviewChallenges(req, res) {
+    try {
+      console.log('🔍 Debug - Starting bulk preview...');
+      const { preferences } = req.body;
+      
+      const {
+        selectedMonth,
+        selectedYear,
+        challengesPerMonth = 30,
+        monthlyThemes,
+        difficultyDistribution,
+        topicMix,
+        timeLimit = 30,
+        maxPoints = 100
+      } = preferences;
+
+      const monthTheme = monthlyThemes[selectedMonth];
+      console.log(`📚 Preview theme: ${monthTheme}`);
+
+      // Calculate date range for month
+      const firstDay = new Date(selectedYear, selectedMonth, 1);
+      const lastDay = new Date(selectedYear, selectedMonth + 1, 0);
+      
+      const challenges = [];
+
+      // Generate preview challenges for each day in month
+      for (let date = new Date(firstDay); date <= lastDay && challenges.length < challengesPerMonth; date.setDate(date.getDate() + 1)) {
+        try {
+          // Select difficulty based on distribution
+          const difficulty = this.selectDifficultyByDistribution(difficultyDistribution);
+          
+          // Build comprehensive topic prompt
+          const topicPrompt = this.buildMixedTopicPrompt(monthTheme, topicMix, difficulty);
+          
+          // Generate challenge using the generator service
+          const challengeData = await this.generator.generateDailyChallenge({
+            difficulty,
+            category: monthTheme,
+            timeLimit,
+            maxPoints,
+            topic: topicPrompt
+          });
+
+          // Add date info for preview (don't save to database)
+          challenges.push({
+            ...challengeData.data,
+            previewDate: new Date(date).toISOString().split('T')[0],
+            dayNumber: challenges.length + 1
+          });
+          
+        } catch (error) {
+          console.error(`❌ Failed to generate preview challenge for day ${challenges.length + 1}:`, error.message);
+        }
+      }
+
+      console.log(`🎉 Bulk preview complete: ${challenges.length} challenges generated`);
+
+      res.status(200).json({
+        success: true,
+        message: `Generated preview for ${challenges.length} challenges`,
+        data: challenges
+      });
+
+    } catch (error) {
+      console.error('🚨 Debug - Error in bulk preview:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Bulk preview failed',
+        error: error.message
+      });
+    }
+  }
+
+  // Bulk preview challenges with Server-Sent Events for real-time progress
+  async bulkPreviewChallengesStream(req, res) {
+    try {
+      console.log('🔍 Debug - Starting bulk preview stream...');
+      
+      // Set headers for Server-Sent Events
+      res.writeHead(200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'Cache-Control'
+      });
+
+      const { preferences } = req.body;
+      
+      const {
+        selectedMonth,
+        selectedYear,
+        monthlyThemes,
+        difficultyDistribution,
+        topicMix,
+        timeLimit = 30,
+        maxPoints = 100
+      } = preferences;
+
+      // Calculate actual days in the selected month
+      const daysInMonth = new Date(selectedYear, selectedMonth + 1, 0).getDate();
+      
+      const monthTheme = monthlyThemes[selectedMonth];
+      console.log(`📚 Stream preview theme: ${monthTheme} (${daysInMonth} days)`);
+
+      // Calculate date range for month
+      const firstDay = new Date(selectedYear, selectedMonth, 1);
+      const lastDay = new Date(selectedYear, selectedMonth + 1, 0);
+      
+      let challengesGenerated = 0;
+      const sessionTitles = []; // Track titles in current session
+
+      // Generate preview challenges for each day in month
+      for (let date = new Date(firstDay); date <= lastDay && challengesGenerated < daysInMonth; date.setDate(date.getDate() + 1)) {
+        try {
+          // Select difficulty based on distribution
+          const difficulty = this.selectDifficultyByDistribution(difficultyDistribution);
+          
+          // Build comprehensive topic prompt
+          const topicPrompt = this.buildMixedTopicPrompt(monthTheme, topicMix, difficulty);
+          
+          // Generate challenge using the generator service
+          const challengeData = await this.generator.generateDailyChallenge({
+            difficulty,
+            category: monthTheme,
+            timeLimit,
+            maxPoints,
+            topic: topicPrompt
+          });
+
+          // Check for duplicate and generate unique title if needed
+          const uniqueTitle = await this.generator.generateUniqueTitle(
+            challengeData.data.title, 
+            challengeData.data.category, 
+            challengeData.data.difficulty,
+            sessionTitles
+          );
+          
+          challengeData.data.title = uniqueTitle;
+          sessionTitles.push(uniqueTitle); // Add to session tracking
+
+          const challenge = {
+            ...challengeData.data,
+            previewDate: new Date(date).toISOString().split('T')[0],
+            dayNumber: challengesGenerated + 1
+          };
+
+          challengesGenerated++;
+
+          // Send progress update to client
+          const progressData = {
+            type: 'progress',
+            current: challengesGenerated,
+            total: daysInMonth,
+            challenge: challenge
+          };
+
+          res.write(`data: ${JSON.stringify(progressData)}\n\n`);
+          
+          // Small delay to make the progress visible
+          await new Promise(resolve => setTimeout(resolve, 200));
+          
+        } catch (error) {
+          console.error(`❌ Failed to generate preview challenge for day ${challengesGenerated + 1}:`, error.message);
+          
+          // Send error for this specific challenge but continue
+          const errorData = {
+            type: 'warning',
+            message: `Failed to generate challenge for day ${challengesGenerated + 1}: ${error.message}`
+          };
+          res.write(`data: ${JSON.stringify(errorData)}\n\n`);
+        }
+      }
+
+      console.log(`🎉 Bulk preview stream complete: ${challengesGenerated} challenges generated`);
+
+      // Send completion message
+      const completionData = {
+        type: 'complete',
+        total: challengesGenerated,
+        message: `Generated preview for ${challengesGenerated} challenges`
+      };
+
+      res.write(`data: ${JSON.stringify(completionData)}\n\n`);
+      res.end();
+
+    } catch (error) {
+      console.error('🚨 Debug - Error in bulk preview stream:', error);
+      
+      const errorData = {
+        type: 'error',
+        message: 'Bulk preview failed: ' + error.message
+      };
+      
+      res.write(`data: ${JSON.stringify(errorData)}\n\n`);
+      res.end();
+    }
+  }
+  selectDifficultyByDistribution(distribution) {
+    const random = Math.random() * 100;
+    
+    if (random < distribution.easy) {
+      return 'Easy';
+    } else if (random < distribution.easy + distribution.medium) {
+      return 'Medium';
+    } else {
+      return 'Hard';
+    }
+  }
+
+  buildMixedTopicPrompt(theme, topicMix, difficulty) {
+    const topicAreas = [];
+    
+    if (topicMix.algorithms) topicAreas.push('algorithmic problem-solving');
+    if (topicMix.dataStructures) topicAreas.push('data structure implementation');
+    if (topicMix.problemSolving) topicAreas.push('problem-solving techniques');
+    if (topicMix.optimization) topicAreas.push('performance optimization');
+    if (topicMix.realWorldApplications) topicAreas.push('real-world applications');
+
+    const topicAreasText = topicAreas.join(', ');
+    
+    return `Create a ${difficulty.toLowerCase()} ${theme} challenge that combines ${topicAreasText}. The challenge should be practical, educational, and suitable for ${difficulty} difficulty level.`;
   }
 
   async bulkGenerate(req, res) {

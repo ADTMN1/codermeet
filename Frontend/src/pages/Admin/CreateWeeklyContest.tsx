@@ -108,7 +108,19 @@ const CreateWeeklyContest: React.FC = () => {
   const statuses = ['draft', 'upcoming', 'active', 'completed', 'cancelled'];
 
   const handleInputChange = (field: string, value: any) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    setFormData(prev => {
+      const newData = { ...prev, [field]: value };
+      
+      // Auto-calculate end date when start date changes
+      if (field === 'startDate' && value) {
+        const startDate = new Date(value);
+        // Add 7 days for weekly contest
+        const endDate = new Date(startDate.getTime() + 7 * 24 * 60 * 60 * 1000);
+        newData.endDate = endDate.toISOString().slice(0, 16);
+      }
+      
+      return newData;
+    });
   };
 
   const addTag = () => {
@@ -251,6 +263,7 @@ const CreateWeeklyContest: React.FC = () => {
         <Button 
           variant="outline" 
           onClick={() => navigate('/admin/weekly-challenges')}
+          className='cursor-pointer'
         >
           <X className="w-4 h-4 mr-2" />
           Cancel
@@ -645,7 +658,7 @@ const CreateWeeklyContest: React.FC = () => {
             <Button
               type="submit"
               disabled={loading}
-              className="bg-red-600 hover:bg-red-700 text-white px-6"
+              className="bg-red-600 hover:bg-red-700 text-white px-6 cursor-pointer"
             >
               {loading ? (
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>

@@ -37,11 +37,26 @@ router.get('/monthly-schedule', adminChallengeController.getMonthlySchedule);
 // Bulk register challenges with preferences
 router.post('/bulk-register', adminChallengeController.bulkRegisterChallenges);
 
+// Bulk preview challenges (generate without saving)
+router.post('/bulk-preview', adminChallengeController.bulkPreviewChallenges);
+
+// Bulk preview challenges with real-time streaming
+router.post('/bulk-preview-stream', adminChallengeController.bulkPreviewChallengesStream);
+
 // Get generation statistics
 router.get('/stats', challengeController.getChallengeStats);
 
 // Get all challenges for admin
 router.get('/all', challengeController.getAllChallenges); // Main challenges only
+
+// Get challenge by ID for admin
+router.get('/:id', challengeController.getChallengeById);
+
+// Update challenge by ID for admin
+router.put('/:id', challengeController.updateChallenge);
+
+// Get challenge submissions for admin
+router.get('/:id/submissions', challengeController.getChallengeSubmissions);
 
 // Get daily challenges for admin  
 router.get('/daily', adminChallengeController.getAllChallenges); // Daily challenges only

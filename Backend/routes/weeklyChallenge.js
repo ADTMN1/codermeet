@@ -4,6 +4,8 @@ const weeklyChallengeController = require('../controllers/weeklyChallengeControl
 const { authenticate, requireAdmin } = require('../middlewares/roleBasedAuth');
 
 // Admin routes - require authentication first, then admin role
+router.get('/check-exists', authenticate, requireAdmin, weeklyChallengeController.checkWeeklyChallengeExists);
+router.get('/next-available-week', authenticate, requireAdmin, weeklyChallengeController.getNextAvailableWeek);
 router.post('/', authenticate, requireAdmin, weeklyChallengeController.createWeeklyChallenge);
 router.get('/stats', authenticate, requireAdmin, weeklyChallengeController.getWeeklyChallengeStats);
 router.put('/:id', authenticate, requireAdmin, weeklyChallengeController.updateWeeklyChallenge);

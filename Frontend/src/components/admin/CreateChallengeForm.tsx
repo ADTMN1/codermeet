@@ -48,8 +48,8 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({ onClose, onSu
         requirements: challenge.requirements || [''],
         deliverables: challenge.deliverables || [''],
         resources: challenge.resources?.map(r => ({ ...r, icon: 'BookOpen' })) || [{ title: '', url: '', type: 'article', icon: 'BookOpen' }],
-        startDate: challenge.startDate ? new Date(challenge.startDate).toISOString().split('T')[0] : '',
-        endDate: challenge.endDate ? new Date(challenge.endDate).toISOString().split('T')[0] : '',
+        startDate: challenge.startDate ? new Date(challenge.startDate).toISOString().slice(0, 16) : '',
+        endDate: challenge.endDate ? new Date(challenge.endDate).toISOString().slice(0, 16) : '',
         maxParticipants: challenge.maxParticipants?.toString() || '',
         prizes: challenge.prizes || [{ position: 1, prize: '', value: 0, currency: 'USD' }],
         evaluationCriteria: challenge.evaluationCriteria || [{ criterion: '', weight: 1, description: '' }]
@@ -221,9 +221,9 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({ onClose, onSu
       // Error handling is done in hooks, but we'll add a fallback
       console.error('Form submission error:', error);
       if (error.response?.data?.message) {
-        error(error.response.data.message);
+        warning(error.response.data.message);
       } else {
-        error('Failed to create weekly challenge. Please try again.');
+        warning('Failed to create weekly challenge. Please try again.');
       }
     } finally {
       setLoading(false);
@@ -461,7 +461,7 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({ onClose, onSu
                   <button
                     type="button"
                     onClick={() => removeArrayItem('prizes', index)}
-                    className="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                    className="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center justify-center cursor-pointer"
                   >
                     <Trash2 className="h-4 w-4" />
                   </button>
