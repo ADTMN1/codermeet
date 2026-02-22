@@ -7,26 +7,16 @@ const User = require('../models/user');
 // Get messages for a challenge
 exports.getMessages = async (req, res) => {
   try {
-    console.log('🔍 Backend Debug - getMessages called');
-    console.log('🔍 Backend Debug - req.params:', req.params);
-    console.log('🔍 Backend Debug - req.query:', req.query);
-    console.log('🔍 Backend Debug - req.originalUrl:', req.originalUrl);
-    
     const { challengeId: id } = req.params;
     const { page = 1, limit = 50 } = req.query;
-    
-    console.log('🔍 Backend Debug - Extracted params:', { challengeId: id, page, limit });
 
     // Validate challenge ID
     if (!id) {
-      console.log('❌ Backend Debug - No challenge ID provided');
       return res.status(400).json({
         success: false,
         message: 'Challenge ID is required'
       });
     }
-
-    console.log('🔍 Backend Debug - Looking for challenge with ID:', id);
     
     // Check if it's a weekly challenge or regular challenge
     let challenge;
@@ -48,17 +38,17 @@ exports.getMessages = async (req, res) => {
       });
     }
 
-    console.log('🔍 Backend Debug - Fetching messages...');
     // Try populate with error handling
     let messages;
     try {
       messages = await Message.find({ challengeId: id })
         .populate('author', 'fullName username avatar')
+        .populate('replies.author', 'fullName username avatar')
+        .populate('replies.likes', 'fullName username')
         .sort({ createdAt: -1 })
         .limit(parseInt(limit))
         .skip((parseInt(page) - 1) * parseInt(limit));
     } catch (populateError) {
-      console.log('⚠️ Backend Debug - Populate failed, using fallback:', populateError.message);
       // Fallback to simple query without populate
       messages = await Message.find({ challengeId: id })
         .sort({ createdAt: -1 })
@@ -67,9 +57,6 @@ exports.getMessages = async (req, res) => {
     }
 
     const total = await Message.countDocuments({ challengeId: id });
-    
-    console.log('✅ Backend Debug - Found messages:', messages.length);
-    console.log('✅ Backend Debug - Total messages:', total);
 
     res.status(200).json({
       success: true,
@@ -82,7 +69,6 @@ exports.getMessages = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('❌ Backend Debug - Error in getMessages:', error);
     res.status(500).json({
       success: false,
       message: 'Error fetching messages',
@@ -250,7 +236,7 @@ exports.createReply = async (req, res) => {
   try {
     const { messageId } = req.params;
     const { content, parentReplyId } = req.body;
-    const userId = req.user.id;
+    const userId = req.user?.id || req.userProfile?._id;
 
     // Validate required fields
     if (!content || content.trim().length === 0) {
@@ -271,7 +257,14 @@ exports.createReply = async (req, res) => {
 
 
     // Verify user is part of the challenge
-    const challenge = await Challenge.findById(message.challengeId);
+        
+    let challenge;
+    // Check if the message's challenge is a weekly challenge by trying WeeklyChallenge first
+    challenge = await WeeklyChallenge.findById(message.challengeId);
+    if (!challenge) {
+            challenge = await Challenge.findById(message.challengeId);
+    }
+    
     if (!challenge) {
       return res.status(404).json({
         success: false,
@@ -280,14 +273,16 @@ exports.createReply = async (req, res) => {
     }
 
     // Check if user is registered for the challenge
+        
     const isRegistered = challenge.participants.some(
       participant => {
         // Handle both direct user ID and nested user object
         const participantUserId = participant.user?._id || participant._id || participant;
-        return participantUserId.toString() === userId;
+                return participantUserId.toString() === userId;
       }
     );
 
+    
     if (!isRegistered) {
       return res.status(403).json({
         success: false,
@@ -313,13 +308,14 @@ exports.createReply = async (req, res) => {
       { path: 'replies.likes', select: 'fullName username' }
     ]);
 
+    
     res.status(201).json({
       success: true,
       message: 'Reply posted successfully',
       data: message
     });
   } catch (error) {
-    res.status(500).json({
+        res.status(500).json({
       success: false,
       message: 'Error creating reply',
       error: error.message

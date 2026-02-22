@@ -57,14 +57,14 @@ const NestedReply = ({
         <div className="flex items-center gap-2 mb-2">
           <div className={`w-6 h-6 ${getUserAvatarColor(reply.author._id)} rounded-full flex items-center justify-center text-white text-xs font-semibold`}>
             {reply.author.avatar ? (
-              <img src={reply.author.avatar} alt={reply.author.fullName} className="w-full h-full rounded-full object-cover" />
+              <img src={reply.author.avatar} alt={reply.author.fullName || 'Unknown User'} className="w-full h-full rounded-full object-cover" />
             ) : (
               getUserInitials(reply.author.fullName)
             )}
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
-              <span className="text-xs text-slate-300 font-medium">{reply.author.fullName}</span>
+              <span className="text-xs text-slate-300 font-medium">{reply.author.fullName || 'Unknown User'}</span>
               {isNestedReply && (
                 <span className="text-xs text-blue-400 flex items-center gap-1">
                   <CornerUpLeft className="w-3 h-3" />
@@ -135,7 +135,6 @@ const NestedReply = ({
               }}
               placeholder="Write your reply..."
               className="bg-slate-900 border-slate-700 text-slate-100 min-h-[50px] resize-none text-xs"
-              autoFocus
             />
             <div className="flex justify-end mt-2">
               <Button
@@ -275,9 +274,14 @@ export function DiscussionSection({ challengeId }: DiscussionSectionProps) {
     }
   };
 
-  // Scroll to bottom when new messages arrive
+  // Scroll to bottom only when user sends a message or when new messages arrive after initial load
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    // Only scroll if this is not the initial load and there are messages
+    if (messages.length > 1) {
+      setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      }, 100);
+    }
   }, [messages]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -313,7 +317,7 @@ export function DiscussionSection({ challengeId }: DiscussionSectionProps) {
   };
 
   const handleReplyToReply = (messageId: string, replyId: string, replyAuthorName: string) => {
-    setReplyingTo(messageId);
+    setReplyingTo(null); // Clear main reply form
     setReplyingToReply(replyId);
     setReplyToReplyContent(prev => ({ ...prev, [replyId]: '' }));
   };
@@ -441,6 +445,7 @@ export function DiscussionSection({ challengeId }: DiscussionSectionProps) {
   };
 
   const getUserInitials = (fullName: string) => {
+    if (!fullName) return 'U';
     return fullName
       .split(' ')
       .map(word => word[0])
@@ -659,7 +664,6 @@ export function DiscussionSection({ challengeId }: DiscussionSectionProps) {
                             onChange={(e) => setReplyContent(prev => ({ ...prev, [msg._id]: e.target.value }))}
                             placeholder="Write your reply..."
                             className="bg-slate-900 border-slate-700 text-slate-100 min-h-[60px] resize-none text-sm"
-                            autoFocus
                           />
                           <div className="flex justify-end mt-2">
                             <Button

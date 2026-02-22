@@ -1,5 +1,4 @@
 import React from 'react';
-
 import { useState } from 'react';
 import { User, Users, Plus, X } from 'lucide-react';
 import {
@@ -14,6 +13,7 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { toast } from 'sonner';
 import { useUser } from '../context/UserContext';
+import { API_CONFIG } from '../config/api';
 
 interface RegistrationModalProps {
   open: boolean;
@@ -90,7 +90,7 @@ export function RegistrationModal({
 
     try {
       // Call the registration API
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/challenges/${challengeId}/register`, {
+      const response = await fetch(`${API_CONFIG.BASE_URL}/weekly-challenges/${challengeId}/join`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

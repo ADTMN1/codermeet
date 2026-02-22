@@ -24,18 +24,34 @@ import { Label } from '../../components/ui/label';
 const SubmissionsReview: React.FC = () => {
   const navigate = useNavigate();
   const [challenges, setChallenges] = useState<Challenge[]>([]);
+  const [weeklyChallenges, setWeeklyChallenges] = useState<Challenge[]>([]);
+  const [dailyChallenges, setDailyChallenges] = useState<Challenge[]>([]);
   const [selectedChallengeForSubmissions, setSelectedChallengeForSubmissions] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<'all' | 'weekly' | 'daily'>('all');
 
   useEffect(() => {
-    fetchChallenges();
+    fetchAllChallenges();
   }, []);
 
-  const fetchChallenges = async () => {
+  const fetchAllChallenges = async () => {
     try {
       setLoading(true);
-      const challengesData = await challengeService.getAllChallenges({ limit: 100 });
-      setChallenges(challengesData?.data || []);
+      
+      // Fetch all types of challenges
+      const [allChallenges, weekly, daily] = await Promise.all([
+        challengeService.getAllChallenges({ limit: 100 }),
+        challengeService.getAllWeeklyChallenges({ limit: 100 }),
+        challengeService.getDailyChallenges({ limit: 100 })
+      ]);
+      
+      setChallenges(allChallenges?.data?.challenges || []);
+      setWeeklyChallenges(weekly?.data || []);
+      setDailyChallenges(daily?.data || []);
+      
+      console.log('📊 All challenges:', allChallenges?.data?.challenges?.length);
+      console.log('📅 Weekly challenges:', weekly?.data?.length);
+      console.log('📝 Daily challenges:', daily?.data?.length);
     } catch (error) {
       console.error('Failed to fetch challenges:', error);
     } finally {
@@ -57,6 +73,40 @@ const SubmissionsReview: React.FC = () => {
       <div>
         <h2 className="text-2xl font-bold text-white mb-2">Code Review</h2>
         <p className="text-gray-400">Review and manage challenge submissions</p>
+      </div>
+
+      {/* Challenge Type Tabs */}
+      <div className="flex space-x-1 bg-slate-800 rounded-lg p-1">
+        <button
+          onClick={() => setActiveTab('all')}
+          className={`flex-1 px-4 py-2 rounded-md font-medium transition-colors ${
+            activeTab === 'all'
+              ? 'bg-blue-600 text-white'
+              : 'text-gray-400 hover:text-white hover:bg-slate-700'
+          }`}
+        >
+          All Challenges ({challenges.length})
+        </button>
+        <button
+          onClick={() => setActiveTab('weekly')}
+          className={`flex-1 px-4 py-2 rounded-md font-medium transition-colors ${
+            activeTab === 'weekly'
+              ? 'bg-blue-600 text-white'
+              : 'text-gray-400 hover:text-white hover:bg-slate-700'
+          }`}
+        >
+          Weekly ({weeklyChallenges.length})
+        </button>
+        <button
+          onClick={() => setActiveTab('daily')}
+          className={`flex-1 px-4 py-2 rounded-md font-medium transition-colors ${
+            activeTab === 'daily'
+              ? 'bg-blue-600 text-white'
+              : 'text-gray-400 hover:text-white hover:bg-slate-700'
+          }`}
+        >
+          Daily ({dailyChallenges.length})
+        </button>
       </div>
 
       {/* Stats Overview */}
@@ -128,16 +178,15 @@ const SubmissionsReview: React.FC = () => {
       <Card className="bg-gray-900 border-gray-800 p-6">
         <div className="flex items-center gap-4">
           <div className="flex-1">
-            <Label className="text-gray-300 mb-2 block">Select Challenge to Review</Label>
-            <select
+             <select
               value={selectedChallengeForSubmissions || ''}
               onChange={(e) => setSelectedChallengeForSubmissions(e.target.value || null)}
               className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-red-500"
             >
-              <option value="">All Challenges</option>
-              {challenges.map((challenge) => (
+              <option value="">All {activeTab === 'all' ? 'Challenges' : activeTab === 'weekly' ? 'Weekly Challenges' : 'Daily Challenges'}</option>
+              {(activeTab === 'all' ? challenges : activeTab === 'weekly' ? weeklyChallenges : dailyChallenges).map((challenge) => (
                 <option key={challenge._id} value={challenge._id}>
-                  {challenge.title} ({challenge.status})
+                  {challenge.title} ({challenge.status || 'active'})
                 </option>
               ))}
             </select>

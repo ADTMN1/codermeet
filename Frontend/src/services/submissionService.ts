@@ -4,13 +4,7 @@ import { API_CONFIG } from '../config/api';
 
 export interface SubmissionData {
   githubUrl: string;
-  liveUrl?: string;
   description: string;
-  screenshots?: Array<{
-    filename: string;
-    url: string;
-    size: number;
-  }>;
   files?: Array<{
     filename: string;
     url: string;
@@ -81,11 +75,10 @@ class SubmissionService {
       
       return response.data.data;
     } catch (error: any) {
-      if (error.response?.status === 404) {
-        // Expected when user hasn't submitted yet
-        return null;
+      // Only log unexpected errors, not 404s
+      if (error.response?.status !== 404) {
+        console.error('Unexpected error fetching submission:', error);
       }
-      // For other errors, log and rethrow
       throw new Error(error.response?.data?.message || 'Failed to fetch submission');
     }
   }
@@ -95,7 +88,7 @@ class SubmissionService {
     try {
       const params = status ? { status } : {};
       const response = await axios.get(
-        `${API_CONFIG.BASE_URL}/challenges/${challengeId}/submissions`,
+        `${API_CONFIG.BASE_URL}/weekly-challenges/${challengeId}/submissions`,
         {
           params,
           headers: {
@@ -115,7 +108,7 @@ class SubmissionService {
     try {
       const params = status ? { status } : {};
       const response = await axios.get(
-        `${API_CONFIG.BASE_URL}/challenges/submissions/all`,
+        `${API_CONFIG.BASE_URL}/weekly-challenges/submissions/all`,
         {
           params,
           headers: {
@@ -135,10 +128,17 @@ class SubmissionService {
     status: 'accepted' | 'rejected';
     score?: number;
     feedback?: string;
+    rankingCriteria?: {
+      codeQuality?: number;
+      functionality?: number;
+      creativity?: number;
+      documentation?: number;
+    };
+    rank?: string;
   }): Promise<Submission> {
     try {
       const response = await axios.put(
-        `${API_CONFIG.BASE_URL}/challenges/${challengeId}/submissions/${submissionId}/review`,
+        `${API_CONFIG.BASE_URL}/weekly-challenges/${challengeId}/submissions/${submissionId}/review`,
         reviewData,
         {
           headers: {

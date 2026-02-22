@@ -1,10 +1,8 @@
 import React from 'react';
-
 import { useState, useEffect } from 'react';
 import {
   Upload,
   Github,
-  FileArchive,
   CheckCircle,
   Circle,
   ArrowRight,
@@ -20,10 +18,13 @@ import LoadingSpinner from './ui/loading-spinner';
 interface UploadSectionProps {
   registrationMode: 'solo' | 'team';
   challengeId?: string;
+  userId: string;
 }
 
-export function UploadSection({ registrationMode, challengeId }: UploadSectionProps) {
+export function UploadSection({ registrationMode, challengeId, userId }: UploadSectionProps) {
   const [githubUrl, setGithubUrl] = useState('');
+  const [liveUrl, setLiveUrl] = useState('');
+  const [description, setDescription] = useState('');
   const [fileName, setFileName] = useState('');
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -63,25 +64,28 @@ export function UploadSection({ registrationMode, challengeId }: UploadSectionPr
       return;
     }
     
-    if (!githubUrl && !fileName) {
-      toast.error('Please provide either a GitHub URL or upload a file');
+    if (!githubUrl) {
+      toast.error('Please provide a GitHub URL');
       return;
     }
+
+    console.log('🚀 Submitting project with data:', {
+      challengeId,
+      githubUrl,
+      liveUrl,
+      description
+    });
 
     setLoading(true);
     
     try {
       const submissionData: SubmissionData = {
         githubUrl: githubUrl,
-        liveUrl: '', // Optional field for weekly challenges
-        description: `Project submitted by ${registrationMode === 'solo' ? 'individual' : 'team'} participant`,
-        screenshots: fileName ? [{
-          filename: fileName,
-          url: '', // Will be populated when file upload is implemented
-          size: 0
-        }] : []
+        liveUrl: liveUrl,
+        description: description
       };
 
+      console.log('📤 Sending submission data:', submissionData);
       const result = await submissionService.submitProject(challengeId, submissionData);
       
       setSubmitted(true);
@@ -92,9 +96,21 @@ export function UploadSection({ registrationMode, challengeId }: UploadSectionPr
         duration: 5000,
       });
     } catch (error: any) {
+      console.error('❌ Submission error:', error);
+      
       if (error.message && error.message.includes('already submitted')) {
         toast.error('🚫 Resubmission not allowed', {
           description: 'You have already submitted a project for this challenge.',
+          duration: 5000,
+        });
+      } else if (error.message && error.message.includes('join this challenge')) {
+        toast.error('🚫 Not registered', {
+          description: 'You must join this challenge before submitting.',
+          duration: 5000,
+        });
+      } else if (error.message && error.message.includes('not accepting submissions')) {
+        toast.error('🚫 Challenge closed', {
+          description: 'This challenge is not accepting submissions.',
           duration: 5000,
         });
       } else {
@@ -203,35 +219,28 @@ export function UploadSection({ registrationMode, challengeId }: UploadSectionPr
               </div>
             </div>
 
-            <div className="relative my-4">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-slate-700"></div>
-              </div>
-              <div className="relative flex justify-center text-xs">
-                <span className="px-2 bg-slate-900 text-slate-500">OR</span>
+            <div className="space-y-2">
+              <Label className="text-slate-300">Live Demo URL (Optional)</Label>
+              <div className="relative">
+                <Input
+                  type="url"
+                  value={liveUrl}
+                  onChange={(e) => setLiveUrl(e.target.value)}
+                  placeholder="https://your-demo-url.com"
+                  className="bg-slate-800 border-slate-700 text-slate-100"
+                />
               </div>
             </div>
 
             <div className="space-y-2">
-              <Label className="text-slate-300">Upload Project (ZIP)</Label>
-              <div className="relative">
-                <Input
-                  type="file"
-                  accept=".zip"
-                  onChange={handleFileChange}
-                  className="hidden"
-                  id="file-upload"
-                />
-                <label
-                  htmlFor="file-upload"
-                  className="flex items-center justify-center gap-2 p-4 border-2 border-dashed border-slate-700 rounded-lg cursor-pointer hover:border-blue-500/50 hover:bg-slate-800/50 transition-all"
-                >
-                  <FileArchive className="w-5 h-5 text-slate-400" />
-                  <span className="text-slate-400">
-                    {fileName || 'Click to upload ZIP file'}
-                  </span>
-                </label>
-              </div>
+              <Label className="text-slate-300">Project Description</Label>
+              <textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Describe your project and what makes it special..."
+                className="w-full p-3 bg-slate-800 border-slate-700 text-slate-100 rounded-lg resize-none h-20"
+                rows={3}
+              />
             </div>
 
             <Button
@@ -260,6 +269,9 @@ export function UploadSection({ registrationMode, challengeId }: UploadSectionPr
               <p className="text-sm text-slate-400 mt-2">
                 Your submission is being evaluated by our team.
               </p>
+              <p className="text-sm text-slate-400 mt-1">
+                Submission Details
+              </p>
             </div>
             
             {/* Submission Details */}
@@ -268,40 +280,53 @@ export function UploadSection({ registrationMode, challengeId }: UploadSectionPr
                 <h4 className="text-sm font-medium text-slate-300 mb-3">Submission Details</h4>
                 
                 {submission.githubUrl && (
-                  <div className="flex items-center gap-2">
-                    <Github className="w-4 h-4 text-slate-400" />
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <Github className="w-4 h-4 text-slate-400" />
+                      <span className="text-xs text-slate-400">GitHub Repository:</span>
+                    </div>
                     <a 
                       href={submission.githubUrl} 
                       target="_blank" 
                       rel="noopener noreferrer"
-                      className="text-sm text-blue-400 hover:text-blue-300 truncate"
+                      className="text-sm text-blue-400 hover:text-blue-300 truncate ml-6 block"
                     >
                       {submission.githubUrl}
                     </a>
                   </div>
                 )}
                 
-                {submission.files && submission.files.length > 0 && (
-                  <div className="flex items-center gap-2">
-                    <FileArchive className="w-4 h-4 text-slate-400" />
-                    <span className="text-sm text-slate-300">
-                      {submission.files[0].filename}
-                    </span>
+                {submission.liveUrl && (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <Upload className="w-4 h-4 text-slate-400" />
+                      <span className="text-xs text-slate-400">Live Demo:</span>
+                    </div>
+                    <a 
+                      href={submission.liveUrl} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-sm text-blue-400 hover:text-blue-300 truncate ml-6 block"
+                    >
+                      {submission.liveUrl}
+                    </a>
                   </div>
                 )}
                 
-                <div className="flex items-center justify-between pt-2 border-t border-slate-700">
-                  <span className="text-xs text-slate-500">
-                    Submitted: {new Date(submission.submittedAt).toLocaleDateString()}
-                  </span>
-                  <span className={`px-2 py-1 rounded-full text-xs ${
-                    submission.status === 'pending' ? 'bg-orange-500/20 text-orange-300' :
-                    submission.status === 'reviewed' ? 'bg-blue-500/20 text-blue-300' :
-                    submission.status === 'accepted' ? 'bg-green-500/20 text-green-300' :
-                    'bg-red-500/20 text-red-300'
-                  }`}>
-                    {submission.status.charAt(0).toUpperCase() + submission.status.slice(1)}
-                  </span>
+                {submission.description && (
+                  <div className="space-y-2">
+                    <span className="text-xs text-slate-400">Project Description:</span>
+                    <p className="text-sm text-slate-300 ml-6">
+                      {submission.description}
+                    </p>
+                  </div>
+                )}
+                
+                <div className="space-y-2">
+                  <span className="text-xs text-slate-400">Submitted At:</span>
+                  <p className="text-sm text-slate-300 ml-6">
+                    {new Date(submission.submittedAt).toLocaleDateString()} at {new Date(submission.submittedAt).toLocaleTimeString()}
+                  </p>
                 </div>
                 
                 {submission.feedback && (

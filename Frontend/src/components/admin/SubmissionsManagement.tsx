@@ -16,7 +16,8 @@ import {
   Star, 
   MessageSquare,
   Filter,
-  Search
+  Search,
+  Eye
 } from 'lucide-react';
 
 interface SubmissionsManagementProps {
@@ -29,6 +30,7 @@ export function SubmissionsManagement({ challengeId }: SubmissionsManagementProp
   const [loading, setLoading] = useState(true);
   const [selectedSubmission, setSelectedSubmission] = useState<Submission | null>(null);
   const [reviewDialogOpen, setReviewDialogOpen] = useState(false);
+  const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [reviewForm, setReviewForm] = useState({
@@ -276,7 +278,18 @@ export function SubmissionsManagement({ challengeId }: SubmissionsManagementProp
                   </div>
                 </div>
 
-                <div className="ml-4">
+                <div className="ml-4 flex gap-2">
+                  <Button
+                    onClick={() => {
+                      setSelectedSubmission(submission);
+                      setViewDialogOpen(true);
+                    }}
+                    variant="outline"
+                    size="sm"
+                    className="border-slate-600 text-slate-300 hover:bg-slate-800"
+                  >
+                    <Eye className="w-4 h-4" />
+                  </Button>
                   <Button
                     onClick={() => handleReview(submission)}
                     size="sm"
@@ -359,6 +372,140 @@ export function SubmissionsManagement({ challengeId }: SubmissionsManagementProp
                 </Button>
                 <Button onClick={handleSubmitReview} className="bg-blue-600 hover:bg-blue-700">
                   Submit Review
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* View Submission Detail Modal */}
+      <Dialog open={viewDialogOpen} onOpenChange={setViewDialogOpen}>
+        <DialogContent className="bg-slate-900 border-slate-700 text-white max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Eye className="w-5 h-5" />
+              Submission Details
+            </DialogTitle>
+          </DialogHeader>
+
+          {selectedSubmission && (
+            <div className="space-y-6">
+              {/* User Information */}
+              <div className="p-4 bg-slate-800/50 rounded-lg">
+                <h3 className="text-lg font-semibold text-white mb-3">User Information</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm text-slate-400">Full Name</p>
+                    <p className="text-white font-medium">{selectedSubmission.userId.fullName}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-slate-400">Username</p>
+                    <p className="text-white font-medium">@{selectedSubmission.userId.username}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-slate-400">Email</p>
+                    <p className="text-white font-medium">{selectedSubmission.userId.email}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-slate-400">Submission Date</p>
+                    <p className="text-white font-medium">
+                      {new Date(selectedSubmission.submittedAt).toLocaleDateString()} at{' '}
+                      {new Date(selectedSubmission.submittedAt).toLocaleTimeString()}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Submission Information */}
+              <div className="p-4 bg-slate-800/50 rounded-lg">
+                <h3 className="text-lg font-semibold text-white mb-3">Submission Information</h3>
+                <div className="space-y-3">
+                  <div>
+                    <p className="text-sm text-slate-400">GitHub Repository</p>
+                    <a
+                      href={selectedSubmission.githubUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-400 hover:text-blue-300 underline flex items-center gap-2"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                      {selectedSubmission.githubUrl}
+                    </a>
+                  </div>
+                  
+                  {selectedSubmission.description && (
+                    <div>
+                      <p className="text-sm text-slate-400">Description</p>
+                      <p className="text-white">{selectedSubmission.description}</p>
+                    </div>
+                  )}
+
+                  <div className="flex items-center gap-4">
+                    <div>
+                      <p className="text-sm text-slate-400">Status</p>
+                      <Badge className={getStatusColor(selectedSubmission.status)}>
+                        <div className="flex items-center gap-1">
+                          {getStatusIcon(selectedSubmission.status)}
+                          {selectedSubmission.status.charAt(0).toUpperCase() + selectedSubmission.status.slice(1)}
+                        </div>
+                      </Badge>
+                    </div>
+                    
+                    {selectedSubmission.score && (
+                      <div>
+                        <p className="text-sm text-slate-400">Score</p>
+                        <Badge className="bg-purple-500/20 text-purple-300 border-purple-500/30">
+                          <Star className="w-3 h-3 mr-1" />
+                          {selectedSubmission.score}/100
+                        </Badge>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Feedback Section */}
+              {selectedSubmission.feedback && (
+                <div className="p-4 bg-slate-800/50 rounded-lg">
+                  <h3 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
+                    <MessageSquare className="w-5 h-5" />
+                    Feedback
+                  </h3>
+                  <div className="bg-slate-700/50 p-3 rounded-lg">
+                    <p className="text-white">{selectedSubmission.feedback}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Challenge Information */}
+              {(selectedSubmission as any).challengeTitle && (
+                <div className="p-4 bg-slate-800/50 rounded-lg">
+                  <h3 className="text-lg font-semibold text-white mb-3">Challenge Information</h3>
+                  <div>
+                    <p className="text-sm text-slate-400">Challenge</p>
+                    <p className="text-white font-medium">{(selectedSubmission as any).challengeTitle}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div className="flex justify-end gap-3 pt-4 border-t border-slate-700">
+                <Button
+                  variant="outline"
+                  onClick={() => setViewDialogOpen(false)}
+                  className="border-slate-600 text-slate-300"
+                >
+                  Close
+                </Button>
+                <Button 
+                  onClick={() => {
+                    setViewDialogOpen(false);
+                    handleReview(selectedSubmission);
+                  }}
+                  className="bg-blue-600 hover:bg-blue-700"
+                >
+                  Review Submission
                 </Button>
               </div>
             </div>
