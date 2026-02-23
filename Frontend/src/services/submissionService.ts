@@ -21,31 +21,39 @@ export interface Submission {
     email: string;
     avatar?: string;
   };
-  githubUrl: string;
-  description: string;
-  files: Array<{
-    filename: string;
-    url: string;
-    size: number;
-  }>;
+  challengeId: string;
+  challengeTitle: string;
+  challengeType: 'weekly' | 'daily';
+  challengeCategory: string;
+  challengeDifficulty: string;
+  status: string;
   submittedAt: string;
-  status: 'pending' | 'reviewed' | 'accepted' | 'rejected';
-  score?: number;
-  feedback?: string;
+  githubUrl?: string;
+  liveUrl?: string;
+  description?: string;
+  screenshots?: string[];
+  score: number;
+  code?: string;
+  language?: string;
+  testResults?: any[];
+  completionTime?: any;
+  hintsUsed?: number;
   reviewedBy?: {
     _id: string;
     fullName: string;
     username: string;
   };
   reviewedAt?: string;
+  feedback?: string;
 }
 
 class SubmissionService {
   // Submit project for a challenge
-  async submitProject(challengeId: string, submissionData: SubmissionData): Promise<{ success: boolean; data: Submission; message: string }> {
+  async submitProject(challengeId: string, submissionData: SubmissionData, challengeType: 'regular' | 'weekly' = 'regular'): Promise<{ success: boolean; data: Submission; message: string }> {
     try {
+      const endpoint = challengeType === 'weekly' ? 'weekly-challenges' : 'challenges';
       const response = await axios.post(
-        `${API_CONFIG.BASE_URL}/weekly-challenges/${challengeId}/submit`,
+        `${API_CONFIG.BASE_URL}/${endpoint}/${challengeId}/submit`,
         submissionData,
         {
           headers: {
@@ -62,10 +70,11 @@ class SubmissionService {
   }
 
   // Get user's submissions for a challenge
-  async getUserSubmission(challengeId: string): Promise<Submission | null> {
+  async getUserSubmission(challengeId: string, challengeType: 'regular' | 'weekly' = 'regular'): Promise<Submission | null> {
     try {
+      const endpoint = challengeType === 'weekly' ? 'weekly-challenges' : 'challenges';
       const response = await axios.get(
-        `${API_CONFIG.BASE_URL}/weekly-challenges/${challengeId}/my-submission`,
+        `${API_CONFIG.BASE_URL}/${endpoint}/${challengeId}/my-submission`,
         {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
@@ -104,11 +113,10 @@ class SubmissionService {
   }
 
   // Get all submissions across all challenges (admin only)
-  async getAllSubmissions(status?: string): Promise<{ data: Submission[]; pagination: any }> {
+  async getAllSubmissions(params?: { status?: string; challengeType?: string }): Promise<{ data: Submission[]; pagination: any; stats?: any }> {
     try {
-      const params = status ? { status } : {};
       const response = await axios.get(
-        `${API_CONFIG.BASE_URL}/weekly-challenges/submissions/all`,
+        `${API_CONFIG.BASE_URL}/submissions`,
         {
           params,
           headers: {
@@ -124,7 +132,7 @@ class SubmissionService {
   }
 
   // Review a submission (admin only)
-  async reviewSubmission(challengeId: string, submissionId: string, reviewData: {
+  async reviewSubmission(submissionId: string, reviewData: {
     status: 'accepted' | 'rejected';
     score?: number;
     feedback?: string;
@@ -135,10 +143,11 @@ class SubmissionService {
       documentation?: number;
     };
     rank?: string;
+    content?: any;
   }): Promise<Submission> {
     try {
       const response = await axios.put(
-        `${API_CONFIG.BASE_URL}/weekly-challenges/${challengeId}/submissions/${submissionId}/review`,
+        `${API_CONFIG.BASE_URL}/submissions/${submissionId}/review`,
         reviewData,
         {
           headers: {

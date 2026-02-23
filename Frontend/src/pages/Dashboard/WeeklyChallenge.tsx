@@ -28,11 +28,14 @@ import { LiveStats } from '../../components/live-state';
 
 import { TimelineTracker } from '../../components/timeline-tracker';
 
+import { ChallengeLeaderboard } from '../../components/weekly-challenge/ChallengeLeaderboard';
+
 // import { ResourcesCard } from './components/resources-card';
 
 // import { TimelineTracker } from './components/timeline-tracker';
 
 import { Toaster } from '../../components/ui/sonner';
+import { toast } from 'sonner';
 
 import { UploadSection } from '../../components/upload-section';
 
@@ -44,7 +47,11 @@ import { useUser } from '../../context/UserContext';
 
 import { authService } from '../../services/auth';
 
+import { Trophy } from 'lucide-react';
 
+import { Button } from '../../components/ui/button';
+
+import { Select } from '../../components/ui/select';
 
 export default function WeeklyChallenge() {
 
@@ -73,6 +80,16 @@ export default function WeeklyChallenge() {
   // Challenge deadline passed (set to false initially, true to show winners)
 
   const [challengeEnded, setChallengeEnded] = useState(false);
+
+  const [showLeaderboard, setShowLeaderboard] = useState(false);
+
+  const [showPreviousRankings, setShowPreviousRankings] = useState(false);
+
+  const [previousChallengeId, setPreviousChallengeId] = useState<string | null>(null);
+
+  const [allCompletedChallenges, setAllCompletedChallenges] = useState<any[]>([]);
+
+  const [allChallengesForDropdown, setAllChallengesForDropdown] = useState<any[]>([]);
 
 
 
@@ -155,6 +172,81 @@ export default function WeeklyChallenge() {
 
   }, [user?._id, challenge?._id, challenge?.submissions]);
 
+  // Fetch all completed weekly challenges for dropdown
+  useEffect(() => {
+    const fetchCompletedChallenges = async () => {
+      try {
+        console.log('🔍 Fetching all completed challenges...');
+        const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+        const response = await fetch(`${API_URL}/weekly-challenges?status=completed&sort=weekNumber:desc`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+          }
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          console.log('🔍 Completed challenges response:', data);
+          
+          if (data.success && data.data.weeklyChallenges && data.data.weeklyChallenges.length > 0) {
+            const completed = data.data.weeklyChallenges;
+            console.log('🔍 Setting completed challenges:', completed.length);
+            setAllCompletedChallenges(completed);
+            
+            // Create dropdown options with current challenge + completed challenges
+            const dropdownOptions = [
+              {
+                _id: 'current',
+                weekNumber: challenge?.weekNumber || 'Current',
+                title: challenge?.title || 'Current Challenge',
+                isCurrent: true,
+                deadlinePassed: challengeEnded
+              },
+              ...completed.map((c: any) => ({
+                ...c,
+                isCurrent: false,
+                deadlinePassed: true
+              }))
+            ];
+            
+            setAllChallengesForDropdown(dropdownOptions);
+            
+            // Make challenges available to Select component via window context
+            (window as any).allCompletedChallenges = dropdownOptions;
+            
+            // Don't auto-select any challenge - let user choose
+            console.log('🔍 No auto-selection - user must choose challenge');
+            setPreviousChallengeId(null);
+          } else {
+            console.log('🔍 No completed challenges found');
+            setAllCompletedChallenges([]);
+            
+            // Still add current challenge to dropdown
+            const dropdownOptions = [{
+              _id: 'current',
+              weekNumber: challenge?.weekNumber || 'Current',
+              title: challenge?.title || 'Current Challenge',
+              isCurrent: true,
+              deadlinePassed: challengeEnded
+            }];
+            
+            setAllChallengesForDropdown(dropdownOptions);
+            (window as any).allCompletedChallenges = dropdownOptions;
+          }
+        } else {
+          console.error('🔍 Failed to fetch completed challenges:', response.status);
+        }
+      } catch (error) {
+        console.error('🔍 Error fetching completed challenges:', error);
+      }
+    };
+
+    // Only fetch if challenge is loaded
+    if (challenge) {
+      fetchCompletedChallenges();
+    }
+  }, [challenge, challengeEnded]); // Run when challenge and deadline status are available
+
 
 
   const handleJoinClick = () => {
@@ -173,6 +265,56 @@ export default function WeeklyChallenge() {
 
     setRegistrationModalOpen(false);
 
+  };
+
+
+
+  const handleViewRankings = () => {
+    if (!previousChallengeId) {
+      toast.error('Please select a challenge to view rankings');
+      return;
+    }
+
+    const selectedChallenge = allChallengesForDropdown.find(c => c._id === previousChallengeId);
+    
+    if (!selectedChallenge) {
+      toast.error('Invalid challenge selection');
+      return;
+    }
+
+    // Check if it's current challenge and deadline hasn't passed
+    if (selectedChallenge.isCurrent && !selectedChallenge.deadlinePassed) {
+      toast.error('Rankings Not Available Yet', {
+        description: 'Rankings will be available after the submission deadline. Please check back after the deadline.',
+        duration: 6000,
+      });
+      return;
+    }
+
+    // Show appropriate rankings
+    if (selectedChallenge.isCurrent) {
+      setShowLeaderboard(true);
+    } else {
+      setShowPreviousRankings(true);
+    }
+  };
+
+  const handleChallengeChange = (challengeId: string) => {
+    setPreviousChallengeId(challengeId);
+    console.log('🔍 Selected challenge:', challengeId);
+  };
+
+  const handleBackFromPreviousRankings = () => {
+    setShowPreviousRankings(false);
+  };
+
+  const handleViewNextChallenge = () => {
+    // Navigate to next available weekly challenge
+    navigate('/dashboard/weekly-challenges');
+  };
+
+  const handleBackToChallenge = () => {
+    setShowLeaderboard(false);
   };
 
 
@@ -213,37 +355,110 @@ export default function WeeklyChallenge() {
 
           <div className="lg:col-span-2 space-y-6">
 
-            <ChallengeOverviewCard
+            {showLeaderboard ? (
+              // Show Challenge Leaderboard
+              <div>
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-2xl font-bold text-white flex items-center gap-2">
+                    <Trophy className="text-yellow-400" />
+                    Challenge Rankings
+                  </h2>
+                  <Button
+                    onClick={handleBackToChallenge}
+                    variant="outline"
+                    className="border-gray-600 text-gray-300 hover:bg-gray-800"
+                  >
+                    Back to Challenge
+                  </Button>
+                </div>
+                <ChallengeLeaderboard
+                  challengeId={challenge?._id}
+                  onViewNextChallenge={handleViewNextChallenge}
+                />
+              </div>
+            ) : showPreviousRankings ? (
+              // Show Previous Challenge Rankings
+              <div>
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-2xl font-bold text-white flex items-center gap-2">
+                    <Trophy className="text-gray-400" />
+                    Previous Challenge Rankings
+                  </h2>
+                  <Button
+                    onClick={handleBackFromPreviousRankings}
+                    variant="outline"
+                    className="border-gray-600 text-gray-300 hover:bg-gray-800"
+                  >
+                    Back to Challenge
+                  </Button>
+                </div>
+                {previousChallengeId && (
+                  <ChallengeLeaderboard
+                    challengeId={previousChallengeId}
+                    onViewNextChallenge={handleViewNextChallenge}
+                  />
+                )}
+              </div>
+            ) : (
+              // Show Regular Challenge Content
+              <>
+                <ChallengeOverviewCard
+                  isRegistered={isRegistered}
+                  onJoinClick={handleJoinClick}
+                  challengeId={id} // Pass URL parameter or undefined to fetch first active
+                  onChallengeLoaded={setChallenge} // Set challenge when loaded
+                />
 
-              isRegistered={isRegistered}
+                {isRegistered && (
+                  <div className="mb-6">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-lg font-semibold text-white">Your Submission</h3>
+                      <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2">
+                          <Trophy className="w-4 h-4 text-gray-400" />
+                          <span className="text-sm text-gray-400">Rankings:</span>
+                          <Select
+                            value={previousChallengeId || ''}
+                            onValueChange={handleChallengeChange}
+                            className="w-56"
+                          >
+                            <Select.Trigger>
+                              <Select.Value placeholder="Select challenge" />
+                            </Select.Trigger>
+                            <Select.Content>
+                              {allChallengesForDropdown.map((challenge) => (
+                                <Select.Item key={challenge._id} value={challenge._id}>
+                                  {challenge.isCurrent ? `Current Challenge (Week ${challenge.weekNumber})` : `Week ${challenge.weekNumber}`}
+                                  {!challenge.deadlinePassed && !challenge.isCurrent && (
+                                    <span className="text-xs text-gray-500 ml-2">- After deadline</span>
+                                  )}
+                                </Select.Item>
+                              ))}
+                            </Select.Content>
+                          </Select>
+                        </div>
+                        <Button
+                          onClick={handleViewRankings}
+                          disabled={!previousChallengeId}
+                          className="bg-purple-600 hover:bg-purple-700 text-white disabled:opacity-50"
+                        >
+                          <Trophy className="w-4 h-4 mr-2" />
+                          View Rankings
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
-              onJoinClick={handleJoinClick}
+                <UploadSection registrationMode={registrationMode} challengeId={challenge?._id} challengeType="weekly" userId={user?._id} />
 
-              challengeId={id} // Pass URL parameter or undefined to fetch first active
+                <ScoringCriteria />
 
-              onChallengeLoaded={setChallenge} // Set challenge when loaded
+                {challengeEnded && <WinnersSection />}
 
-            />
-
-
-
-            {isRegistered && (
-
-              <UploadSection registrationMode={registrationMode} challengeId={challenge?._id} />
-
+                <DiscussionSection challengeId={challenge?._id} />
+              </>
             )}
-
-
-
-            <ScoringCriteria />
-
-
-
-            {challengeEnded && <WinnersSection />}
-
-
-
-            <DiscussionSection challengeId={challenge?._id} />
 
           </div>
 

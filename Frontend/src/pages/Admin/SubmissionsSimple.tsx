@@ -69,41 +69,108 @@ const SubmissionsSimple: React.FC = () => {
     if (!selectedSubmission) return;
     
     try {
+      console.log('=== DEBUGGING SUBMISSION RANKING ===');
+      console.log('1. Original rankingForm state:', JSON.stringify(rankingForm, null, 2));
+      console.log('2. Selected submission:', JSON.stringify(selectedSubmission, null, 2));
+      
+      // Validate ranking criteria before sending
+      if (!rankingForm.rankingCriteria || 
+          typeof rankingForm.rankingCriteria !== 'object' ||
+          Object.keys(rankingForm.rankingCriteria).length === 0) {
+        console.error('Invalid ranking criteria:', rankingForm.rankingCriteria);
+        return;
+      }
+      
+      // Create a clean copy of ranking criteria to avoid any corruption
+      const cleanRankingCriteria = {
+        codeQuality: (!rankingForm.rankingCriteria.codeQuality && rankingForm.rankingCriteria.codeQuality !== 0) ? rankingForm.rankingCriteria.codeQuality : '',
+        functionality: Number(rankingForm.rankingCriteria.functionality) || 0,
+        creativity: Number(rankingForm.rankingCriteria.creativity) || 0,
+        documentation: Number(rankingForm.rankingCriteria.documentation) || 0
+      };
+      
+      console.log('3. Clean ranking criteria:', JSON.stringify(cleanRankingCriteria, null, 2));
+      
       // Prepare the review data
       const reviewData = {
         status: rankingForm.status,
         score: rankingForm.score,
         feedback: rankingForm.feedback,
-        rankingCriteria: rankingForm.rankingCriteria,
-        rank: rankingForm.rank
+        rankingCriteria: cleanRankingCriteria,
+        rank: rankingForm.rank,
+        content: selectedSubmission.content || {
+          description: '',
+          githubUrl: '',
+          files: []
+        }
       };
 
-      console.log('Submitting ranking:', reviewData);
-
-      // Get challenge ID from submission
-      const challengeId = selectedSubmission.challengeId || selectedSubmission.challenge?._id;
-      
-      if (!challengeId) {
-        throw new Error('Challenge ID not found');
-      }
+      console.log('4. Final review data to send:', JSON.stringify(reviewData, null, 2));
+      console.log('5. Review data types:', {
+        status: typeof reviewData.status,
+        score: typeof reviewData.score,
+        feedback: typeof reviewData.feedback,
+        rankingCriteria: typeof reviewData.rankingCriteria,
+        rank: typeof reviewData.rank,
+        content: typeof reviewData.content
+      });
+      console.log('=== END DEBUGGING ===');
 
       // Submit the ranking to the backend
       const updatedSubmission = await submissionService.reviewSubmission(
-        challengeId,
         selectedSubmission._id,
         {
           status: rankingForm.status,
           score: rankingForm.score,
           feedback: rankingForm.feedback,
-          rankingCriteria: rankingForm.rankingCriteria,
-          rank: rankingForm.rank
+          rankingCriteria: cleanRankingCriteria,
+          rank: rankingForm.rank,
+          content: selectedSubmission.content || {
+            description: '',
+            githubUrl: '',
+            files: []
+          }
         }
       );
 
       console.log('Ranking submitted successfully:', updatedSubmission);
 
       // Show success message
-      alert(`Submission ${rankingForm.status === 'accepted' ? 'accepted' : 'rejected'} with score ${rankingForm.score}/100. The user will be notified.`);
+      const message = rankingForm.status === 'accepted' 
+        ? `Submission approved with score ${rankingForm.score}/100. The user will be notified.`
+        : `Submission rejected with feedback. The user will be notified.`;
+      
+      // Create a professional notification instead of alert
+      const notification = document.createElement('div');
+      const isSuccess = rankingForm.status === 'accepted';
+      notification.className = `fixed top-4 right-4 ${isSuccess ? 'bg-green-600' : 'bg-red-600'} text-white px-6 py-3 rounded-lg shadow-lg z-50 flex items-center gap-2 transform transition-all duration-300 translate-x-full`;
+      notification.innerHTML = `
+        <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+          ${isSuccess 
+            ? '<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 00016zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 7.293a1 1 0 00-1.414 0l-2 2a1 1 0 001.414 1.414L9 11.586l3.293 3.293a1 1 0 001.414 1.414l-2-2z" clip-rule="evenodd"></path>'
+            : '<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 00016zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-2.293 2.293a1 1 0 101.414 1.414L10 11.414l2.293 2.293a1 1 0 001.414-1.414L11.414 10l2.293-2.293a1 1 0 00-1.414-1.414L10 8.586 7.707 7.293a1 1 0 00-1.414 0z" clip-rule="evenodd"></path>'
+          }
+        </svg>
+        <span class="font-medium">${message}</span>
+      `;
+      
+      document.body.appendChild(notification);
+      
+      // Animate in
+      setTimeout(() => {
+        notification.classList.remove('translate-x-full');
+        notification.classList.add('translate-x-0');
+      }, 100);
+      
+      // Auto-remove after 4 seconds
+      setTimeout(() => {
+        notification.classList.add('translate-x-full');
+        setTimeout(() => {
+          if (notification.parentNode) {
+            notification.parentNode.removeChild(notification);
+          }
+        }, 300);
+      }, 4000);
       
       // Close the dialog
       setViewDialogOpen(false);
@@ -117,7 +184,34 @@ const SubmissionsSimple: React.FC = () => {
       
     } catch (error: any) {
       console.error('Failed to submit ranking:', error);
-      alert(`Failed to submit ranking: ${error.message}`);
+      
+      // Create professional error notification
+      const errorNotification = document.createElement('div');
+      errorNotification.className = 'fixed top-4 right-4 bg-red-600 text-white px-6 py-3 rounded-lg shadow-lg z-50 flex items-center gap-2 transform transition-all duration-300 translate-x-full';
+      errorNotification.innerHTML = `
+        <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+          <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 00016zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-2.293 2.293a1 1 0 101.414 1.414L10 11.414l2.293 2.293a1 1 0 001.414-1.414L11.414 10l2.293-2.293a1 1 0 00-1.414-1.414L10 8.586 7.707 7.293a1 1 0 00-1.414 0z" clip-rule="evenodd"></path>
+        </svg>
+        <span class="font-medium">Failed to submit ranking: ${error.message}</span>
+      `;
+      
+      document.body.appendChild(errorNotification);
+      
+      // Animate in
+      setTimeout(() => {
+        errorNotification.classList.remove('translate-x-full');
+        errorNotification.classList.add('translate-x-0');
+      }, 100);
+      
+      // Auto-remove after 5 seconds
+      setTimeout(() => {
+        errorNotification.classList.add('translate-x-full');
+        setTimeout(() => {
+          if (errorNotification.parentNode) {
+            errorNotification.parentNode.removeChild(errorNotification);
+          }
+        }, 300);
+      }, 5000);
     }
   };
 
@@ -153,8 +247,9 @@ const SubmissionsSimple: React.FC = () => {
   const fetchSubmissions = async (challengeId?: string) => {
     try {
       if (challengeId) {
-        const submissionsData = await challengeService.getChallengeSubmissions(challengeId);
-        const challengeDetails = await challengeService.getChallengeById(challengeId);
+        // Fetch submissions for a specific challenge
+        const submissionsData = await submissionService.getChallengeSubmissions(challengeId);
+        const challengeDetails = challenges.find(c => c._id === challengeId);
         
         // Merge challenge details into submissions
         const submissionsWithChallenge = (submissionsData?.data || []).map(submission => ({
@@ -164,17 +259,20 @@ const SubmissionsSimple: React.FC = () => {
         
         setSubmissions(submissionsWithChallenge);
       } else {
-        // Fetch all submissions across all challenges
-        const allSubmissions: any[] = [];
-        for (const challenge of challenges) {
-          const submissionsData = await challengeService.getChallengeSubmissions(challenge._id);
-          const submissionsWithChallenge = (submissionsData?.data || []).map(submission => ({
+        // Fetch all submissions across all challenges using the proper submission service
+        const allSubmissionsData = await submissionService.getAllSubmissions();
+        const allSubmissions = allSubmissionsData?.data || [];
+        
+        // Merge challenge details into submissions
+        const submissionsWithChallenge = allSubmissions.map(submission => {
+          const challengeDetails = challenges.find(c => c._id === submission.challengeId);
+          return {
             ...submission,
-            challenge: challenge
-          }));
-          allSubmissions.push(...submissionsWithChallenge);
-        }
-        setSubmissions(allSubmissions);
+            challenge: challengeDetails
+          };
+        });
+        
+        setSubmissions(submissionsWithChallenge);
       }
     } catch (error) {
       console.error('Failed to fetch submissions:', error);
@@ -193,25 +291,35 @@ const SubmissionsSimple: React.FC = () => {
     );
   }
 
-  const totalSubmissions = challenges.reduce((sum, c) => sum + (c.submissions?.length || 0), 0);
-  const pendingSubmissions = submissions.filter(s => s.status === 'pending').length;
-  const approvedSubmissions = submissions.filter(s => s.status === 'approved').length;
+  const totalSubmissions = submissions.length;
+  const pendingSubmissions = submissions.filter(s => s.status === 'pending' || s.status === 'under_review').length;
+  const approvedSubmissions = submissions.filter(s => s.status === 'approved' || s.status === 'reviewed').length;
   const rejectedSubmissions = submissions.filter(s => s.status === 'rejected').length;
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'accepted': return 'bg-green-500/20 text-green-300 border-green-500/30';
+      case 'accepted':
+      case 'approved':
+        return 'bg-green-500/20 text-green-300 border-green-500/30';
       case 'rejected': return 'bg-red-500/20 text-red-300 border-red-500/30';
       case 'reviewed': return 'bg-blue-500/20 text-blue-300 border-blue-500/30';
-      default: return 'bg-yellow-500/20 text-yellow-300 border-yellow-500/30';
+      case 'pending':
+      case 'under_review':
+        return 'bg-yellow-500/20 text-yellow-300 border-yellow-500/30';
+      default: return 'bg-gray-500/20 text-gray-300 border-gray-500/30';
     }
   };
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'accepted': return <CheckCircle className="w-4 h-4" />;
+      case 'accepted':
+      case 'approved':
+        return <CheckCircle className="w-4 h-4" />;
       case 'rejected': return <XCircle className="w-4 h-4" />;
       case 'reviewed': return <Star className="w-4 h-4" />;
+      case 'pending':
+      case 'under_review':
+        return <Clock className="w-4 h-4" />;
       default: return <Clock className="w-4 h-4" />;
     }
   };
@@ -318,10 +426,10 @@ const SubmissionsSimple: React.FC = () => {
 
       {/* Submissions List */}
       <Card className="bg-gray-900 border-gray-800 p-6">
-        <h3 className="text-lg font-semibold text-white mb-4">Recent Submissions</h3>
+        <h3 className="text-lg font-semibold text-white mb-4">All Submissions</h3>
         {submissions.length > 0 ? (
           <div className="space-y-3">
-            {submissions.slice(0, 10).map((submission) => (
+            {submissions.map((submission) => (
               <div key={submission._id} className="flex items-center justify-between p-4 bg-gray-800 rounded-lg border border-gray-700">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
@@ -330,7 +438,10 @@ const SubmissionsSimple: React.FC = () => {
                   <div>
                     <p className="text-white font-medium">{submission.userId?.fullName || submission.user?.fullName || 'Unknown User'}</p>
                     <p className="text-gray-400 text-sm">
-                      {submission.challenge?.title || `Challenge ID: ${submission.challengeId || 'Unknown'}`}
+                      {submission.challenge?.title || 
+                       `${submission.challengeType?.charAt(0).toUpperCase() + submission.challengeType?.slice(1) || 'Unknown'} Challenge` ||
+                       `Challenge ID: ${submission.challengeId || 'Unknown'}`
+                      }
                     </p>
                     <p className="text-gray-500 text-xs">
                       Submitted {new Date(submission.submittedAt).toLocaleDateString()}
@@ -341,7 +452,9 @@ const SubmissionsSimple: React.FC = () => {
                   <span className={`px-3 py-1 rounded-full text-xs font-medium ${
                     submission.status === 'approved' ? 'bg-green-500/20 text-green-300 border border-green-500/30' :
                     submission.status === 'rejected' ? 'bg-red-500/20 text-red-300 border border-red-500/30' :
-                    'bg-yellow-500/20 text-yellow-300 border border-yellow-500/30'
+                    submission.status === 'reviewed' ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30' :
+                    submission.status === 'pending' || submission.status === 'under_review' ? 'bg-yellow-500/20 text-yellow-300 border border-yellow-500/30' :
+                    'bg-gray-500/20 text-gray-300 border border-gray-500/30'
                   }`}>
                     {submission.status}
                   </span>
@@ -410,38 +523,38 @@ const SubmissionsSimple: React.FC = () => {
                   <div>
                     <p className="text-sm text-gray-400">GitHub Repository</p>
                     <a
-                      href={selectedSubmission.githubUrl}
+                      href={selectedSubmission.content?.githubUrl}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-blue-400 hover:text-blue-300 underline flex items-center gap-2"
                     >
                       <ExternalLink className="w-4 h-4" />
-                      {selectedSubmission.githubUrl}
+                      {selectedSubmission.content?.githubUrl}
                     </a>
                   </div>
 
                   {/* Live URL for weekly challenges */}
-                  {selectedSubmission.liveUrl && (
+                  {selectedSubmission.content?.liveUrl && (
                     <div>
                       <p className="text-sm text-gray-400">Live Demo URL</p>
                       <a
-                        href={selectedSubmission.liveUrl}
+                        href={selectedSubmission.content.liveUrl}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-blue-400 hover:text-blue-300 underline flex items-center gap-2"
                       >
                         <ExternalLink className="w-4 h-4" />
-                        {selectedSubmission.liveUrl}
+                        {selectedSubmission.content.liveUrl}
                       </a>
                     </div>
                   )}
 
                   {/* File Upload Information */}
-                  {selectedSubmission.files && selectedSubmission.files.length > 0 && (
+                  {selectedSubmission.content?.files && selectedSubmission.content.files.length > 0 && (
                     <div>
                       <p className="text-sm text-gray-400">Uploaded Files</p>
                       <div className="space-y-2">
-                        {selectedSubmission.files.map((file: any, index: number) => (
+                        {selectedSubmission.content.files.map((file: any, index: number) => (
                           <div key={index} className="flex items-center gap-2 p-2 bg-gray-700/50 rounded-lg">
                             <FileText className="w-4 h-4 text-gray-400" />
                             <span className="text-white text-sm">{file.filename}</span>
@@ -456,10 +569,10 @@ const SubmissionsSimple: React.FC = () => {
                     </div>
                   )}
                   
-                  {selectedSubmission.description && (
+                  {selectedSubmission.content?.description && (
                     <div>
                       <p className="text-sm text-gray-400">Description</p>
-                      <p className="text-white">{selectedSubmission.description}</p>
+                      <p className="text-white">{selectedSubmission.content.description}</p>
                     </div>
                   )}
 
@@ -546,13 +659,29 @@ const SubmissionsSimple: React.FC = () => {
                           type="number"
                           min="0"
                           max="25"
-                          value={rankingForm.rankingCriteria.codeQuality}
+                          value={rankingForm.rankingCriteria.codeQuality === 0 ? '' : rankingForm.rankingCriteria.codeQuality}
+                          onFocus={() => {
+                            if (rankingForm.rankingCriteria.codeQuality === 0) {
+                              setRankingForm(prev => ({
+                                ...prev,
+                                rankingCriteria: { ...prev.rankingCriteria, codeQuality: 0 }
+                              }));
+                            }
+                          }}
+                          onClick={() => {
+                            if (rankingForm.rankingCriteria.codeQuality === 0) {
+                              setRankingForm(prev => ({
+                                ...prev,
+                                rankingCriteria: { ...prev.rankingCriteria, codeQuality: 0 }
+                              }));
+                            }
+                          }}
                           onChange={(e) => {
                             const value = e.target.value;
                             if (value === '') {
                               setRankingForm(prev => ({
                                 ...prev,
-                                rankingCriteria: { ...prev.rankingCriteria, codeQuality: '' }
+                                rankingCriteria: { ...prev.rankingCriteria, codeQuality: 0 }
                               }));
                             } else {
                               const numValue = parseInt(value);
@@ -565,6 +694,8 @@ const SubmissionsSimple: React.FC = () => {
                             }
                           }}
                           className="w-full mt-1 px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
+                          placeholder="Enter score (0-25)"
+                          style={{ WebkitAppearance: 'none', MozAppearance: 'textfield' }}
                         />
                       </div>
                       <div>
@@ -576,13 +707,29 @@ const SubmissionsSimple: React.FC = () => {
                           type="number"
                           min="0"
                           max="25"
-                          value={rankingForm.rankingCriteria.functionality}
+                          value={rankingForm.rankingCriteria.functionality === 0 ? '' : rankingForm.rankingCriteria.functionality}
+                          onFocus={() => {
+                            if (rankingForm.rankingCriteria.functionality === 0) {
+                              setRankingForm(prev => ({
+                                ...prev,
+                                rankingCriteria: { ...prev.rankingCriteria, functionality: 0 }
+                              }));
+                            }
+                          }}
+                          onClick={() => {
+                            if (rankingForm.rankingCriteria.functionality === 0) {
+                              setRankingForm(prev => ({
+                                ...prev,
+                                rankingCriteria: { ...prev.rankingCriteria, functionality: 0 }
+                              }));
+                            }
+                          }}
                           onChange={(e) => {
                             const value = e.target.value;
                             if (value === '') {
                               setRankingForm(prev => ({
                                 ...prev,
-                                rankingCriteria: { ...prev.rankingCriteria, functionality: '' }
+                                rankingCriteria: { ...prev.rankingCriteria, functionality: 0 }
                               }));
                             } else {
                               const numValue = parseInt(value);
@@ -595,6 +742,8 @@ const SubmissionsSimple: React.FC = () => {
                             }
                           }}
                           className="w-full mt-1 px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
+                          placeholder="Enter score (0-25)"
+                          style={{ WebkitAppearance: 'none', MozAppearance: 'textfield' }}
                         />
                       </div>
                       <div>
@@ -606,13 +755,29 @@ const SubmissionsSimple: React.FC = () => {
                           type="number"
                           min="0"
                           max="25"
-                          value={rankingForm.rankingCriteria.creativity}
+                          value={rankingForm.rankingCriteria.creativity === 0 ? '' : rankingForm.rankingCriteria.creativity}
+                          onFocus={() => {
+                            if (rankingForm.rankingCriteria.creativity === 0) {
+                              setRankingForm(prev => ({
+                                ...prev,
+                                rankingCriteria: { ...prev.rankingCriteria, creativity: 0 }
+                              }));
+                            }
+                          }}
+                          onClick={() => {
+                            if (rankingForm.rankingCriteria.creativity === 0) {
+                              setRankingForm(prev => ({
+                                ...prev,
+                                rankingCriteria: { ...prev.rankingCriteria, creativity: 0 }
+                              }));
+                            }
+                          }}
                           onChange={(e) => {
                             const value = e.target.value;
                             if (value === '') {
                               setRankingForm(prev => ({
                                 ...prev,
-                                rankingCriteria: { ...prev.rankingCriteria, creativity: '' }
+                                rankingCriteria: { ...prev.rankingCriteria, creativity: 0 }
                               }));
                             } else {
                               const numValue = parseInt(value);
@@ -625,6 +790,8 @@ const SubmissionsSimple: React.FC = () => {
                             }
                           }}
                           className="w-full mt-1 px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
+                          placeholder="Enter score (0-25)"
+                          style={{ WebkitAppearance: 'none', MozAppearance: 'textfield' }}
                         />
                       </div>
                       <div>
@@ -636,13 +803,29 @@ const SubmissionsSimple: React.FC = () => {
                           type="number"
                           min="0"
                           max="25"
-                          value={rankingForm.rankingCriteria.documentation}
+                          value={rankingForm.rankingCriteria.documentation === 0 ? '' : rankingForm.rankingCriteria.documentation}
+                          onFocus={() => {
+                            if (rankingForm.rankingCriteria.documentation === 0) {
+                              setRankingForm(prev => ({
+                                ...prev,
+                                rankingCriteria: { ...prev.rankingCriteria, documentation: 0 }
+                              }));
+                            }
+                          }}
+                          onClick={() => {
+                            if (rankingForm.rankingCriteria.documentation === 0) {
+                              setRankingForm(prev => ({
+                                ...prev,
+                                rankingCriteria: { ...prev.rankingCriteria, documentation: 0 }
+                              }));
+                            }
+                          }}
                           onChange={(e) => {
                             const value = e.target.value;
                             if (value === '') {
                               setRankingForm(prev => ({
                                 ...prev,
-                                rankingCriteria: { ...prev.rankingCriteria, documentation: '' }
+                                rankingCriteria: { ...prev.rankingCriteria, documentation: 0 }
                               }));
                             } else {
                               const numValue = parseInt(value);
@@ -655,6 +838,8 @@ const SubmissionsSimple: React.FC = () => {
                             }
                           }}
                           className="w-full mt-1 px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
+                          placeholder="Enter score (0-25)"
+                          style={{ WebkitAppearance: 'none', MozAppearance: 'textfield' }}
                         />
                       </div>
                     </div>

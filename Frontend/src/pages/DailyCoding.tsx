@@ -18,6 +18,7 @@ import {
   FaCalendar
 } from 'react-icons/fa';
 import { useUser } from '../context/UserContext';
+import { ChallengeHeader } from '../components/challenge-header';
 
 interface DailyChallenge {
   _id: string;
@@ -236,41 +237,13 @@ export default function DailyCoding() {
     <div className="min-h-screen bg-gradient-to-br">
       {/* Main Container */}
       <div className="container mx-auto px-4 py-8 max-w-7xl">
-        {/* Challenge Header - Match WeeklyChallenge Style */}
-        <div className="text-center space-y-4 pt-6">
-          <div className="flex items-center justify-center gap-3 mb-2">
-            <FaCode className="w-10 h-10 text-purple-400" />
-            <h1 className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-blue-400 to-cyan-400">
-              Daily Coding Challenge
-            </h1>
-          </div>
-
-          <p className="text-slate-400 text-lg">
-            Improve your skills one challenge at a time.
-          </p>
-
-          {/* Challenge Title and Badges */}
-          <div className="mt-6 space-y-4">
-            <h2 className="text-transparent bg-clip-text bg-gradient-to-r from-blue-300 to-purple-300">
-              {challenge.title}
-            </h2>
-
-            <div className="flex items-center gap-6">
-              <div className={`px-4 py-1 rounded-full text-sm font-medium border ${getDifficultyColor(challenge.difficulty)}`}>
-                {challenge.difficulty}
-              </div>
-              <div className="bg-gradient-to-r from-purple-500/20 to-blue-500/20 text-blue-300 border border-blue-500/30 px-4 py-1 rounded-full text-sm font-medium">
-                <FaTrophy className="inline w-4 h-4 mr-1" />
-                {challenge.maxPoints} Points + Mobile Card Prize
-              </div>
-              {userScore > 0 && (
-                <div className="bg-gradient-to-r from-green-500/20 to-emerald-500/20 text-green-300 border border-green-500/30 px-4 py-1 rounded-full text-sm font-medium">
-                  Score: {userScore}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
+        {/* Challenge Header - Use ChallengeHeader Component */}
+        <ChallengeHeader 
+          challengeTitle={challenge?.title || "Daily Challenge"}
+          challengeDifficulty={challenge?.difficulty || "Easy"}
+          challengePoints={challenge?.maxPoints || 100}
+          challengeType="daily"
+        />
 
         {/* Main Grid Layout */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-8">
@@ -409,15 +382,15 @@ export default function DailyCoding() {
                 <div className="space-y-2">
                   <div className="flex items-center justify-center gap-2 text-yellow-400">
                     <FaCrown className="w-5 h-5" />
-                    <span className="font-bold">1st: {challenge.prizes.first.amount} {challenge.prizes.first.currency}</span>
+                    <span className="font-bold">1st: {challenge.prizes?.first?.amount || '0'} {challenge.prizes?.first?.currency || 'USD'}</span>
                   </div>
                   <div className="flex items-center justify-center gap-2 text-gray-300">
                     <FaMedal className="w-5 h-5" />
-                    <span className="font-bold">2nd: {challenge.prizes.second.amount} {challenge.prizes.second.currency}</span>
+                    <span className="font-bold">2nd: {challenge.prizes?.second?.amount || '0'} {challenge.prizes?.second?.currency || 'USD'}</span>
                   </div>
                   <div className="flex items-center justify-center gap-2 text-orange-400">
                     <FaAward className="w-5 h-5" />
-                    <span className="font-bold">3rd: {challenge.prizes.third.amount} {challenge.prizes.third.currency}</span>
+                    <span className="font-bold">3rd: {challenge.prizes?.third?.amount || '0'} {challenge.prizes?.third?.currency || 'USD'}</span>
                   </div>
                 </div>
               </div>

@@ -1,5 +1,5 @@
 const User = require("../models/user");
-const Submission = require("../models/submission");
+const Submission = require("../models/Submission");
 const DailySubmission = require("../models/dailySubmission");
 const BusinessIdea = require("../models/businessIdea");
 const Challenge = require("../models/challenge");
@@ -1028,6 +1028,46 @@ exports.getUnreadNotificationCount = async (req, res) => {
       message: "Server error", 
       error: error.message 
     });
+  }
+};
+
+// Update user plan
+exports.updatePlan = async (req, res) => {
+  try {
+    const { plan } = req.body;
+    const userId = req.user.id;
+
+    // Validate plan
+    const validPlans = ["Trial", "Basic", "Premium"];
+    if (!validPlans.includes(plan)) {
+      return res.status(400).json({ 
+        success: false, 
+        message: `Invalid plan. Must be one of: ${validPlans.join(', ')}` 
+      });
+    }
+
+    // Update user plan and isProfessional flag
+    const isProfessional = plan !== "Trial";
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      { 
+        plan,
+        isProfessional
+      },
+      { new: true, runValidators: true }
+    ).select("-password");
+
+    if (!updatedUser) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Plan updated successfully",
+      data: updatedUser
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Server error", error: error.message });
   }
 };
 

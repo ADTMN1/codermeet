@@ -1,55 +1,13 @@
 const WeeklyChallenge = require('../models/weeklyChallenge');
-const User = require('../models/user');
-const Notification = require('../models/notification');
 const mongoose = require('mongoose');
 
-// Automatic status update function
-const updateChallengeStatuses = async () => {
-  try {
-    const now = new Date();
-    
-    // Find upcoming challenges that should be active
-    const upcomingToActive = await WeeklyChallenge.find({
-      status: 'upcoming',
-      startDate: { $lte: now },
-      endDate: { $gt: now }
-    });
-    
-    for (const challenge of upcomingToActive) {
-      challenge.status = 'active';
-      await challenge.save();
-      console.log(`🔄 Challenge "${challenge.title}" automatically changed to ACTIVE`);
-    }
-    
-    // Find active challenges that should be completed
-    const activeToCompleted = await WeeklyChallenge.find({
-      status: 'active',
-      endDate: { $lte: now }
-    });
-    
-    for (const challenge of activeToCompleted) {
-      challenge.status = 'completed';
-      await challenge.save();
-      console.log(`🏁 Challenge "${challenge.title}" automatically changed to COMPLETED`);
-    }
-    
-  } catch (error) {
-    console.error('❌ Error updating challenge statuses:', error);
-  }
-};
-
-// Run status update every 5 minutes
-setInterval(updateChallengeStatuses, 5 * 60 * 1000);
-
-// Run once on server start
-updateChallengeStatuses();
+// Lazy load User to avoid circular dependency
+const getUser = () => require('../models/user');
+const getNotification = () => require('../models/notification');
 
 // Get all weekly challenges
 exports.getAllWeeklyChallenges = async (req, res) => {
   try {
-    // Run status update before fetching challenges
-    await updateChallengeStatuses();
-    
     const {
       page = 1,
       limit = 10,
@@ -214,9 +172,6 @@ exports.checkWeeklyChallengeExists = async (req, res) => {
 // Get weekly challenge by ID
 exports.getWeeklyChallengeById = async (req, res) => {
   try {
-    // Run status update before fetching challenge
-    await updateChallengeStatuses();
-    
     const { id } = req.params;
 
     const weeklyChallenge = await WeeklyChallenge.findById(id)
@@ -270,9 +225,11 @@ exports.createWeeklyChallenge = async (req, res) => {
 
     // Create notification for admin users about new challenge
     try {
+      const User = getUser();
       const adminUsers = await User.find({ role: 'admin' }).select('_id');
       
       for (const admin of adminUsers) {
+        const Notification = getNotification();
         await Notification.createNotification({
           recipient: admin._id,
           sender: req.userProfile._id,
@@ -502,210 +459,18 @@ exports.joinWeeklyChallenge = async (req, res) => {
   }
 };
 
-// Clear submission for testing
-exports.clearSubmission = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const userId = '6957ad5161015aa2d862aa3b'; // Test user ID
-    
-    const weeklyChallenge = await WeeklyChallenge.findById(id);
-    
-    if (!weeklyChallenge) {
-      return res.status(404).json({
-        success: false,
-        message: 'Weekly challenge not found'
-      });
-    }
-    
-    // Remove user's submission
-    weeklyChallenge.submissions = weeklyChallenge.submissions.filter(
-      s => s.user.toString() !== userId.toString()
-    );
-    
-    await weeklyChallenge.save();
-    
-    res.status(200).json({
-      success: true,
-      message: 'Submission cleared successfully',
-      data: {
-        remainingSubmissions: weeklyChallenge.submissions.length
-      }
-    });
-  } catch (error) {
-    console.error('Error clearing submission:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error clearing submission',
-      error: error.message
-    });
-  }
-};
-
-// Debug endpoint to check user participation
-exports.checkUserParticipation = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const weeklyChallenge = await WeeklyChallenge.findById(id);
-
-    if (!weeklyChallenge) {
-      return res.status(404).json({
-        success: false,
-        message: 'Weekly challenge not found'
-      });
-    }
-
-    // Get all participants
-    const participants = weeklyChallenge.participants.map(p => ({
-      userId: p.user,
-      joinedAt: p.joinedAt
-    }));
-
-    // Get all submissions
-    const submissions = weeklyChallenge.submissions.map(s => ({
-      userId: s.user,
-      submittedAt: s.submittedAt,
-      githubUrl: s.githubUrl
-    }));
-
-    res.status(200).json({
-      success: true,
-      data: {
-        challenge: {
-          title: weeklyChallenge.title,
-          status: weeklyChallenge.status,
-          totalParticipants: weeklyChallenge.participants.length,
-          totalSubmissions: weeklyChallenge.submissions.length
-        },
-        participants: participants,
-        submissions: submissions
-      }
-    });
-  } catch (error) {
-    console.error('Error checking user participation:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error checking user participation',
-      error: error.message
-    });
-  }
-};
-
-// Temporary endpoint to fix challenge dates
-exports.fixChallengeDates = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const weeklyChallenge = await WeeklyChallenge.findById(id);
-
-    if (!weeklyChallenge) {
-      return res.status(404).json({
-        success: false,
-        message: 'Weekly challenge not found'
-      });
-    }
-
-    // Update dates to make it active now
-    const now = new Date();
-    weeklyChallenge.startDate = new Date(now.getTime() - 24 * 60 * 60 * 1000); // 1 day ago
-    weeklyChallenge.endDate = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000); // 7 days from now
-    weeklyChallenge.status = 'active';
-    
-    await weeklyChallenge.save();
-
-    res.status(200).json({
-      success: true,
-      message: 'Challenge dates updated successfully',
-      data: {
-        title: weeklyChallenge.title,
-        status: weeklyChallenge.status,
-        startDate: weeklyChallenge.startDate,
-        endDate: weeklyChallenge.endDate,
-        currentDate: now
-      }
-    });
-  } catch (error) {
-    console.error('Error fixing challenge dates:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error fixing challenge dates',
-      error: error.message
-    });
-  }
-};
-
-// Debug endpoint to check challenge status
-exports.debugChallengeStatus = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const weeklyChallenge = await WeeklyChallenge.findById(id);
-
-    if (!weeklyChallenge) {
-      return res.status(404).json({
-        success: false,
-        message: 'Weekly challenge not found'
-      });
-    }
-
-    const now = new Date();
-    const shouldBeActive = weeklyChallenge.startDate <= now && weeklyChallenge.endDate > now;
-
-    // Auto-update if needed
-    if (shouldBeActive && weeklyChallenge.status !== 'active') {
-      weeklyChallenge.status = 'active';
-      await weeklyChallenge.save();
-    }
-
-    res.status(200).json({
-      success: true,
-      data: {
-        title: weeklyChallenge.title,
-        status: weeklyChallenge.status,
-        startDate: weeklyChallenge.startDate,
-        endDate: weeklyChallenge.endDate,
-        currentDate: now,
-        shouldBeActive: shouldBeActive,
-        updated: shouldBeActive && weeklyChallenge.status === 'active'
-      }
-    });
-  } catch (error) {
-    console.error('Error checking challenge status:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error checking challenge status',
-      error: error.message
-    });
-  }
-};
-
 // Submit project for weekly challenge
 exports.submitWeeklyChallenge = async (req, res) => {
   try {
+    console.log('🔍 Debug - submitWeeklyChallenge called');
+    console.log('🔍 Debug - req.userProfile:', req.userProfile);
+    console.log('🔍 Debug - req.user:', req.user);
+    console.log('🔍 Debug - req.params:', req.params);
+    console.log('🔍 Debug - req.body:', req.body);
+    
     const { id } = req.params;
-    
-    console.log('🔍 Debug - Request object:', {
-      hasUser: !!req.user,
-      hasUserProfile: !!req.userProfile,
-      userId: req.user?.id || req.user?.userId,
-      userProfileId: req.userProfile?._id,
-      userProfileEmail: req.userProfile?.email
-    });
-    
-    // For testing without auth, use a default user ID
-    let userId;
-    if (req.userProfile && req.userProfile._id) {
-      userId = req.userProfile._id;
-    } else {
-      // Test user ID (same as the one in participation data)
-      userId = '6957ad5161015aa2d862aa3b';
-      console.log('🧪 Using test user ID for debugging:', userId);
-    }
-    
+    const userId = req.userProfile._id;
     const { githubUrl, liveUrl, description, screenshots } = req.body;
-
-    console.log('📝 Submission attempt:', {
-      challengeId: id,
-      userId: userId,
-      githubUrl: githubUrl
-    });
 
     const weeklyChallenge = await WeeklyChallenge.findById(id);
 
@@ -742,46 +507,42 @@ exports.submitWeeklyChallenge = async (req, res) => {
     );
 
     if (existingSubmission) {
-      console.log('🚫 Duplicate submission detected for user:', userId);
       return res.status(400).json({
         success: false,
         message: 'You have already submitted to this challenge'
       });
     }
 
-    // Create submission data in backend (UI handled by backend)
-    const submissionData = {
+    // Add submission
+    weeklyChallenge.submissions.push({
       user: userId,
       submittedAt: new Date(),
-      githubUrl: githubUrl || '',
-      liveUrl: liveUrl || '',
-      description: description || `Project submitted by participant`,
-      screenshots: [], // Backend manages screenshots array
-      status: 'pending',
-      score: 0
-    };
-
-    // Add submission
-    weeklyChallenge.submissions.push(submissionData);
+      githubUrl,
+      liveUrl,
+      description,
+      screenshots: screenshots || []
+    });
 
     await weeklyChallenge.save();
 
     // Create notification for admin users about new submission
+    const User = getUser();
+    const Notification = getNotification();
     const adminUsers = await User.find({ role: 'admin' }).select('_id');
     
     for (const admin of adminUsers) {
       await Notification.createNotification({
-        recipient: admin._id,
-        sender: userId,
-        title: 'New Challenge Submission',
-        message: `New project submitted for weekly challenge: ${weeklyChallenge.title}`,
-        type: 'challenge', // Use valid enum value
-        metadata: {
-          priority: 'medium',
-          challengeId: weeklyChallenge._id,
-          userId: userId
-        }
-      });
+          recipient: admin._id,
+          sender: userId,
+          title: 'New Challenge Submission',
+          message: `New project submitted for weekly challenge: ${weeklyChallenge.title}`,
+          type: 'challenge',
+          metadata: {
+            priority: 'medium',
+            challengeId: weeklyChallenge._id,
+            userId: userId
+          }
+        });
     }
 
     res.status(200).json({
@@ -833,6 +594,23 @@ exports.reviewWeeklySubmission = async (req, res) => {
 
     await weeklyChallenge.save();
 
+    // Create notification for the user who submitted
+    await Notification.createNotification({
+      recipient: submission.user,
+      sender: reviewerId,
+      title: status === 'accepted' ? '🎉 Submission Accepted!' : '📝 Submission Reviewed',
+      message: `Your submission for "${weeklyChallenge.title}" has been ${status}${score ? ` with a score of ${score}/100` : ''}.`,
+      type: status === 'accepted' ? 'achievement' : 'challenge',
+      metadata: {
+        challengeId: id,
+        submissionId: submissionId,
+        status,
+        score,
+        feedback: reviewComments,
+        challengeType: 'weekly'
+      }
+    });
+
     res.status(200).json({
       success: true,
       message: 'Submission reviewed successfully',
@@ -853,6 +631,7 @@ exports.announceWinners = async (req, res) => {
   try {
     const { id } = req.params;
     const { winners } = req.body; // Array of { userId, rank, score, prizeAmount }
+    const adminId = req.userProfile._id;
 
     const weeklyChallenge = await WeeklyChallenge.findById(id);
 
@@ -866,7 +645,7 @@ exports.announceWinners = async (req, res) => {
     // Clear existing winners
     weeklyChallenge.winners = [];
 
-    // Add new winners
+    // Add new winners and send notifications
     for (const winnerData of winners) {
       weeklyChallenge.winners.push({
         user: winnerData.userId,
@@ -874,6 +653,22 @@ exports.announceWinners = async (req, res) => {
         score: winnerData.score,
         prizeAmount: winnerData.prizeAmount,
         announcedAt: new Date()
+      });
+
+      // Create notification for each winner
+      await Notification.createNotification({
+        recipient: winnerData.userId,
+        sender: adminId,
+        title: '🏆 Challenge Winner!',
+        message: `Congratulations! You ranked ${winnerData.rank}${winnerData.rank === 1 ? 'st' : winnerData.rank === 2 ? 'nd' : winnerData.rank === 3 ? 'rd' : 'th'} in "${weeklyChallenge.title}"${winnerData.prizeAmount ? ` and won $${winnerData.prizeAmount}` : ''}!`,
+        type: 'achievement',
+        metadata: {
+          challengeId: id,
+          rank: winnerData.rank,
+          score: winnerData.score,
+          prizeAmount: winnerData.prizeAmount,
+          challengeType: 'weekly'
+        }
       });
     }
 
@@ -921,9 +716,8 @@ exports.getUserSubmission = async (req, res) => {
     );
 
     if (!submission) {
-      return res.status(200).json({
-        success: true,
-        data: null,
+      return res.status(404).json({
+        success: false,
         message: 'No submission found'
       });
     }
@@ -1091,6 +885,123 @@ exports.getWeeklyChallengeSubmissions = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error fetching weekly challenge submissions',
+      error: error.message
+    });
+  }
+};
+
+// Get individual weekly challenge statistics
+exports.getWeeklyChallengeByIdStats = async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Validate ObjectId format
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid challenge ID format'
+      });
+    }
+    
+    const challenge = await WeeklyChallenge.findById(id)
+      .populate('participants', 'fullName username')
+      .populate('submissions');
+    
+    if (!challenge) {
+      return res.status(404).json({
+        success: false,
+        message: 'Weekly challenge not found'
+      });
+    }
+
+    const stats = {
+      participants: challenge.participants?.length || 0,
+      teams: challenge.teams?.length || 0,
+      submissions: challenge.submissions?.length || 0,
+      title: challenge.title,
+      status: challenge.status
+    };
+
+    res.status(200).json({
+      success: true,
+      data: stats
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching weekly challenge statistics',
+      error: error.message
+    });
+  }
+};
+
+// Get weekly challenge leaderboard (challenge-specific rankings)
+exports.getWeeklyChallengeLeaderboard = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.userProfile?._id || req.user?.id;
+
+    const weeklyChallenge = await WeeklyChallenge.findById(id)
+      .populate('submissions.user', 'fullName username avatar email')
+      .populate('submissions.reviewedBy', 'fullName username');
+
+    if (!weeklyChallenge) {
+      return res.status(404).json({
+        success: false,
+        message: 'Weekly challenge not found'
+      });
+    }
+
+    // Process submissions for leaderboard
+    const leaderboardEntries = weeklyChallenge.submissions
+      .map(submission => {
+        const submissionObj = submission.toObject();
+        return {
+          _id: submissionObj._id,
+          userId: submissionObj.user._id,
+          userName: submissionObj.user.fullName,
+          userUsername: submissionObj.user.username,
+          userAvatar: submissionObj.user.avatar,
+          totalScore: submissionObj.score || 0,
+          rank: 0, // Will be calculated below
+          submittedAt: submissionObj.submittedAt,
+          reviewedAt: submissionObj.reviewedAt,
+          criteriaScores: submissionObj.criteriaScores || [],
+          feedback: submissionObj.reviewComments,
+          status: submissionObj.status,
+          isCurrentUser: userId && submissionObj.user._id.toString() === userId.toString()
+        };
+      })
+      .sort((a, b) => b.totalScore - a.totalScore) // Sort by score descending
+      .map((entry, index) => ({
+        ...entry,
+        rank: index + 1 // Assign rank
+      }));
+
+    // Find current user's rank
+    const currentUserEntry = leaderboardEntries.find(entry => entry.isCurrentUser);
+    const currentUserRank = currentUserEntry ? currentUserEntry.rank : null;
+
+    res.status(200).json({
+      success: true,
+      data: {
+        challengeId: weeklyChallenge._id,
+        challengeTitle: weeklyChallenge.title,
+        challengeStatus: weeklyChallenge.status,
+        evaluationCriteria: weeklyChallenge.scoringCriteria || [],
+        totalParticipants: weeklyChallenge.participants?.length || 0,
+        totalSubmissions: leaderboardEntries.length,
+        leaderboard: leaderboardEntries,
+        currentUserRank,
+        topThree: leaderboardEntries.slice(0, 3),
+        isCompleted: weeklyChallenge.status === 'completed',
+        winnersAnnounced: weeklyChallenge.winnerAnnounced || false
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching weekly challenge leaderboard',
       error: error.message
     });
   }

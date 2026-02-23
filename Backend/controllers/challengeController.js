@@ -597,6 +597,7 @@ exports.reviewSubmission = async (req, res) => {
   try {
     const { submissionId } = req.params;
     const { status, score, feedback } = req.body;
+    const reviewerId = req.userProfile?._id || req.user?.id;
 
     const challenge = await Challenge.findById(req.params.challengeId);
     if (!challenge) {
@@ -617,10 +618,27 @@ exports.reviewSubmission = async (req, res) => {
     submission.status = status;
     submission.score = score;
     submission.feedback = feedback;
-    submission.reviewedBy = req.userProfile?._id || req.user?.id;
+    submission.reviewedBy = reviewerId;
     submission.reviewedAt = new Date();
 
     await challenge.save();
+
+    // Create notification for the user who submitted
+    await Notification.createNotification({
+      recipient: submission.userId,
+      sender: reviewerId,
+      title: status === 'accepted' ? '🎉 Submission Accepted!' : '📝 Submission Reviewed',
+      message: `Your submission for "${challenge.title}" has been ${status}${score ? ` with a score of ${score}/100` : ''}.`,
+      type: status === 'accepted' ? 'achievement' : 'challenge',
+      metadata: {
+        challengeId: req.params.challengeId,
+        submissionId: submissionId,
+        status,
+        score,
+        feedback,
+        challengeType: 'regular'
+      }
+    });
 
     await Challenge.populate(challenge, [
       { path: 'submissions.userId', select: 'fullName username email' },
@@ -645,6 +663,7 @@ exports.reviewSubmission = async (req, res) => {
 exports.selectWinners = async (req, res) => {
   try {
     const { winners } = req.body; // [{ position: 1, userId: '...' }, ...]
+    const adminId = req.userProfile?._id || req.user?.id;
 
     const challenge = await Challenge.findById(req.params.id);
     if (!challenge) {
@@ -654,14 +673,29 @@ exports.selectWinners = async (req, res) => {
       });
     }
 
-    // Update prize winners
-    winners.forEach(winner => {
+    // Update prize winners and send notifications
+    for (const winner of winners) {
       const prize = challenge.prizes.find(p => p.position === winner.position);
       if (prize) {
         prize.winner = winner.userId;
         prize.awardedAt = new Date();
+
+        // Create notification for each winner
+        Notification.createNotification({
+          recipient: winner.userId,
+          sender: adminId,
+          title: '🏆 Challenge Winner!',
+          message: `Congratulations! You ranked ${winner.position}${winner.position === 1 ? 'st' : winner.position === 2 ? 'nd' : winner.position === 3 ? 'rd' : 'th'} in "${challenge.title}"${prize.amount ? ` and won $${prize.amount}` : ''}!`,
+          type: 'achievement',
+          metadata: {
+            challengeId: req.params.id,
+            rank: winner.position,
+            prizeAmount: prize.amount,
+            challengeType: 'regular'
+          }
+        });
       }
-    });
+    }
 
     challenge.winnerAnnounced = true;
     challenge.winnerAnnouncedAt = new Date();

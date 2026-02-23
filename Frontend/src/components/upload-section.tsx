@@ -18,10 +18,11 @@ import LoadingSpinner from './ui/loading-spinner';
 interface UploadSectionProps {
   registrationMode: 'solo' | 'team';
   challengeId?: string;
-  userId: string;
+  userId?: string;
+  challengeType?: 'regular' | 'weekly';
 }
 
-export function UploadSection({ registrationMode, challengeId, userId }: UploadSectionProps) {
+export function UploadSection({ registrationMode, challengeId, userId, challengeType }: UploadSectionProps) {
   const [githubUrl, setGithubUrl] = useState('');
   const [liveUrl, setLiveUrl] = useState('');
   const [description, setDescription] = useState('');
@@ -36,7 +37,7 @@ export function UploadSection({ registrationMode, challengeId, userId }: UploadS
       if (!challengeId) return;
       
       try {
-        const userSubmission = await submissionService.getUserSubmission(challengeId);
+        const userSubmission = await submissionService.getUserSubmission(challengeId, challengeType);
         if (userSubmission) {
           setSubmission(userSubmission);
           setSubmitted(true);
@@ -86,7 +87,7 @@ export function UploadSection({ registrationMode, challengeId, userId }: UploadS
       };
 
       console.log('📤 Sending submission data:', submissionData);
-      const result = await submissionService.submitProject(challengeId, submissionData);
+      const result = await submissionService.submitProject(challengeId, submissionData, challengeType);
       
       setSubmitted(true);
       setSubmission(result.data);

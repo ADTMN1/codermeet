@@ -126,6 +126,9 @@ router.patch("/notifications/:id/read", authMiddleware, userController.markNotif
 router.patch("/notifications/read-all", authMiddleware, userController.markAllNotificationsAsRead);
 router.delete("/notifications/:id", authMiddleware, userController.deleteNotification);
 
+// Update user plan
+router.put("/plan", authMiddleware, userController.updatePlan);
+
 // Check if email or username exists
 router.get("/check-user", checkUserLimiter, userController.checkUser);
 

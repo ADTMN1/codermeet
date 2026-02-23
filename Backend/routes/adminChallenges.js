@@ -46,6 +46,9 @@ router.post('/bulk-preview-stream', adminChallengeController.bulkPreviewChalleng
 // Get generation statistics
 router.get('/stats', challengeController.getChallengeStats);
 
+// Get all challenges for admin (root route)
+router.get('/', challengeController.getAllChallenges);
+
 // Get all challenges for admin
 router.get('/all', challengeController.getAllChallenges); // Main challenges only
 

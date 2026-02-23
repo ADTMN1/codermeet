@@ -7,16 +7,18 @@ interface ChallengeHeaderProps {
   challengeTitle?: string;
   challengeDifficulty?: string;
   challengePoints?: number;
+  challengeType?: 'weekly' | 'daily';
 }
 
 export function ChallengeHeader({ 
   challengeTitle = "Build a Real-Time Chat App",
   challengeDifficulty = "Intermediate",
-  challengePoints = 500
+  challengePoints = 500,
+  challengeType = 'weekly'
 }: ChallengeHeaderProps) {
   const [displayText, setDisplayText] = useState('');
   const [isTyping, setIsTyping] = useState(true);
-  const fullText = "Weekly Coding Challenge";
+  const fullText = challengeType === 'daily' ? "Daily Coding Challenge" : "Weekly Coding Challenge";
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
@@ -71,11 +73,13 @@ export function ChallengeHeader({
         </div>
       </div>
 
-      <p className="text-slate-400 text-lg">
-        Improving your skills one challenge at a time.
+      <p className="text-slate-400 text-lg my-4">
+        {challengeType === 'daily' ? 'Test your skills with today\'s coding challenge.' : 'Improving your skills one challenge at a time.'}
       </p>
 
+
       {/* Challenge Title and Badges */}
+      
       
        <div className="flex items-center justify-center gap-3 mb-2">
         <Code2 className="w-10 h-10 text-purple-400" />
