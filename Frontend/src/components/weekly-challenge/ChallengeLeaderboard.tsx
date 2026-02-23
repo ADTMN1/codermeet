@@ -366,7 +366,10 @@ export function ChallengeLeaderboard({ challengeId, onViewNextChallenge }: Chall
               Check out next week's challenge and see how you rank among other developers.
             </p>
             <Button
-              onClick={onViewNextChallenge}
+              onClick={() => {
+                console.log('🔍 Next Challenge button clicked');
+                onViewNextChallenge?.();
+              }}
               className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white"
             >
               Next Challenge

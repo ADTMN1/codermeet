@@ -309,8 +309,9 @@ export default function WeeklyChallenge() {
   };
 
   const handleViewNextChallenge = () => {
-    // Navigate to next available weekly challenge
-    navigate('/dashboard/weekly-challenges');
+    // Navigate back to current challenge (like back to challenge button)
+    setShowLeaderboard(false);
+    setShowPreviousRankings(false); // Also hide previous rankings if shown
   };
 
   const handleBackToChallenge = () => {

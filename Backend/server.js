@@ -94,7 +94,13 @@ const dailyChallengeRoutes = require('./routes/dailyChallenge');
 
 
 
-const submissionRoutes = require('./routes/submissions');
+
+
+const userNotificationRoutes = require('./routes/userNotifications');
+
+
+
+const submissionsRoutes = require('./routes/submissions');
 
 
 
@@ -106,7 +112,6 @@ const weeklyChallengeRoutes = require('./routes/weeklyChallenge');
 
 
 
-const userNotificationRoutes = require('./routes/userNotifications');
 const twoFactorRoutes = require('./routes/twoFactor');
 
 
@@ -666,6 +671,9 @@ app.use("/api/auth", authLimiter, authRoutes);
 app.use("/api/users", userRoutes);
 
 
+app.use("/api/user-notifications", userNotificationRoutes);
+
+
 
 app.use("/api/admin", adminRoutes);
 
@@ -675,7 +683,7 @@ app.use("/api/admin/challenges", adminChallengeRoutes); // AI Challenge Generati
 
 
 
-app.use("/api/submissions", submissionRoutes); // Professional submission management
+// app.use("/api/submissions", submissionsRoutes); // Professional submission management
 
 
 
@@ -703,7 +711,6 @@ app.use("/api/daily-challenge", dailyChallengeRoutes);
 
 
 
-app.use("/api/user-notifications", userNotificationRoutes);
 app.use("/api/2fa", twoFactorRoutes); // 2FA routes
 
 

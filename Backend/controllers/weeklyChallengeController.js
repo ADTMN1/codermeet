@@ -545,6 +545,39 @@ exports.submitWeeklyChallenge = async (req, res) => {
         });
     }
 
+    // Create notification for the user who submitted
+    console.log('🔍 Creating user notification for:', userId);
+    try {
+      const userNotification = await Notification.createNotification({
+        recipient: userId,
+        sender: userId,
+        title: '🎯 Project Submitted Successfully!',
+        message: `Your project for "${weeklyChallenge.title}" has been submitted and is now under review.`,
+        type: 'challenge',
+        metadata: {
+          priority: 'high',
+          challengeId: weeklyChallenge._id,
+          submissionType: 'weekly_challenge'
+        }
+      });
+      console.log('🔍 User notification created successfully');
+
+      // Emit real-time notification to the user
+      const io = req.app.get('io');
+      if (io) {
+        io.to(`user_${userId}`).emit('new-notification', {
+          type: 'challenge_submission',
+          title: '🎯 Project Submitted Successfully!',
+          message: `Your project for "${weeklyChallenge.title}" has been submitted and is now under review.`,
+          priority: 'high',
+          notification: userNotification
+        });
+        console.log('🔍 Real-time notification emitted to user:', userId);
+      }
+    } catch (notificationError) {
+      console.error('🔍 Error creating user notification:', notificationError);
+    }
+
     res.status(200).json({
       success: true,
       message: 'Project submitted successfully',

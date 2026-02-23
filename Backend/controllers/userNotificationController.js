@@ -6,13 +6,18 @@ exports.getUserNotifications = async (req, res) => {
     const { limit = 50, skip = 0, unreadOnly = false } = req.query;
     const userId = req.user.id;
     
+    console.log('🔍 getUserNotifications called for userId:', userId);
+    
     const notifications = await Notification.getUserNotifications(userId, {
       limit: parseInt(limit),
       skip: parseInt(skip),
       unreadOnly: unreadOnly === 'true'
     });
     
+    console.log('🔍 Found notifications:', notifications.length);
+    
     const unreadCount = await Notification.getUnreadCount(userId);
+    console.log('🔍 Unread count:', unreadCount);
     
     res.status(200).json({
       success: true,
