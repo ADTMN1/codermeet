@@ -493,8 +493,8 @@ exports.submitWeeklyChallenge = async (req, res) => {
       });
     }
 
-    // Check if challenge is still active
-    if (weeklyChallenge.status !== 'active') {
+    // Check if challenge is still active for submissions
+    if (weeklyChallenge.status !== 'active' && weeklyChallenge.status !== 'upcoming') {
       return res.status(400).json({
         success: false,
         message: 'This challenge is not accepting submissions'

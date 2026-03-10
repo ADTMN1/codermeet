@@ -37,4 +37,22 @@ router.put("/notifications/:id/read", adminNotificationController.markAdminNotif
 router.put("/notifications/read-all", adminNotificationController.markAllAdminNotificationsAsRead);
 router.delete("/notifications/:id", adminNotificationController.deleteAdminNotification);
 
+// Notification cleanup routes
+const notificationCleanupService = require("../services/notificationCleanupService");
+router.post("/notifications/cleanup", async (req, res) => {
+  try {
+    await notificationCleanupService.cleanupOldNotifications();
+    res.json({
+      success: true,
+      message: "Notification cleanup completed successfully"
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Error during notification cleanup",
+      error: error.message
+    });
+  }
+});
+
 module.exports = router;

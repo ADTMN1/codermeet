@@ -19,7 +19,10 @@ const POINT_CONFIG = {
     SECOND_PLACE: 100,
     THIRD_PLACE: 75,
     PARTICIPATION: 25,
-    PERFECT_SCORE: 50 // Bonus for perfect score
+    PERFECT_SCORE: 50, // Bonus for perfect score
+    SPEED_BONUS: 25, // Bonus for fast completion
+    EFFICIENCY_BONUS: 25, // Bonus for efficient code
+    HINT_PENALTY: -25 // Penalty for using hints
   },
   
   // Streak bonuses
@@ -41,9 +44,9 @@ const POINT_CONFIG = {
 };
 
 // Award points for challenge submission
-exports.awardChallengePoints = async (req, res) => {
+exports.awardChallengePoints = async (data) => {
   try {
-    const { userId, challengeId, submissionId } = req;
+    const { userId, challengeId, submissionId } = data;
     
     // Get user and challenge details
     const user = await User.findById(userId);
@@ -102,9 +105,19 @@ exports.awardChallengePoints = async (req, res) => {
 };
 
 // Award points for daily challenge completion
-exports.awardDailyChallengePoints = async (req, res) => {
+exports.awardDailyChallengePoints = async (data) => {
   try {
-    const { userId, dailyChallengeId, rank, score, maxScore } = req;
+    const { 
+      userId, 
+      dailyChallengeId, 
+      rank, 
+      score, 
+      maxScore, 
+      completionTime,
+      timeLimit,
+      usedHint = false,
+      performanceMetrics = {}
+    } = data;
     
     const user = await User.findById(userId);
     const dailyChallenge = await DailyChallenge.findById(dailyChallengeId);
@@ -116,6 +129,7 @@ exports.awardDailyChallengePoints = async (req, res) => {
     // Calculate points based on rank
     let points = 0;
     let reason = '';
+    let bonuses = [];
     
     if (rank === 1) {
       points = POINT_CONFIG.DAILY_CHALLENGE.FIRST_PLACE;
@@ -134,7 +148,30 @@ exports.awardDailyChallengePoints = async (req, res) => {
     // Perfect score bonus
     if (score === maxScore) {
       points += POINT_CONFIG.DAILY_CHALLENGE.PERFECT_SCORE;
-      reason += ' (perfect score bonus)';
+      bonuses.push('Perfect score');
+    }
+    
+    // Speed bonus (completed in less than 50% of time limit)
+    if (completionTime && timeLimit && completionTime < (timeLimit * 0.5 * 60 * 1000)) {
+      points += POINT_CONFIG.DAILY_CHALLENGE.SPEED_BONUS;
+      bonuses.push('Speed bonus');
+    }
+    
+    // Efficiency bonus (based on performance metrics)
+    if (performanceMetrics.efficiency && performanceMetrics.efficiency > 0.8) {
+      points += POINT_CONFIG.DAILY_CHALLENGE.EFFICIENCY_BONUS;
+      bonuses.push('Efficiency bonus');
+    }
+    
+    // Hint penalty
+    if (usedHint) {
+      points += POINT_CONFIG.DAILY_CHALLENGE.HINT_PENALTY;
+      bonuses.push('Hint used');
+    }
+    
+    // Add bonuses to reason
+    if (bonuses.length > 0) {
+      reason += ` (${bonuses.join(', ')})`;
     }
     
     const newTotalPoints = user.points + points;
@@ -233,15 +270,14 @@ async function checkAndAwardStreakBonus(userId, type) {
 }
 
 // Get user's points history
-exports.getPointsHistory = async (req, res) => {
+exports.getPointsHistory = async (data) => {
   try {
-    const { userId } = req.params;
-    const { limit = 20, page = 1 } = req.query;
+    const { userId, limit = 20, page = 1 } = data;
     
     const user = await User.findById(userId).select('pointsAwarded');
     
     if (!user) {
-      return res.status(404).json({ success: false, message: 'User not found' });
+      return { success: false, message: 'User not found' };
     }
     
     const history = user.pointsAwarded || [];
@@ -250,16 +286,16 @@ exports.getPointsHistory = async (req, res) => {
       .sort((a, b) => new Date(b.awardedAt) - new Date(a.awardedAt))
       .slice(startIndex, startIndex + parseInt(limit));
     
-    res.status(200).json({
+    return {
       success: true,
       data: paginatedHistory,
       total: history.length,
       page: parseInt(page),
       totalPages: Math.ceil(history.length / limit)
-    });
+    };
     
   } catch (error) {
     console.error('Error getting points history:', error);
-    res.status(500).json({ success: false, message: 'Server error' });
+    return { success: false, message: 'Server error' };
   }
 };

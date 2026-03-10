@@ -1,10 +1,212 @@
 // Real Code Execution Service
 const axios = require('axios');
+const fs = require('fs');
+const path = require('path');
 
 class CodeExecutor {
   constructor() {
     // Choose one of these services:
     this.service = 'judge0'; // or 'hackerearth', 'leetcode', etc.
+    this.tempDir = path.join(__dirname, '../temp');
+    this.ensureTempDir();
+  }
+
+  ensureTempDir() {
+    if (!fs.existsSync(this.tempDir)) {
+      fs.mkdirSync(this.tempDir, { recursive: true });
+    }
+  }
+
+  // Validate that code actually solves the stated problem
+  validateCodeRelevance(code, problemDescription, expectedFunctionNames = []) {
+    const validationResults = {
+      isRelevant: false,
+      confidence: 0,
+      issues: [],
+      suggestions: []
+    };
+
+    try {
+      // Extract function names from code
+      const functionMatches = code.match(/(?:function\s+(\w+)|(\w+)\s*:\s*function|(\w+)\s*\([^)]*\)\s*{|class\s+(\w+)[\s\S]*?{[\s\S]*?(\w+)\s*\()/g);
+      const extractedFunctions = [];
+      
+      if (functionMatches) {
+        functionMatches.forEach(match => {
+          const funcName = match[1] || match[2] || match[3] || match[4];
+          if (funcName) extractedFunctions.push(funcName);
+        });
+      }
+
+      // Check if expected function names are present
+      if (expectedFunctionNames.length > 0) {
+        const hasExpectedFunction = expectedFunctionNames.some(expectedName => 
+          extractedFunctions.some(actualName => 
+            actualName.toLowerCase().includes(expectedName.toLowerCase()) ||
+            expectedName.toLowerCase().includes(actualName.toLowerCase())
+          )
+        );
+
+        if (!hasExpectedFunction) {
+          validationResults.issues.push('Code does not contain expected function for this problem type');
+          validationResults.suggestions.push('Implement a function that solves: ' + problemDescription.substring(0, 100) + '...');
+          return validationResults;
+        }
+      }
+
+      // Analyze problem keywords vs code content
+      const problemKeywords = this.extractProblemKeywords(problemDescription);
+      const codeKeywords = this.extractCodeKeywords(code);
+
+      // Calculate relevance score
+      const matchingKeywords = problemKeywords.filter(keyword => 
+        codeKeywords.some(codeKeyword => 
+          codeKeyword.toLowerCase().includes(keyword.toLowerCase()) ||
+          keyword.toLowerCase().includes(codeKeyword.toLowerCase())
+        )
+      );
+
+      validationResults.confidence = matchingKeywords.length / Math.max(problemKeywords.length, 1);
+      validationResults.isRelevant = validationResults.confidence >= 0.3; // 30% threshold
+
+      if (!validationResults.isRelevant) {
+        validationResults.issues.push('Code appears unrelated to the problem description');
+        validationResults.suggestions.push('Ensure your code actually solves the stated problem');
+      }
+
+      // Additional checks for common issues
+      if (code.length < 50) {
+        validationResults.issues.push('Code appears to be incomplete or placeholder');
+        validationResults.confidence = Math.min(validationResults.confidence, 0.2);
+      }
+
+      if (extractedFunctions.length === 0) {
+        validationResults.issues.push('No functions found in code');
+        validationResults.confidence = Math.min(validationResults.confidence, 0.3);
+      }
+
+    } catch (error) {
+      console.error('Error validating code relevance:', error);
+      validationResults.issues.push('Failed to validate code relevance');
+    }
+
+    return validationResults;
+  }
+
+  extractProblemKeywords(description) {
+    const keywords = [];
+    
+    // Common programming problem patterns
+    const patterns = [
+      { regex: /\b(minimum|minimum|find|search)\b/gi, weight: 2 },
+      { regex: /\b(array|string|linked list|tree|graph)\b/gi, weight: 2 },
+      { regex: /\b(sum|product|average|count|sort)\b/gi, weight: 1 },
+      { regex: /\b(window|substring|subarray|subsequence)\b/gi, weight: 2 },
+      { regex: /\b(reverse|palindrome|anagram)\b/gi, weight: 1 },
+      { regex: /\b(binary|search|sort|merge)\b/gi, weight: 1 },
+      { regex: /\b(dynamic|programming|dp|recursion)\b/gi, weight: 1 }
+    ];
+
+    patterns.forEach(pattern => {
+      const matches = description.match(pattern.regex);
+      if (matches) {
+        keywords.push(...matches.map(m => m.toLowerCase()));
+      }
+    });
+
+    // Extract specific problem terms
+    const specificTerms = description.match(/\b([a-z]+(?:ed|ing|s|))\b/gi);
+    if (specificTerms) {
+      keywords.push(...specificTerms.map(t => t.toLowerCase()));
+    }
+
+    return [...new Set(keywords)]; // Remove duplicates
+  }
+
+  extractCodeKeywords(code) {
+    const keywords = [];
+    
+    // Function names
+    const functionNames = code.match(/(?:function\s+(\w+)|(\w+)\s*:\s*function|(\w+)\s*\([^)]*\)\s*{|class\s+(\w+)[\s\S]*?{[\s\S]*?(\w+)\s*\()/g);
+    if (functionNames) {
+      functionNames.forEach(match => {
+        const funcName = match[1] || match[2] || match[3] || match[4];
+        if (funcName) keywords.push(funcName.toLowerCase());
+      });
+    }
+
+    // Variable names and key operations
+    const operations = code.match(/\b(for|while|if|else|return|push|pop|shift|unshift|slice|splice|substring|substr|split|join|map|filter|reduce)\b/gi);
+    if (operations) {
+      keywords.push(...operations.map(op => op.toLowerCase()));
+    }
+
+    // Comments and strings (might indicate problem understanding)
+    const comments = code.match(/\/\/.*$|\/\*[\s\S]*?\*\/\//gm);
+    if (comments) {
+      comments.forEach(comment => {
+        const words = comment.match(/\b[a-z]{3,}\b/gi);
+        if (words) keywords.push(...words.map(w => w.toLowerCase()));
+      });
+    }
+
+    return [...new Set(keywords)];
+  }
+
+  // Professional execution with validation
+  async executeWithProfessionalValidation(code, language, testCases, challengeDescription) {
+    console.log('🔍 Starting professional execution with validation...');
+    
+    try {
+      // Step 1: Validate code relevance to problem
+      console.log('🔍 Validating code relevance...');
+      const validation = this.validateCodeRelevance(code, challengeDescription);
+      
+      if (!validation.isRelevant) {
+        console.log('❌ Code validation failed:', validation.issues);
+        return testCases.map((testCase, index) => ({
+          testCaseIndex: index,
+          input: testCase.input,
+          expectedOutput: testCase.expectedOutput,
+          actualOutput: null,
+          passed: false,
+          executionTime: 0,
+          memoryUsage: 0,
+          error: 'Code does not solve the stated problem: ' + validation.issues.join(', '),
+          timestamp: new Date().toISOString(),
+          validationFailed: true,
+          suggestions: validation.suggestions
+        }));
+      }
+      
+      console.log('✅ Code validation passed, confidence:', validation.confidence);
+      
+      // Step 2: Execute with real code runner
+      console.log('⚙️ Executing code with real test cases...');
+      const executionResults = await this.executeWithJudge0(code, language, testCases);
+      
+      // Step 3: Enhance results with validation confidence
+      return executionResults.map(result => ({
+        ...result,
+        validationConfidence: validation.confidence,
+        professionalExecution: true
+      }));
+      
+    } catch (error) {
+      console.error('❌ Professional execution failed:', error);
+      return testCases.map((testCase, index) => ({
+        testCaseIndex: index,
+        input: testCase.input,
+        expectedOutput: testCase.expectedOutput,
+        actualOutput: null,
+        passed: false,
+        executionTime: 0,
+        memoryUsage: 0,
+        error: 'Professional execution error: ' + error.message,
+        timestamp: new Date().toISOString(),
+        executionFailed: true
+      }));
+    }
   }
 
   // Option 1: Judge0 CE (Free, 100 requests/hour)

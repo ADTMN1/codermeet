@@ -196,7 +196,7 @@ export function ChallengeLeaderboard({ challengeId, onViewNextChallenge }: Chall
             <div className="text-center">
               <p className="text-gray-400 text-sm mb-1">Your Rank</p>
               <p className="text-xl font-bold text-yellow-400">
-                {leaderboardData.currentUserRank || `#${leaderboardData.currentUserRank}` || 'Not Ranked'}
+                {leaderboardData.currentUserRank ? `#${leaderboardData.currentUserRank}` : 'Not Ranked'}
               </p>
             </div>
             <div className="text-center">

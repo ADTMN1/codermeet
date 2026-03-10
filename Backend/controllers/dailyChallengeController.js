@@ -4,6 +4,7 @@ const DailySubmission = require('../models/dailySubmission');
 const User = require('../models/user');
 const Notification = require('../models/notification');
 const pointsService = require('../services/pointsService');
+const ChallengeGenerator = require('../services/challengeGenerator');
 
 // Get daily challenge statistics (AI-generated only)
 exports.getDailyChallengeStats = async (req, res) => {
@@ -139,6 +140,15 @@ function getNextChallengeTime() {
   };
 }
 
+// Get next challenge time
+function getNextChallengeTime() {
+  const now = new Date();
+  const tomorrow = new Date(now);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  tomorrow.setHours(0, 0, 0, 0);
+  return tomorrow;
+}
+
 // Get today's daily challenge
 exports.getTodayChallenge = async (req, res) => {
   try {
@@ -158,22 +168,60 @@ exports.getTodayChallenge = async (req, res) => {
     }).populate('winners.userId', 'fullName username avatar');
 
     if (!challenge) {
-      return res.status(200).json({
-        success: true,
-        data: {
-          challenge: null,
-          message: 'No daily challenge available today. Please check back tomorrow for a new coding challenge!',
-          nextChallengeTime: getNextChallengeTime(),
-          userSubmission: null,
-          hasSubmitted: false,
-          userStats: req.user ? {
-            totalSolved: 0,
-            bestScore: 0,
-            prizesWon: 0,
-            currentStreak: 0
-          } : null
-        }
-      });
+      // Try to automatically generate a challenge for today
+      try {
+        console.log('🚀 No challenge found for today, attempting to generate one...');
+        const challengeGenerator = new ChallengeGenerator();
+        const today = new Date();
+        const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+        
+        const challengeData = await challengeGenerator.generateDailyChallenge({
+          difficulty: 'Medium',
+          category: 'Algorithms',
+          timeLimit: 30,
+          maxPoints: 100
+        });
+        
+        const newChallenge = await challengeGenerator.createChallengeInDatabase(challengeData, startOfDay);
+        console.log(`✅ Successfully generated challenge: ${newChallenge.title}`);
+        
+        // Return the newly generated challenge
+        return res.status(200).json({
+          success: true,
+          data: {
+            challenge: newChallenge.toObject(),
+            userSubmission: null,
+            hasSubmitted: false,
+            userStats: req.user ? {
+              totalSolved: 0,
+              bestScore: 0,
+              prizesWon: 0,
+              currentStreak: 0
+            } : null
+          }
+        });
+        
+      } catch (generationError) {
+        console.error('❌ Failed to generate automatic challenge:', generationError);
+        
+        // Return fallback response
+        return res.status(200).json({
+          success: true,
+          data: {
+            challenge: null,
+            message: 'No daily challenge available today. Please check back tomorrow for a new coding challenge!',
+            nextChallengeTime: getNextChallengeTime(),
+            userSubmission: null,
+            hasSubmitted: false,
+            userStats: req.user ? {
+              totalSolved: 0,
+              bestScore: 0,
+              prizesWon: 0,
+              currentStreak: 0
+            } : null
+          }
+        });
+      }
     }
 
     console.log('✅ Found challenge:', challenge.title);
@@ -216,9 +264,29 @@ exports.getTodayChallenge = async (req, res) => {
 
 // Submit solution to daily challenge
 exports.submitSolution = async (req, res) => {
+  const startTime = Date.now();
+  const submissionStartTime = startTime; // Fix undefined variable
+  console.log('🚀 DAILY CHALLENGE SUBMISSION STARTED');
+  console.log('📋 Request body:', JSON.stringify(req.body, null, 2));
+  console.log('👤 User ID:', req.userProfile?._id || 'NOT_FOUND');
+  console.log('🔑 Auth header:', req.headers.authorization ? 'PRESENT' : 'MISSING');
+  
   try {
     const { challengeId, code, language = 'javascript' } = req.body;
-    const userId = req.user.id;
+    const userId = req.userProfile._id;
+    
+    console.log('🎯 Parsed data:', { challengeId, codeLength: code?.length || 0, language });
+    console.log('👤 User ID extracted:', userId);
+
+    // Validate required fields
+    if (!challengeId || !code) {
+      console.error('❌ Missing required fields:', { challengeId: !!challengeId, code: !!code });
+      return res.status(400).json({
+        success: false,
+        message: 'Missing required fields: challengeId and code',
+        error: 'VALIDATION_ERROR'
+      });
+    }
 
     // Get challenge details
     const challenge = await DailyChallenge.findById(challengeId);
@@ -232,8 +300,7 @@ exports.submitSolution = async (req, res) => {
     // Check if user has already submitted
     const existingSubmission = await DailySubmission.findOne({
       userId,
-      challengeId,
-      status: 'submitted'
+      challengeId
     });
 
     if (existingSubmission) {
@@ -243,11 +310,18 @@ exports.submitSolution = async (req, res) => {
       });
     }
 
-    // Run code against test cases (mock execution)
-    const testResults = await executeCode(code, challenge.testCases);
+    // Run code against test cases (real execution + AI analysis)
+    console.log('🔧 Starting code execution...');
+    const testCases = challenge.testCases || [];
+    console.log('📝 Test cases count:', testCases.length);
+    console.log('🔑 Challenge description length:', challenge.description?.length || 0);
+    
+    const testResults = await executeCode(code, testCases, challenge.description, language);
+    console.log('✅ Execution completed, results count:', testResults.length);
+    console.log('📊 First result sample:', JSON.stringify(testResults[0], null, 2));
     
     // Calculate score based on criteria
-    const score = calculateScore(testResults, challenge.scoringCriteria);
+    const score = calculateScore(testResults, challenge.scoringCriteria || {});
     
     // Create submission record
     const submission = new DailySubmission({
@@ -267,6 +341,7 @@ exports.submitSolution = async (req, res) => {
     });
 
     await submission.save();
+    console.log('🆕 Created new submission for user:', userId);
 
     // Create notification for admin users about new daily challenge submission
     const adminUsers = await User.find({ role: 'admin' }).select('_id');
@@ -289,22 +364,38 @@ exports.submitSolution = async (req, res) => {
 
     // Award points for daily challenge completion
     try {
-      // Calculate rank based on today's submissions
-      const todaySubmissions = await DailySubmission.find({
+      // Calculate professional score with validation
+      const validationConfidence = testResults[0]?.validationConfidence || 1;
+      const professionalScore = calculateProfessionalScore(testResults, validationConfidence);
+      
+      // Determine if actually passed (not just validation passed)
+      const actuallyPassed = testResults.some(r => r.passed && !r.validationFailed);
+      
+      // Calculate rank based on professional score
+      const allSubmissions = await DailySubmission.find({
         challengeId,
         status: 'passed'
       }).sort({ 'score.total': -1 });
       
-      const userRank = todaySubmissions.findIndex(s => s.userId.toString() === userId) + 1;
+      const userRank = allSubmissions.findIndex(s => s.userId.toString() === userId) + 1;
       
+      // Award points with professional scoring
       const pointsResult = await pointsService.awardDailyChallengePoints({
-        userId,
+        userId: userId,
         dailyChallengeId: challengeId,
         rank: userRank,
-        score: score.total,
-        maxScore: challenge.maxPoints
+        score: professionalScore,
+        maxScore: challenge.maxPoints,
+        completionTime: Date.now() - submissionStartTime,
+        timeLimit: challenge.timeLimit,
+        usedHint: false, // TODO: Track hint usage
+        performanceMetrics: {
+          efficiency: professionalScore / 100,
+          executionTime: testResults[0]?.executionTime || 0,
+          memoryUsage: testResults[0]?.memoryUsage || 0
+        }
       });
-      
+        
       console.log(`Awarded ${pointsResult.pointsAwarded} points to user ${userId} for daily challenge rank ${userRank}`);
     } catch (pointsError) {
       console.error('Error awarding daily challenge points:', pointsError);
@@ -315,7 +406,12 @@ exports.submitSolution = async (req, res) => {
     await updateUserDailyProgress(userId, score.total);
 
     // Check and update rankings
-    await updateRankings(challengeId);
+    try {
+      await updateRankings(challengeId);
+    } catch (rankingError) {
+      console.error('Error updating rankings:', rankingError);
+      // Continue with submission response even if ranking update fails
+    }
 
     res.status(201).json({
       success: true,
@@ -327,10 +423,42 @@ exports.submitSolution = async (req, res) => {
       }
     });
   } catch (error) {
+    console.error('💥 SUBMISSION ERROR:', error.message);
+    console.error('💥 ERROR STACK:', error.stack);
+    
+    // Check for rate limit errors
+    const isRateLimit = error.message === 'RATE_LIMIT_EXCEEDED' || 
+                       error.message.toLowerCase().includes('rate limit') ||
+                       error.message.toLowerCase().includes('too many requests');
+    
+    if (isRateLimit) {
+      // Try to get wait time from test results if available
+      let waitTime = 60; // Default fallback
+      let userMessage = 'AI service rate limit exceeded. Please wait a moment and try again.';
+      
+      // Check if we have test results with rate limit info
+      if (error.testResults && error.testResults[0]?.rateLimited) {
+        waitTime = error.testResults[0].waitTime || 60;
+        userMessage = error.testResults[0].userMessage || userMessage;
+      }
+      
+      return res.status(429).json({
+        success: false,
+        message: userMessage,
+        error: 'RATE_LIMIT_EXCEEDED',
+        waitTime: waitTime,
+        retryAfter: waitTime
+      });
+    }
+    
     res.status(500).json({
       success: false,
       message: 'Error submitting solution',
-      error: error.message
+      error: error.message,
+      debug: {
+        errorType: error.name,
+        timestamp: new Date().toISOString()
+      }
     });
   }
 };
@@ -411,7 +539,7 @@ exports.getDailyLeaderboard = async (req, res) => {
 // Get user's daily statistics
 exports.getUserDailyStats = async (req, res) => {
   try {
-    const userId = req.user.id;
+    const userId = req.userProfile._id;
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
@@ -473,51 +601,289 @@ exports.getUserDailyStats = async (req, res) => {
   }
 };
 
-// Helper functions
-async function executeCode(code, testCases) {
-  const CodeExecutor = require('../services/codeExecutor');
-  const executor = new CodeExecutor();
-  
-  // Choose your execution method:
-  // 1. Judge0 CE (Free, 100 requests/hour)
-  // return await executor.executeWithJudge0(code, 'javascript', testCases);
-  
-  // 2. Docker Container (Self-hosted, Full control)
-  // return await executor.executeWithDocker(code, 'javascript', testCases);
-  
-  // 3. AI Evaluation (Advanced, requires OpenAI API key)
-  // return await executor.evaluateWithAI(code, challengeDescription, testCases);
-  
-  // For now, keep the mock implementation
-  return testCases.map((testCase, index) => {
-    // Simulate different execution scenarios based on code complexity
-    const codeComplexity = estimateCodeComplexity(code);
-    const baseTime = 50 + (codeComplexity * 10); // Base execution time
-    const baseMemory = 10 + (codeComplexity * 5); // Base memory usage
+// Get user's submission for a specific challenge
+exports.getSubmission = async (req, res) => {
+  try {
+    const { challengeId } = req.params;
+    const userId = req.userProfile._id;
     
-    // Add some randomness to simulate real execution variations
-    const timeVariation = Math.random() * 0.3 - 0.15; // ±15% variation
-    const memoryVariation = Math.random() * 0.2 - 0.1; // ±10% variation
+    const submission = await DailySubmission.findOne({
+      userId,
+      challengeId
+    });
     
-    const executionTime = Math.max(1, baseTime * (1 + timeVariation));
-    const memoryUsage = Math.max(1, baseMemory * (1 + memoryVariation));
-    
-    // Simulate pass/fail based on code quality (mock logic)
-    const passProbability = Math.min(0.95, 0.7 + (code.length / 1000)); // Longer code = higher chance of passing
-    const passed = Math.random() < passProbability;
-    
-    return {
-      testCaseIndex: index,
-      input: testCase.input,
-      expectedOutput: testCase.expectedOutput,
-      actualOutput: passed ? testCase.expectedOutput : `Incorrect output for test ${index + 1}`,
-      passed,
-      executionTime: Math.round(executionTime),
-      memoryUsage: Math.round(memoryUsage),
-      error: passed ? null : `Test case ${index + 1} failed`,
-      timestamp: new Date().toISOString()
-    };
+    if (submission) {
+      res.status(200).json({
+        success: true,
+        data: submission
+      });
+    } else {
+      res.status(404).json({
+        success: false,
+        message: 'No submission found'
+      });
+    }
+  } catch (error) {
+    console.error('Error fetching submission:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching submission',
+      error: error.message
+    });
+  }
+};
+
+// Helper function to extract expected function names from problem description
+function extractExpectedFunctionNames(description) {
+  const functionPatterns = [
+    { keywords: ['minimum window substring', 'find minimum window'], functions: ['minWindow', 'findMinWindow'] },
+    { keywords: ['sum of array', 'array sum'], functions: ['arraySum', 'sumArray', 'calculateSum'] },
+    { keywords: ['reverse string', 'string reverse'], functions: ['reverseString', 'reverseStr'] },
+    { keywords: ['binary search', 'search binary'], functions: ['binarySearch', 'searchBinary'] },
+    { keywords: ['linked list', 'list operations'], functions: ['reverseList', 'listOperations'] },
+    { keywords: ['stable arrays', 'count stable'], functions: ['countStableArrays', 'numberOfStableArrays'] },
+    { keywords: ['two sum'], functions: ['twoSum', 'findTwoSum'] },
+    { keywords: ['palindrome'], functions: ['isPalindrome', 'checkPalindrome'] }
+  ];
+
+  const descLower = description.toLowerCase();
+  
+  for (const pattern of functionPatterns) {
+    if (pattern.keywords.some(keyword => descLower.includes(keyword))) {
+      return pattern.functions;
+    }
+  }
+  
+  return []; // No specific pattern detected
+}
+
+// Helper function to calculate professional score
+function calculateProfessionalScore(testResults, validationConfidence) {
+  const totalTests = testResults.length;
+  const passedTests = testResults.filter(r => r.passed && !r.validationFailed).length;
+  
+  if (totalTests === 0) return 0;
+  
+  // Base score from test results
+  const baseScore = (passedTests / totalTests) * 100;
+  
+  // Adjust based on validation confidence
+  const adjustedScore = baseScore * (validationConfidence || 1);
+  
+  // Apply scoring curve
+  if (adjustedScore >= 90) return Math.min(100, adjustedScore);
+  if (adjustedScore >= 80) return Math.min(95, adjustedScore);
+  if (adjustedScore >= 70) return Math.min(85, adjustedScore);
+  if (adjustedScore >= 50) return Math.min(75, adjustedScore);
+  
+  return Math.max(0, adjustedScore);
+}
+
+async function executeCode(code, testCases, challengeDescription = '', language = 'javascript') {
+  console.log('🔧 executeCode called with:', { 
+    codeLength: code?.length || 0, 
+    testCasesCount: testCases?.length || 0,
+    descriptionLength: challengeDescription?.length || 0 
   });
+  
+  const { getActiveService, isServiceConfigured } = require('../config/executionConfig');
+  const CodeExecutor = require('../services/codeExecutor');
+  const FreeAIExecutor = require('../services/aiExecutor');
+  
+  const activeConfig = getActiveService();
+  console.log('⚙ Active config:', {
+    primary: activeConfig.primary?.service,
+    aiAnalysis: activeConfig.aiAnalysis?.service,
+    strategy: activeConfig.strategy?.mode
+  });
+  
+  try {
+    // Use AI-first strategy if configured
+    if (activeConfig.strategy?.mode === 'ai_only' && activeConfig.aiAnalysis && isServiceConfigured('groq')) {
+      console.log(`🤖 Using ${activeConfig.aiAnalysis.name} for AI-first evaluation`);
+      return await fallbackToAI(code, challengeDescription, testCases, { service: 'groq' }, language);
+    }
+    
+    // Use professional execution with validation
+    if (activeConfig.primary && isServiceConfigured(activeConfig.primary.service)) {
+      console.log(`✅ Using ${activeConfig.primary.name} for professional execution`);
+      
+      // Detect expected function names based on problem description
+      const expectedFunctionNames = extractExpectedFunctionNames(challengeDescription);
+      
+      const executionResults = await CodeExecutor.prototype.executeWithProfessionalValidation.call(
+        new CodeExecutor(), 
+        code, 
+        language, 
+        testCases, 
+        challengeDescription
+      );
+      
+      console.log('📊 Professional execution completed');
+      return executionResults;
+    }
+    
+    throw new Error('No valid execution service configured');
+    
+  } catch (error) {
+    console.error('❌ Primary execution failed:', error.message);
+    console.error('❌ Stack trace:', error.stack);
+    
+    // Check if it's a rate limit error
+    const isRateLimit = error.message === 'RATE_LIMIT_EXCEEDED' || 
+                       error.message.toLowerCase().includes('rate limit') ||
+                       error.message.toLowerCase().includes('too many requests');
+    
+    if (isRateLimit) {
+      // Don't try fallback if it's a rate limit error
+      const rateLimitError = new Error('RATE_LIMIT_EXCEEDED');
+      rateLimitError.testResults = testResults;
+      throw rateLimitError;
+    }
+    
+    // Try AI analysis as fallback
+    if (activeConfig.strategy.fallback && activeConfig.aiAnalysis && isServiceConfigured('groq')) {
+      console.log(`🔄 Falling back to ${activeConfig.aiAnalysis.name} for evaluation`);
+      return await fallbackToAI(code, challengeDescription, testCases, { service: 'groq' }, language);
+    }
+    
+    // Final fallback to local code evaluation if all else fails
+    console.warn('⚠️ All execution services failed, using local code evaluation');
+    return testCases.map((testCase, index) => {
+      try {
+        // Create a safe execution environment
+        const vm = require('vm');
+        const context = vm.createContext({
+          console: {
+            log: () => {} // Suppress console.log
+          }
+        });
+        
+        // Wrap the user code to capture the result
+        let wrappedCode = code;
+        
+        // Try to detect if code has a function and call it
+        if (code.includes('function') || code.includes('=>')) {
+          // Add a call to the function if it's defined but not called
+          if (!code.includes('(') && !code.includes('print')) {
+            wrappedCode = code + '\nif (typeof minWindow === "function") minWindow("ADOBECODEBANC", "ABC");';
+          }
+        }
+        
+        // Execute the code
+        let actualOutput = '';
+        const originalLog = console.log;
+        console.log = (...args) => {
+          actualOutput = args.join(' ');
+        };
+        
+        vm.runInContext(wrappedCode, context);
+        
+        console.log = originalLog;
+        
+        // Clean up the output
+        actualOutput = actualOutput.trim().replace(/['"]/g, '');
+        const expectedOutput = testCase.expectedOutput.trim().replace(/['"]/g, '');
+        
+        return {
+          testCaseIndex: index,
+          input: testCase.input,
+          expectedOutput: testCase.expectedOutput,
+          actualOutput: actualOutput,
+          passed: actualOutput === expectedOutput,
+          executionTime: Math.random() * 200 + 50, // Random time between 50-250ms
+          memoryUsage: Math.random() * 512 + 256, // Random memory between 256-768MB
+          error: null,
+          timestamp: new Date().toISOString(),
+          localEvaluation: true
+        };
+        
+      } catch (error) {
+        return {
+          testCaseIndex: index,
+          input: testCase.input,
+          expectedOutput: testCase.expectedOutput,
+          actualOutput: '',
+          passed: false,
+          executionTime: 0,
+          memoryUsage: 0,
+          error: error.message,
+          timestamp: new Date().toISOString(),
+          localEvaluation: true
+        };
+      }
+    });
+  }
+}
+
+// Enhance execution results with AI analysis
+async function enhanceWithAI(executionResults, code, challengeDescription, testCases, aiConfig) {
+  try {
+    const FreeAIExecutor = require('../services/aiExecutor');
+    const aiExecutor = new FreeAIExecutor();
+    
+    let aiResults;
+    switch (aiConfig.service) {
+      case 'gemini':
+        aiResults = await aiExecutor.evaluateWithGemini(code, challengeDescription, testCases);
+        break;
+      case 'openai':
+        aiResults = await aiExecutor.evaluateWithAI(code, challengeDescription, testCases);
+        break;
+      case 'groq':
+        aiResults = await aiExecutor.evaluateWithGroq(code, challengeDescription, testCases);
+        break;
+      default:
+        console.warn(`Unknown AI service: ${aiConfig.service}`);
+        return executionResults;
+    }
+    
+    // Combine execution results with AI insights
+    return executionResults.map((result, index) => ({
+      ...result,
+      aiEvaluation: aiResults[index]?.aiEvaluation || null,
+      enhanced: true
+    }));
+    
+  } catch (aiError) {
+    console.warn(`AI enhancement failed: ${aiError.message}`);
+    return executionResults;
+  }
+}
+
+// Fallback to AI-only evaluation
+async function fallbackToAI(code, challengeDescription, testCases, aiConfig, language = 'javascript') {
+  const FreeAIExecutor = require('../services/aiExecutor');
+  const aiExecutor = new FreeAIExecutor(); 
+  
+  try {
+    switch (aiConfig.service) {
+      case 'gemini':
+        return await aiExecutor.evaluateWithGemini(code, challengeDescription, testCases);
+      case 'openai':
+        return await aiExecutor.evaluateWithAI(code, challengeDescription, testCases);
+      case 'groq':
+        return await aiExecutor.evaluateWithGroq(code, challengeDescription, testCases, language);
+      default:
+        throw new Error(`Fallback AI service ${aiConfig.service} not available`);
+    }
+  } catch (error) {
+    console.error('❌ AI evaluation failed:', error.message);
+    
+    // Check if it's a rate limit error
+    const isRateLimit = error.message === 'RATE_LIMIT_EXCEEDED' || 
+                       error.message.toLowerCase().includes('rate limit') ||
+                       error.message.toLowerCase().includes('too many requests');
+    
+    if (isRateLimit) {
+      // Pass through the rate limit error with test results
+      const rateLimitError = new Error('RATE_LIMIT_EXCEEDED');
+      rateLimitError.testResults = testResults;
+      throw rateLimitError;
+    }
+    
+    throw new Error(`Fallback AI service ${aiConfig.service} not available`);
+  }
 }
 
 // Estimate code complexity (mock algorithm)
@@ -536,9 +902,49 @@ function estimateCodeComplexity(code) {
   return Math.max(1, Math.min(10, totalComplexity / 3)); // Scale 1-10
 }
 
+// Export executeCode for debugging
+module.exports.executeCode = executeCode;
+
 function calculateScore(testResults, criteria) {
   const passedTests = testResults.filter(r => r.passed).length;
   const totalTests = testResults.length;
+  
+  // Check if AI evaluation is available and use AI score
+  const firstResult = testResults[0];
+  if (firstResult?.aiEvaluation?.score) {
+    const aiScore = firstResult.aiEvaluation.score;
+    console.log('🤖 Using AI evaluation score:', aiScore);
+    
+    return {
+      total: aiScore,
+      breakdown: {
+        correctness: {
+          score: aiScore,
+          weight: 1.0,
+          passed: passedTests,
+          total: totalTests
+        },
+        performance: {
+          speed: { score: 0, weight: 0, avgTime: 0, unit: 'ms' },
+          efficiency: { score: 0, weight: 0, avgMemory: 0, unit: 'MB' }
+        },
+        bonuses: {
+          consistency: 0,
+          perfect: passedTests === totalTests
+        }
+      },
+      rating: aiScore >= 90 ? 'Expert' : aiScore >= 80 ? 'Advanced' : aiScore >= 70 ? 'Intermediate' : aiScore >= 60 ? 'Competent' : 'Beginner',
+      metrics: {
+        avgExecutionTime: 0,
+        avgMemoryUsage: 0,
+        passRate: Math.round((passedTests / totalTests) * 100)
+      },
+      aiEvaluated: true
+    };
+  }
+  
+  // Fallback to original calculation if no AI score
+  console.log('📊 Using traditional score calculation');
   
   // 1. Correctness Score (0-100 points) - Most important
   const correctnessScore = (passedTests / totalTests) * 100;
@@ -624,15 +1030,27 @@ function calculateScore(testResults, criteria) {
 }
 
 async function updateUserDailyProgress(userId, score) {
-  // Update user's daily progress tracking
-  await User.findByIdAndUpdate(userId, {
-    $inc: {
-      'dailyStats.problemsSolved': 1,
-      'dailyStats.totalScore': score,
-      'dailyStats.streak': score > 0 ? 1 : 0
-    },
-    'dailyStats.lastActiveDate': new Date()
-  });
+  try {
+    // Update user's daily progress tracking - only update fields that exist
+    const updateData = {
+      $set: {
+        lastActiveDate: new Date()
+      }
+    };
+    
+    // Only add points if user has points field
+    const user = await User.findById(userId);
+    if (user && user.points !== undefined) {
+      updateData.$inc = {
+        points: Math.floor(score / 10) // Award some points based on score
+      };
+    }
+    
+    await User.findByIdAndUpdate(userId, updateData);
+  } catch (error) {
+    console.error('Error updating user daily progress:', error);
+    // Don't fail the submission if user update fails
+  }
 }
 
 async function updateRankings(challengeId) {

@@ -15,7 +15,8 @@ import {
   FaBullseye,
   FaStar,
   FaUsers,
-  FaCalendar
+  FaCalendar,
+  FaCheck
 } from 'react-icons/fa';
 import { useUser } from '../context/UserContext';
 import { ChallengeHeader } from '../components/challenge-header';
@@ -59,7 +60,7 @@ interface LeaderboardEntry {
     avatar?: string;
   };
   score: number;
-  completionTime: number;
+  completionTime: number | { total?: number; totalSeconds?: number };
   breakdown: {
     timeBonus: number;
     efficiencyBonus: number;
@@ -86,8 +87,66 @@ export default function DailyCoding() {
   const [code, setCode] = useState('');
   const [output, setOutput] = useState('');
   const [isRunning, setIsRunning] = useState(false);
+  const [hasSubmitted, setHasSubmitted] = useState(false);
+  const [selectedLanguage, setSelectedLanguage] = useState<'javascript' | 'python'>('javascript');
 
-  // Fetch today's challenge
+  // Helper function to get card background color based on score
+const getCardBackground = (score: number, maxPoints: number) => {
+  const percentage = (score / maxPoints) * 100;
+  
+  if (percentage >= 70) {
+    return 'bg-gradient-to-br from-green-900/40 via-emerald-900/30 to-green-900/40 border-green-500/30 shadow-green-500/10';
+  } else if (percentage >= 50) {
+    return 'bg-gradient-to-br from-yellow-900/40 via-orange-900/30 to-yellow-900/40 border-yellow-500/30 shadow-yellow-500/10';
+  } else if (percentage > 0) {
+    return 'bg-gradient-to-br from-red-900/40 via-orange-900/30 to-red-900/40 border-red-500/30 shadow-red-500/10';
+  } else {
+    return 'bg-gradient-to-br from-gray-900/40 via-slate-900/30 to-gray-900/40 border-gray-500/30 shadow-gray-500/10';
+  }
+};
+
+// Helper function to get text colors based on score
+const getTextColors = (score: number, maxPoints: number) => {
+  const percentage = (score / maxPoints) * 100;
+  
+  if (percentage >= 70) {
+    return {
+      titleGradient: 'from-green-300 to-emerald-300',
+      scoreGradient: 'from-green-400 via-emerald-400 to-green-300',
+      glowColor: 'from-green-400 to-emerald-400',
+      textColor: 'text-green-200',
+      progressColor: 'bg-green-900/50',
+      progressFill: 'bg-gradient-to-r from-green-400 to-emerald-400'
+    };
+  } else if (percentage >= 50) {
+    return {
+      titleGradient: 'from-yellow-300 to-orange-300',
+      scoreGradient: 'from-yellow-400 via-orange-400 to-yellow-300',
+      glowColor: 'from-yellow-400 to-orange-400',
+      textColor: 'text-yellow-200',
+      progressColor: 'bg-yellow-900/50',
+      progressFill: 'bg-gradient-to-r from-yellow-400 to-orange-400'
+    };
+  } else if (percentage > 0) {
+    return {
+      titleGradient: 'from-orange-300 to-red-300',
+      scoreGradient: 'from-orange-400 via-red-400 to-orange-300',
+      glowColor: 'from-orange-400 to-red-400',
+      textColor: 'text-orange-200',
+      progressColor: 'bg-red-900/50',
+      progressFill: 'bg-gradient-to-r from-orange-400 to-red-400'
+    };
+  } else {
+    return {
+      titleGradient: 'from-gray-300 to-slate-300',
+      scoreGradient: 'from-gray-400 via-slate-400 to-gray-300',
+      glowColor: 'from-gray-400 to-slate-400',
+      textColor: 'text-gray-200',
+      progressColor: 'bg-gray-900/50',
+      progressFill: 'bg-gradient-to-r from-gray-400 to-slate-400'
+    };
+  }
+};
   useEffect(() => {
     const fetchChallenge = async () => {
       try {
@@ -104,6 +163,112 @@ export default function DailyCoding() {
         if (data.success) {
           setChallenge(data.data.challenge);
           setUserStats(data.data.userStats);
+          
+          // Check if user has already submitted
+          const token = localStorage.getItem('auth_token');
+          const submissionResponse = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/daily-challenge/submission/${data.data.challenge._id}`, {
+            headers: {
+              'Authorization': token ? `Bearer ${token}` : ''
+            }
+          });
+          
+          if (!submissionResponse.ok) {
+            console.log('Submission response not ok:', submissionResponse.status);
+            return; // Don't try to parse if response is not ok
+          }
+          
+          const submissionData = await submissionResponse.json();
+          if (submissionData.success && submissionData.data) {
+            setHasSubmitted(true);
+            setUserScore(typeof submissionData.data.score === 'object' ? submissionData.data.score.total || submissionData.data.score.score || 0 : submissionData.data.score || 0);
+            setCode(submissionData.data.code);
+            
+            // Enhanced output with AI analysis for previous submissions
+            let outputText = `Status: ${submissionData.data.status === 'passed' ? 'PASSED' : 'FAILED'}\nScore: ${typeof submissionData.data.score === 'object' ? submissionData.data.score.total || submissionData.data.score.score || 0 : submissionData.data.score || 0}\nTime: ${submissionData.data.completionTime?.totalSeconds || 'N/A'}s`;
+            
+            // Add AI analysis if available
+            if (submissionData.data.testResults?.[0]?.aiEvaluation) {
+              const aiEval = submissionData.data.testResults[0].aiEvaluation;
+              outputText += `\n\n🤖 AI Analysis:`;
+              outputText += `\n  Time Complexity: ${aiEval.timeComplexity || 'N/A'}`;
+              outputText += `\n  Space Complexity: ${aiEval.spaceComplexity || 'N/A'}`;
+              outputText += `\n  Code Quality Score: ${aiEval.score || 'N/A'}/100`;
+              
+              // Add strengths if available
+              if (aiEval.strengths && aiEval.strengths.length > 0) {
+                outputText += `\n\n  ✅ Strengths:`;
+                aiEval.strengths.forEach((strength: string, index: number) => {
+                  outputText += `\n    ${index + 1}. ${strength}`;
+                });
+              }
+              
+              // Add weaknesses if available
+              if (aiEval.weaknesses && aiEval.weaknesses.length > 0) {
+                outputText += `\n\n  ⚠️ Weaknesses:`;
+                aiEval.weaknesses.forEach((weakness: string, index: number) => {
+                  outputText += `\n    ${index + 1}. ${weakness}`;
+                });
+              }
+              
+              if (aiEval.suggestions && aiEval.suggestions.length > 0) {
+                outputText += `\n\n  💡 Suggestions:`;
+                aiEval.suggestions.forEach((suggestion: string, index: number) => {
+                  outputText += `\n    ${index + 1}. ${suggestion}`;
+                });
+              }
+              if (aiEval.explanation) {
+                outputText += `\n  📝 Analysis: ${aiEval.explanation}`;
+              }
+            }
+            
+            // Add score explanation and reasons for previous submissions
+            if (submissionData.data.testResults?.[0]) {
+              const firstResult = submissionData.data.testResults[0];
+              const currentScore = typeof submissionData.data.score === 'object' ? submissionData.data.score.total || submissionData.data.score.score || 0 : submissionData.data.score || 0;
+              
+              outputText += `\n\n=== PERFORMANCE ANALYSIS ===`;
+              
+              // Add score reasons based on performance
+              if (currentScore >= 90) {
+                outputText += `\n\nOUTSTANDING PERFORMANCE - Elite Level Achievement`;
+                outputText += `\n✓ All test cases passed with optimal efficiency`;
+                outputText += `\n✓ Time complexity: ${firstResult.aiEvaluation?.timeComplexity || 'Optimal'}`;
+                outputText += `\n✓ Space complexity: ${firstResult.aiEvaluation?.spaceComplexity || 'Efficient'}`;
+                outputText += `\n✓ Code demonstrates exceptional problem-solving skills`;
+              } else if (currentScore >= 80) {
+                outputText += `\n\nEXCELLENT PERFORMANCE - Advanced Level`;
+                outputText += `\n✓ All test cases executed successfully`;
+                outputText += `\n✓ Solution demonstrates strong algorithmic understanding`;
+                outputText += `\n• Minor optimizations available for peak performance`;
+              } else if (currentScore >= 70) {
+                outputText += `\n\nGOOD PERFORMANCE - Competent Level`;
+                outputText += `\n✓ Most requirements met successfully`;
+                outputText += `\n✓ Core logic is sound and functional`;
+                outputText += `\n• Performance optimizations available for higher scores`;
+              } else if (currentScore >= 50) {
+                outputText += `\n\nNEEDS IMPROVEMENT - Developing Level`;
+                outputText += `\n⚠ Solution requires refinement before submission`;
+                outputText += `\n• Review logic for failing test cases`;
+                outputText += `\n• Study problem requirements more thoroughly`;
+                outputText += `\n• Consider edge cases and boundary conditions`;
+              } else {
+                outputText += `\n\nSIGNIFICANT IMPROVEMENT NEEDED`;
+                outputText += `\n⚠ Multiple test cases failed - fundamental issues detected`;
+                outputText += `\n• Review overall approach and algorithm choice`;
+                outputText += `\n• Study examples and problem statement carefully`;
+                outputText += `\n• Consider alternative solution strategies`;
+                outputText += `\n• Practice with similar problem patterns`;
+              }
+              
+              // Add AI insights if available
+              if (firstResult.aiEvaluation?.explanation) {
+                outputText += `\n\n=== AI EVALUATION ===`;
+                outputText += `\n${firstResult.aiEvaluation.explanation}`;
+              }
+            }
+            
+            setOutput(outputText);
+          }
         } else {
           setError(data.message || 'Failed to load daily challenge');
         }
@@ -139,7 +304,7 @@ export default function DailyCoding() {
   }, [loading]);
 
   const handleRunCode = async () => {
-    if (!challenge) return;
+    if (!challenge || hasSubmitted) return;
     
     setIsRunning(true);
     setOutput('Running code...');
@@ -155,7 +320,7 @@ export default function DailyCoding() {
         body: JSON.stringify({
           challengeId: challenge._id,
           code: code,
-          language: 'javascript'
+          language: selectedLanguage
         })
       });
 
@@ -164,21 +329,102 @@ export default function DailyCoding() {
       if (data.success) {
         const score = data.data.score;
         const passed = data.data.passed;
-        setUserScore(score);
-        setOutput(`Status: ${passed ? 'PASSED' : 'FAILED'}\nScore: ${score}\nTime: ${data.data.completionTime || 'N/A'}`);
+        const submission = data.data.submission;
         
-        // Refresh leaderboard
-        const leaderboardResponse = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/daily-challenge/leaderboard`);
-        const leaderboardData = await leaderboardResponse.json();
-        if (leaderboardData.success) {
-          setLeaderboard(leaderboardData.data);
+        setUserScore(typeof score === 'object' ? score.total || score.score || 0 : score || 0);
+        setHasSubmitted(true);
+        
+        // Enhanced output with AI analysis
+        let outputText = `Status: ${passed ? 'PASSED' : 'FAILED'}\nScore: ${typeof score === 'object' ? score.total || score.score || 0 : score || 0}\nTime: ${typeof data.data.completionTime === 'object' ? data.data.completionTime.total || data.data.completionTime.totalSeconds || 'N/A' : data.data.completionTime || 'N/A'}`;
+        
+        // Add AI analysis if available
+        if (submission?.testResults?.[0]?.aiEvaluation) {
+          const aiEval = submission.testResults[0].aiEvaluation;
+          outputText += `\n\n🤖 AI Analysis:`;
+          outputText += `\n  Time Complexity: ${aiEval.timeComplexity || 'N/A'}`;
+          outputText += `\n  Space Complexity: ${aiEval.spaceComplexity || 'N/A'}`;
+          outputText += `\n  Code Quality Score: ${aiEval.score || 'N/A'}/100`;
+          
+          // Add strengths if available
+          if (aiEval.strengths && aiEval.strengths.length > 0) {
+            outputText += `\n\n  ✅ Strengths:`;
+            aiEval.strengths.forEach((strength: string, index: number) => {
+              outputText += `\n    ${index + 1}. ${strength}`;
+            });
+          }
+          
+          // Add weaknesses if available
+          if (aiEval.weaknesses && aiEval.weaknesses.length > 0) {
+            outputText += `\n\n  ⚠️ Weaknesses:`;
+            aiEval.weaknesses.forEach((weakness: string, index: number) => {
+              outputText += `\n    ${index + 1}. ${weakness}`;
+            });
+          }
+          
+          if (aiEval.suggestions && aiEval.suggestions.length > 0) {
+            outputText += `\n\n  💡 Suggestions:`;
+            aiEval.suggestions.forEach((suggestion: string, index: number) => {
+              outputText += `\n    ${index + 1}. ${suggestion}`;
+            });
+          }
+          if (aiEval.explanation) {
+            outputText += `\n  📝 Analysis: ${aiEval.explanation}`;
+          }
         }
+        
+        // Add score explanation and reasons
+        if (submission?.testResults?.[0]) {
+          const firstResult = submission.testResults[0];
+          const currentScore = typeof score === 'object' ? score.total || score.score || 0 : score || 0;
+          
+          outputText += `\n\n=== PERFORMANCE ANALYSIS ===`;
+          
+          // Add score reasons based on performance
+          if (currentScore >= 90) {
+            outputText += `\n\nOUTSTANDING PERFORMANCE - Elite Level Achievement`;
+            outputText += `\n✓ All test cases passed with optimal efficiency`;
+            outputText += `\n✓ Time complexity: ${firstResult.aiEvaluation?.timeComplexity || 'Optimal'}`;
+            outputText += `\n✓ Space complexity: ${firstResult.aiEvaluation?.spaceComplexity || 'Efficient'}`;
+            outputText += `\n✓ Code demonstrates exceptional problem-solving skills`;
+          } else if (currentScore >= 80) {
+            outputText += `\n\nEXCELLENT PERFORMANCE - Advanced Level`;
+            outputText += `\n✓ All test cases executed successfully`;
+            outputText += `\n✓ Solution demonstrates strong algorithmic understanding`;
+            outputText += `\n• Minor optimizations available for peak performance`;
+          } else if (currentScore >= 70) {
+            outputText += `\n\nGOOD PERFORMANCE - Competent Level`;
+            outputText += `\n✓ Most requirements met successfully`;
+            outputText += `\n✓ Core logic is sound and functional`;
+            outputText += `\n• Performance optimizations available for higher scores`;
+          } else if (currentScore >= 50) {
+            outputText += `\n\nNEEDS IMPROVEMENT - Developing Level`;
+            outputText += `\n⚠ Solution requires refinement before submission`;
+            outputText += `\n• Review logic for failing test cases`;
+            outputText += `\n• Study problem requirements more thoroughly`;
+            outputText += `\n• Consider edge cases and boundary conditions`;
+          } else {
+            outputText += `\n\nSIGNIFICANT IMPROVEMENT NEEDED`;
+            outputText += `\n⚠ Multiple test cases failed - fundamental issues detected`;
+            outputText += `\n• Review overall approach and algorithm choice`;
+            outputText += `\n• Study examples and problem statement carefully`;
+            outputText += `\n• Consider alternative solution strategies`;
+            outputText += `\n• Practice with similar problem patterns`;
+          }
+          
+          // Add AI insights if available
+          if (firstResult.aiEvaluation?.explanation) {
+            outputText += `\n\n=== AI EVALUATION ===`;
+            outputText += `\n${firstResult.aiEvaluation.explanation}`;
+          }
+        }
+        
+        setOutput(outputText);
       } else {
-        setOutput(`Error: ${data.message}`);
+        setOutput(`Error: ${data.message || 'Failed to run code'}`);
       }
     } catch (error) {
-      console.error('Error submitting code:', error);
-      setOutput('Failed to submit code');
+      console.error('Error running code:', error);
+      setOutput(`Error: Failed to run code. Please try again.`);
     } finally {
       setIsRunning(false);
     }
@@ -189,6 +435,7 @@ export default function DailyCoding() {
     setOutput('');
     setShowHint(false);
     setUserScore(0);
+    setSelectedLanguage('javascript');
   };
 
   const getDifficultyColor = (difficulty: string) => {
@@ -296,6 +543,19 @@ export default function DailyCoding() {
                   ))}
                 </ul>
               </div>
+
+              {/* Next Challenge Message */}
+              {hasSubmitted && (
+                <div className="mt-6 p-4 bg-blue-900/30 border border-blue-500/30 rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <FaCalendar className="w-5 h-5 text-blue-400" />
+                    <div>
+                      <p className="text-blue-300 font-medium">Daily challenge completed!</p>
+                      <p className="text-blue-200 text-sm">Come back tomorrow for a new challenge</p>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Code Editor Card */}
@@ -303,33 +563,53 @@ export default function DailyCoding() {
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-cyan-300 text-lg font-semibold flex items-center gap-2">
                   <FaTerminal className="w-5 h-5 text-green-400" />
-                  Code Editor
+                  Code Editor 
+                  {hasSubmitted && <span className="ml-2 text-xs bg-yellow-500/20 text-yellow-300 px-2 py-1 rounded">Submitted</span>}
+                  {user?.isProfessional && <span className="ml-2 text-xs bg-purple-500/20 text-purple-300 px-2 py-1 rounded">PRO</span>}
                 </h3>
-                <div className="flex gap-2">
-                  <button
-                    onClick={handleReset}
-                    className="text-slate-400 border border-slate-600 hover:bg-slate-700 px-4 py-2 rounded-lg text-sm transition"
+                <div className="flex items-center gap-3">
+                  {/* Language Selector */}
+                  <select
+                    value={selectedLanguage}
+                    onChange={(e) => setSelectedLanguage(e.target.value as 'javascript' | 'python')}
+                    disabled={hasSubmitted}
+                    className="bg-slate-800 border border-slate-600 text-slate-200 px-3 py-2 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500 disabled:opacity-50"
                   >
-                    <FaRedo className="inline w-4 h-4 mr-1" />
-                    Reset
-                  </button>
-                  <button
-                    onClick={handleRunCode}
-                    disabled={isRunning || !code.trim()}
-                    className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm transition disabled:opacity-50"
-                  >
-                    {isRunning ? (
-                      <>
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white inline mr-2"></div>
-                        Running...
-                      </>
-                    ) : (
-                      <>
-                        <FaPlay className="inline w-4 h-4 mr-1" />
-                        Submit Solution
-                      </>
-                    )}
-                  </button>
+                    <option value="javascript">JavaScript</option>
+                    <option value="python">Python</option>
+                  </select>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleReset}
+                      className="text-slate-400 border border-slate-600 hover:bg-slate-700 px-4 py-2 rounded-lg text-sm transition disabled:opacity-50"
+                      disabled={hasSubmitted}
+                    >
+                      <FaRedo className="inline w-4 h-4 mr-1" />
+                      Reset
+                    </button>
+                    <button
+                      onClick={handleRunCode}
+                      disabled={isRunning || !code.trim() || hasSubmitted}
+                      className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm transition disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {isRunning ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white inline mr-2"></div>
+                          Running...
+                        </>
+                      ) : hasSubmitted ? (
+                        <>
+                          <FaCheck className="inline w-4 h-4 mr-1" />
+                          Already Submitted
+                        </>
+                      ) : (
+                        <>
+                          <FaPlay className="inline w-4 h-4 mr-1" />
+                          Submit Solution
+                        </>
+                      )}
+                    </button>
+                  </div>
                 </div>
               </div>
               
@@ -338,14 +618,16 @@ export default function DailyCoding() {
                   value={code}
                   onChange={(e) => setCode(e.target.value)}
                   placeholder="Write your solution here..."
-                  className="w-full h-64 p-4 bg-transparent text-slate-200 font-mono text-sm resize-none focus:outline-none"
+                  className={`w-full h-64 p-4 bg-transparent text-slate-200 font-mono text-sm resize-none focus:outline-none ${hasSubmitted ? 'cursor-not-allowed opacity-75' : ''}`}
                   spellCheck={false}
+                  disabled={hasSubmitted}
+                  readOnly={hasSubmitted}
                 />
               </div>
 
               {output && (
                 <div className="mt-4">
-                  <h4 className="text-white font-medium mb-2">Output</h4>
+                  <h4 className="text-white font-medium mb-2">Result</h4>
                   <div className="bg-slate-800/50 rounded-lg p-4 font-mono text-sm border border-slate-700">
                     <pre className="text-green-400">{output}</pre>
                   </div>
@@ -422,7 +704,7 @@ export default function DailyCoding() {
                         <div>
                           <div className="text-white font-medium">{entry.user.fullName}</div>
                           <div className="text-xs text-slate-400">
-                            Score: {entry.score} • Time: {entry.completionTime}ms
+                            Score: {entry.score} • Time: {typeof entry.completionTime === 'object' ? entry.completionTime.total || entry.completionTime.totalSeconds || 'N/A' : entry.completionTime || 'N/A'}ms
                           </div>
                         </div>
                         <div className="text-right">
@@ -494,37 +776,41 @@ export default function DailyCoding() {
               </div>
             </div>
 
-            {/* User Score Card - Professional */}
-            <div className="bg-gradient-to-br from-green-900/40 via-emerald-900/30 to-green-900/40 border border-green-500/30 rounded-xl p-6 shadow-lg shadow-green-500/10 backdrop-blur-sm relative overflow-hidden">
+            {/* User Score Card - Dynamic Background */}
+            <div className={`${getCardBackground(userScore, challenge?.maxPoints || 100)} rounded-xl p-6 shadow-lg backdrop-blur-sm relative overflow-hidden`}>
               {/* Animated background effect */}
-              <div className="absolute inset-0 bg-gradient-to-br from-green-500/5 to-emerald-500/5 animate-pulse"></div>
+              <div className={`absolute inset-0 bg-gradient-to-br ${userScore >= 70 ? 'from-green-500/5 to-emerald-500/5' : userScore > 0 ? 'from-red-500/5 to-orange-500/5' : 'from-gray-500/5 to-slate-500/5'} animate-pulse`}></div>
               
               <div className="relative z-10">
                 <div className="text-center">
+                  
                   {/* Icon with animation */}
                   <div className="relative inline-block mb-3">
-                    <FaStar className="w-10 h-10 text-green-400 animate-pulse" />
-                    <div className="absolute inset-0 bg-green-400 rounded-full blur-xl opacity-30 animate-ping"></div>
+                    <FaStar className={`w-10 h-10 ${userScore >= 70 ? 'text-green-400' : userScore > 0 ? 'text-orange-400' : 'text-gray-400'} animate-pulse`} />
+                    <div className={`absolute inset-0 ${userScore >= 70 ? 'bg-green-400' : userScore > 0 ? 'bg-orange-400' : 'bg-gray-400'} rounded-full blur-xl opacity-30 animate-ping`}></div>
                   </div>
                   
-                  <h3 className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-green-300 to-emerald-300 mb-3">
+                  <h3 className={`text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r ${getTextColors(userScore, challenge?.maxPoints || 100).titleGradient} mb-3`}>
                     Your Score
                   </h3>
                   
                   {/* Main score display */}
                   <div className="relative mb-3">
-                    <div className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-green-400 via-emerald-400 to-green-300">
+                    <div className={`text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r ${getTextColors(userScore, challenge?.maxPoints || 100).scoreGradient}`}>
                       {userScore}
                     </div>
-                    <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 h-1 bg-gradient-to-r from-green-400 to-emerald-400 rounded-full blur-sm"></div>
+                    <div className={`absolute -bottom-1 left-1/2 transform -translate-x-1/2 h-1 bg-gradient-to-r ${getTextColors(userScore, challenge?.maxPoints || 100).glowColor} rounded-full blur-sm`}></div>
                   </div>
                   
                   {/* Status message */}
-                  <p className="text-green-200 text-sm font-medium mb-4">
+                  <p className={`${getTextColors(userScore, challenge?.maxPoints || 100).textColor} text-sm font-medium mb-4`}>
                     {userScore > 0 ? (
                       <span className="flex items-center justify-center gap-1">
-                        <span className="inline-block w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
-                        Excellent performance!
+                        <span className={`inline-block w-2 h-2 ${userScore >= 70 ? 'bg-green-400' : userScore >= 50 ? 'bg-yellow-400' : 'bg-orange-400'} rounded-full animate-pulse`}></span>
+                        {userScore >= 90 ? '🏆 Outstanding performance!' : 
+                         userScore >= 80 ? '🎯 Excellent performance!' : 
+                         userScore >= 70 ? '👍 Great job!' : 
+                         userScore >= 50 ? '💪 Keep improving!' : '🔥 Keep trying!'}
                       </span>
                     ) : (
                       <span className="flex items-center justify-center gap-1">
@@ -535,22 +821,22 @@ export default function DailyCoding() {
                   </p>
                   
                   {/* Progress bar */}
-                  <div className="w-full bg-green-900/50 rounded-full h-2 mb-4 overflow-hidden">
+                  <div className={`w-full ${getTextColors(userScore, challenge?.maxPoints || 100).progressColor} rounded-full h-2 mb-4 overflow-hidden`}>
                     <div 
-                      className="h-full bg-gradient-to-r from-green-400 to-emerald-400 rounded-full transition-all duration-1000 ease-out"
+                      className={`h-full ${getTextColors(userScore, challenge?.maxPoints || 100).progressFill} rounded-full transition-all duration-1000 ease-out`}
                       style={{ width: `${Math.min((userScore / (challenge?.maxPoints || 100)) * 100, 100)}%` }}
                     ></div>
                   </div>
                   
                   {/* Detailed stats */}
                   {userScore > 0 && (
-                    <div className="grid grid-cols-2 gap-3 mt-4 pt-4 border-t border-green-500/30">
+                    <div className="grid grid-cols-2 gap-3 mt-4 pt-4 border-t border-current/20">
                       <div className="text-center">
-                        <div className="text-green-300 text-xs font-medium">Max Points</div>
+                        <div className={`${getTextColors(userScore, challenge?.maxPoints || 100).textColor} text-xs font-medium`}>Max Points</div>
                         <div className="text-white font-bold">{challenge?.maxPoints || 100}</div>
                       </div>
                       <div className="text-center">
-                        <div className="text-green-300 text-xs font-medium">Performance</div>
+                        <div className={`${getTextColors(userScore, challenge?.maxPoints || 100).textColor} text-xs font-medium`}>Performance</div>
                         <div className="text-white font-bold">{Math.round((userScore / (challenge?.maxPoints || 100)) * 100)}%</div>
                       </div>
                     </div>
@@ -573,8 +859,8 @@ export default function DailyCoding() {
                   )}
                   {userScore > 0 && userScore < 60 && (
                     <div className="flex justify-center gap-2 mt-3">
-                      <span className="px-2 py-1 bg-green-500/20 text-green-300 text-xs rounded-full border border-green-500/30">
-                        👍 Keep Going
+                      <span className="px-2 py-1 bg-orange-500/20 text-orange-300 text-xs rounded-full border border-orange-500/30">
+                        � Keep Going
                       </span>
                     </div>
                   )}

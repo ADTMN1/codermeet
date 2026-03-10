@@ -5,7 +5,7 @@ class FreeAIExecutor {
   constructor() {
     // Initialize Gemini (Free tier: 60 requests/minute)
     this.genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    this.model = this.genAI.getGenerativeModel({ model: 'gemini-pro' });
+    this.model = this.genAI.getGenerativeModel({ model: 'gemini-pro-latest' });
   }
 
   async evaluateWithGemini(code, problemDescription, testCases) {
@@ -33,6 +33,8 @@ class FreeAIExecutor {
         4. What is the space complexity?
         5. Are there any bugs or edge cases missed?
         6. How would you rate this solution (0-100)?
+        7. What are the strengths of this solution?
+        8. What are the weaknesses or areas for improvement?
         
         Respond in JSON format:
         {
@@ -42,7 +44,9 @@ class FreeAIExecutor {
           "spaceComplexity": "O(1)",
           "explanation": "brief explanation",
           "score": 85,
-          "suggestions": ["suggestion1", "suggestion2"]
+          "suggestions": ["suggestion1", "suggestion2"],
+          "strengths": ["strength1", "strength2"],
+          "weaknesses": ["weakness1", "weakness2"]
         }
         `;
 
@@ -59,7 +63,9 @@ class FreeAIExecutor {
           spaceComplexity: "Unknown",
           explanation: "Could not parse AI response",
           score: 0,
-          suggestions: []
+          suggestions: [],
+          strengths: [],
+          weaknesses: []
         };
 
         results.push({
@@ -75,7 +81,9 @@ class FreeAIExecutor {
             spaceComplexity: evaluation.spaceComplexity,
             explanation: evaluation.explanation,
             score: evaluation.score,
-            suggestions: evaluation.suggestions
+            suggestions: evaluation.suggestions,
+            strengths: evaluation.strengths,
+            weaknesses: evaluation.weaknesses
           }
         });
       } catch (error) {
@@ -164,7 +172,7 @@ class FreeAIExecutor {
   }
 
   // Alternative: Groq (Free, Fast)
-  async evaluateWithGroq(code, problemDescription, testCases) {
+  async evaluateWithGroq(code, problemDescription, testCases, language = 'javascript') {
     const Groq = require('groq-sdk');
     const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
     const results = [];
@@ -180,7 +188,7 @@ class FreeAIExecutor {
             {
               role: "user",
               content: `
-              Evaluate this JavaScript solution:
+              Evaluate this ${language.toUpperCase()} solution:
               
               Problem: ${problemDescription}
               Input: ${testCase.input}
@@ -201,12 +209,22 @@ class FreeAIExecutor {
               `
             }
           ],
-          model: "mixtral-8x7b-32768",
+          model: "llama-3.1-8b-instant",
           temperature: 0.1,
           max_tokens: 200
         });
 
-        const evaluation = JSON.parse(completion.choices[0].message.content);
+        const content = completion.choices[0].message.content;
+        // Clean up the response - remove markdown formatting if present
+        let jsonStr = content;
+        if (content.includes('```json')) {
+          jsonStr = content.split('```json')[1].split('```')[0];
+        } else if (content.includes('```')) {
+          jsonStr = content.split('```')[1].split('```')[0];
+        }
+        jsonStr = jsonStr.trim();
+        
+        const evaluation = JSON.parse(jsonStr);
 
         results.push({
           testCaseIndex: testCase.index || 0,
@@ -225,7 +243,19 @@ class FreeAIExecutor {
           }
         });
       } catch (error) {
-        // Groq API error handling
+        // Groq API error handling with rate limit detection
+        const errorMessage = error.message.toLowerCase();
+        const isRateLimit = errorMessage.includes('rate limit') || 
+                           errorMessage.includes('too many requests') || 
+                           errorMessage.includes('quota exceeded') ||
+                           error.status === 429;
+        
+        // Calculate reset time (next minute boundary)
+        const now = new Date();
+        const nextMinute = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 
+                                   now.getHours(), now.getMinutes() + 1, 0, 0);
+        const waitSeconds = Math.ceil((nextMinute.getTime() - now.getTime()) / 1000);
+        
         results.push({
           testCaseIndex: testCase.index || 0,
           input: testCase.input,
@@ -234,7 +264,13 @@ class FreeAIExecutor {
           passed: false,
           executionTime: 0,
           memoryUsage: 0,
-          error: error.message
+          error: isRateLimit ? 'RATE_LIMIT_EXCEEDED' : error.message,
+          rateLimited: isRateLimit,
+          waitTime: isRateLimit ? waitSeconds : null,
+          resetTime: isRateLimit ? nextMinute.toISOString() : null,
+          userMessage: isRateLimit ? 
+            `AI service rate limit exceeded. Please wait ${waitSeconds} seconds and try again.` : 
+            'AI evaluation failed. Please try again.'
         });
       }
     }

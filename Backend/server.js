@@ -172,6 +172,11 @@ const socketHandler = require('./socket/socketHandler');
 
 
 
+const notificationCleanupService = require('./services/notificationCleanupService');
+const DailyChallengeScheduler = require('./services/dailyChallengeScheduler');
+
+
+
 const uploadSecurity = require('./middleware/uploadSecurity');
 
 
@@ -708,6 +713,7 @@ app.use("/api/resources", resourceRoutes);
 
 
 app.use("/api/daily-challenge", dailyChallengeRoutes);
+app.use("/api/debug", require('./routes/debug')); // Debug endpoint
 
 
 
@@ -732,10 +738,6 @@ app.use("/api/messages", messageRoutes); // Message routes (mounted at /api to h
 
 
 app.use("/api/chat", chatRoutes); // Chat routes
-
-
-
-app.use("/api/daily-challenge", dailyChallengeRoutes);
 
 
 
@@ -784,6 +786,16 @@ server.listen(PORT, () => {
 
 
   socketHandler(io);
+
+
+
+  // Initialize notification cleanup service
+  notificationCleanupService.start();
+
+  // Initialize daily challenge scheduler
+  const dailyChallengeScheduler = new DailyChallengeScheduler();
+  dailyChallengeScheduler.initialize();
+
 
 
 

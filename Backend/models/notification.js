@@ -26,7 +26,7 @@ const notificationSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ['message', 'connection_request', 'achievement', 'challenge', 'system'],
+    enum: ['message', 'connection_request', 'achievement', 'challenge', 'challenge_submission', 'system'],
     required: true,
     default: 'system'
   },
@@ -102,6 +102,17 @@ notificationSchema.statics.deleteNotification = function(notificationId, userId)
 notificationSchema.statics.getUnreadCount = function(userId) {
   return this.countDocuments({ recipient: userId, read: false })
     .exec();
+};
+
+// Static method to clean up old read notifications (older than 4 days)
+notificationSchema.statics.cleanupOldReadNotifications = function() {
+  const fourDaysAgo = new Date();
+  fourDaysAgo.setDate(fourDaysAgo.getDate() - 4);
+  
+  return this.deleteMany({
+    read: true,
+    createdAt: { $lt: fourDaysAgo }
+  }).exec();
 };
 
 // Instance method to safely delete

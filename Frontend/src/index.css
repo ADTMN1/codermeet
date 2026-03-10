@@ -105,6 +105,12 @@ input, textarea, select {
   border-color: var(--border-primary) !important;
 }
 
+/* Code editor override */
+.code-editor-textarea {
+  color: #3b82f6 !important;
+  -webkit-text-fill-color: #3b82f6 !important;
+}
+
 /* Card backgrounds */
 .card {
   background-color: var(--card-bg) !important;
