@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Users, UsersRound, FileCheck, Trophy, Wifi, WifiOff } from 'lucide-react';
+import { Users, UsersRound, FileCheck, Trophy, Wifi, WifiOff, User } from 'lucide-react';
 import { Card } from './ui/card';
 import { motion } from 'motion/react';
 import { leaderboardService } from '../services/leaderboardService';
 import { socketService } from '../services/socketService';
+import { API_CONFIG } from '../config/api';
 
-export function LiveStats({ challengeId }: { challengeId?: string }) {
+export function LiveStats({ challengeId, challengeType = 'weekly' }: { challengeId?: string; challengeType?: 'weekly' | 'regular' }) {
   const [stats, setStats] = useState({
     participants: 0,
     teams: 0,
@@ -15,9 +16,11 @@ export function LiveStats({ challengeId }: { challengeId?: string }) {
   const [isLive, setIsLive] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
 
-  // Remove hardcoded demo data - start with zeros
+  console.log('🎯 LiveStats component initialized with:', { challengeId, challengeType });
+
+  // Remove hardcoded demo data - start with zeros and fetch real data
   useEffect(() => {
-    // Initialize with zeros, will be updated by WebSocket
+    console.log('🔄 Initial useEffect running');
     setStats({
       participants: 0,
       teams: 0,
@@ -67,46 +70,91 @@ export function LiveStats({ challengeId }: { challengeId?: string }) {
 
   // WebSocket real-time updates
   useEffect(() => {
-    if (!challengeId) return;
+    console.log('🎯 LiveStats useEffect triggered with:', { challengeId, challengeType });
+    if (!challengeId) {
+      console.log('❌ No challengeId provided, skipping stats fetch');
+      return;
+    }
 
-    // Fetch initial data from API as fallback
-    const fetchInitialStats = async () => {
+    // Simple direct API call test
+    const fetchStatsDirectly = async () => {
       try {
-        const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/challenges/${challengeId}/stats`, {
-          headers: {
-            'Authorization': localStorage.getItem('auth_token') ? `Bearer ${localStorage.getItem('auth_token')}` : ''
-          }
-        });
+        console.log('🚀 Starting direct API call test');
+        const endpoint = challengeType === 'weekly' ? 'weekly-challenges' : 'challenges';
+        const url = `http://localhost:5000/api/${endpoint}/${challengeId}/stats`;
+        console.log('🔍 Fetching stats from:', url);
+        
+        const response = await fetch(url);
+        console.log('📡 Response status:', response.status, response.statusText);
         
         if (response.ok) {
-          const data = await response.json();
+          const apiResponse = await response.json();
+          console.log('📊 Full API Response:', apiResponse);
+          const data = apiResponse.data || apiResponse;
+          console.log('📈 Extracted stats data:', data);
+          
           setStats(prev => ({
             participants: data.participants || prev.participants,
             teams: data.teams || prev.teams,
             submissions: data.submissions || prev.submissions,
-            onlineUsers: prev.onlineUsers, // Keep WebSocket value for online users
+            onlineUsers: prev.onlineUsers,
           }));
           setLastUpdate(new Date());
+          setIsLive(true);
+          console.log('✅ Stats updated successfully');
+        } else {
+          console.error('❌ API Error:', response.status, response.statusText);
+          const errorText = await response.text();
+          console.error('❌ Error response:', errorText);
         }
       } catch (error) {
-      // Could not fetch initial stats, will wait for WebSocket
-    }
+        console.error('❌ Fetch error:', error);
+      }
     };
 
-    // Listen for live stats updates
+    // Listen for real-time stats updates
     const handleLiveStatsUpdate = (newStats: any) => {
+      console.log('📡 Received live stats update:', newStats);
       setStats(prev => ({
-        participants: newStats.participants || prev.participants,
-        teams: newStats.teams || prev.teams,
-        submissions: newStats.submissions || prev.submissions,
-        onlineUsers: newStats.onlineUsers || prev.onlineUsers,
+        participants: newStats.participants !== undefined ? newStats.participants : prev.participants,
+        teams: newStats.teams !== undefined ? newStats.teams : prev.teams,
+        submissions: newStats.submissions !== undefined ? newStats.submissions : prev.submissions,
+        onlineUsers: newStats.onlineUsers !== undefined ? newStats.onlineUsers : prev.onlineUsers,
       }));
-      setLastUpdate(new Date(newStats.timestamp));
+      setLastUpdate(new Date(newStats.timestamp || Date.now()));
       setIsLive(true);
+      console.log('✅ Live stats updated:', newStats);
+    };
+
+    // Listen for participant count updates
+    const handleParticipantUpdate = (data: any) => {
+      console.log('👥 Participant update received:', data);
+      if (data.challengeId === challengeId) {
+        setStats(prev => ({
+          ...prev,
+          participants: data.count || prev.participants
+        }));
+        setLastUpdate(new Date());
+        setIsLive(true);
+      }
+    };
+
+    // Listen for submission updates
+    const handleSubmissionUpdate = (data: any) => {
+      console.log('📁 Submission update received:', data);
+      if (data.challengeId === challengeId) {
+        setStats(prev => ({
+          ...prev,
+          submissions: data.count || prev.submissions
+        }));
+        setLastUpdate(new Date());
+        setIsLive(true);
+      }
     };
 
     // Listen for online users updates
     const handleOnlineUsers = (data: { count: number }) => {
+      console.log('🌐 Online users update:', data);
       setStats(prev => ({ ...prev, onlineUsers: data.count }));
       setLastUpdate(new Date());
       setIsLive(true);
@@ -114,21 +162,30 @@ export function LiveStats({ challengeId }: { challengeId?: string }) {
 
     // Set up event listeners
     socketService.on('live-stats-update', handleLiveStatsUpdate);
-    socketService.onOnlineUsers(handleOnlineUsers);
+    socketService.on('participant-joined', handleParticipantUpdate);
+    socketService.on('participant-left', handleParticipantUpdate);
+    socketService.on('submission-created', handleSubmissionUpdate);
+    socketService.on('online-users', handleOnlineUsers);
 
-    // Request initial stats if connected, otherwise fetch from API
-    if (socketService.isConnected()) {
-      socketService.requestLiveStats(challengeId);
-    } else {
-      fetchInitialStats();
-    }
+    // Call the API immediately to get initial data
+    fetchStatsDirectly();
+
+    // Set up periodic refresh as fallback
+    const interval = setInterval(() => {
+      console.log('⏰ Periodic stats refresh');
+      fetchStatsDirectly();
+    }, 30000); // Refresh every 30 seconds
 
     // Cleanup
     return () => {
+      clearInterval(interval);
       socketService.off('live-stats-update', handleLiveStatsUpdate);
+      socketService.off('participant-joined', handleParticipantUpdate);
+      socketService.off('participant-left', handleParticipantUpdate);
+      socketService.off('submission-created', handleSubmissionUpdate);
       socketService.off('online-users', handleOnlineUsers);
     };
-  }, [challengeId]);
+  }, [challengeId, challengeType]);
 
   return (
     <div className="space-y-6">
@@ -267,7 +324,19 @@ export function LiveStats({ challengeId }: { challengeId?: string }) {
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="text-2xl">{entry.avatar}</div>
+                    <div className="flex items-center gap-3">
+                      {entry.avatar ? (
+                        <img
+                          src={entry.avatar}
+                          alt={entry.name}
+                          className="w-10 h-10 rounded-full border-2 border-gray-600 object-cover"
+                        />
+                      ) : (
+                        <div className="w-10 h-10 rounded-full border-2 border-gray-600 bg-gray-700 flex items-center justify-center">
+                          <User className="w-5 h-5 text-gray-400" />
+                        </div>
+                      )}
+                    </div>
                     <div>
                       <div className="text-slate-200">{entry.name}</div>
                       <div className="text-xs text-slate-500">

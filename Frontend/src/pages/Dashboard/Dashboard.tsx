@@ -231,7 +231,7 @@ const Dashboard: React.FC = () => {
 
       try {
 
-        const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+        const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
         
 
@@ -326,14 +326,13 @@ const Dashboard: React.FC = () => {
 
     try {
 
-      const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
       const token = localStorage.getItem('auth_token');
-
       
 
-      if (!token) return;
 
+      if (!token) return;
 
 
       const response = await axios.get(`${API_BASE_URL}/users/notifications/count`, {

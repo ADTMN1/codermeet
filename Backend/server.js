@@ -692,7 +692,7 @@ app.use("/api/admin/challenges", adminChallengeRoutes); // AI Challenge Generati
 
 
 
-// app.use("/api/submissions", submissionsRoutes); // Professional submission management
+app.use("/api/submissions", submissionsRoutes); // Professional submission management
 
 
 

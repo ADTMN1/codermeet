@@ -444,6 +444,17 @@ exports.joinWeeklyChallenge = async (req, res) => {
 
     await weeklyChallenge.save();
 
+    // Emit live stats update to all clients viewing this challenge
+    const io = req.app.get('io');
+    if (io) {
+      io.emit('participant-joined', {
+        challengeId: weeklyChallenge._id,
+        count: weeklyChallenge.participants.length,
+        timestamp: new Date()
+      });
+      console.log('📡 Live stats update emitted for participant join:', weeklyChallenge.participants.length);
+    }
+
     res.status(200).json({
       success: true,
       message: 'Successfully joined the weekly challenge',
@@ -573,6 +584,14 @@ exports.submitWeeklyChallenge = async (req, res) => {
           notification: userNotification
         });
         console.log('🔍 Real-time notification emitted to user:', userId);
+
+        // Emit live stats update to all clients viewing this challenge
+        io.emit('submission-created', {
+          challengeId: weeklyChallenge._id,
+          count: weeklyChallenge.submissions.length,
+          timestamp: new Date()
+        });
+        console.log('📡 Live stats update emitted for submission:', weeklyChallenge.submissions.length);
       }
     } catch (notificationError) {
       console.error('🔍 Error creating user notification:', notificationError);
@@ -949,7 +968,7 @@ exports.getWeeklyChallengeByIdStats = async (req, res) => {
 
     const stats = {
       participants: challenge.participants?.length || 0,
-      teams: challenge.teams?.length || 0,
+      teams: 0, // Weekly challenges don't have teams, always return 0
       submissions: challenge.submissions?.length || 0,
       title: challenge.title,
       status: challenge.status

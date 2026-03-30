@@ -4,7 +4,7 @@ import { Card } from './ui/card';
 import { Button } from './ui/button';
 import { challengeService, Challenge } from '../services/challengeService';
 import { toast } from 'sonner';
-import { API_CONFIG } from '../config/api';
+import { API_CONFIG, API_URL } from '../config/api';
 
 interface ChallengeOverviewCardProps {
   isRegistered: boolean;
@@ -36,7 +36,7 @@ export function ChallengeOverviewCard({
         let challengeData;
         if (challengeId) {
           // Use public challenges endpoint for regular users
-          const response = await fetch(`${API_CONFIG.BASE_URL}/weekly-challenges/${challengeId}`, {
+          const response = await fetch(`${API_URL}/weekly-challenges/${challengeId}`, {
             headers: {
               'Content-Type': 'application/json',
               'Authorization': localStorage.getItem('auth_token') ? `Bearer ${localStorage.getItem('auth_token')}` : ''
@@ -46,7 +46,7 @@ export function ChallengeOverviewCard({
           challengeData = data.data || null;
         } else {
           // Use public challenges endpoint for regular users
-          const response = await fetch(`${API_CONFIG.BASE_URL}/weekly-challenges?status=active&limit=1`, {
+          const response = await fetch(`${API_URL}/weekly-challenges?status=active&limit=1`, {
             headers: {
               'Content-Type': 'application/json',
               'Authorization': localStorage.getItem('auth_token') ? `Bearer ${localStorage.getItem('auth_token')}` : ''

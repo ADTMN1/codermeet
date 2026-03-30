@@ -469,7 +469,7 @@ export default function WeeklyChallenge() {
 
           <div className="space-y-6">
 
-            <LiveStats challengeId={challenge?._id} />
+            <LiveStats challengeId={challenge?._id} challengeType="weekly" />
 
             {/* <AIMentor /> */}
 

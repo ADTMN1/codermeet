@@ -23,4 +23,37 @@ router.post('/:id/join', authenticate, weeklyChallengeController.joinWeeklyChall
 router.post('/:id/submit', authenticate, weeklyChallengeController.submitWeeklyChallenge);
 router.get('/:id/my-submission', authenticate, weeklyChallengeController.getUserSubmission);
 
+// Test endpoint for simulating live stats updates
+router.get('/:id/simulate-update', (req, res) => {
+  const { id } = req.params;
+  const io = req.app.get('io');
+  
+  if (io) {
+    // Simulate a participant joining
+    io.emit('participant-joined', {
+      challengeId: id,
+      count: Math.floor(Math.random() * 10) + 1,
+      timestamp: new Date()
+    });
+    
+    // Simulate a submission
+    setTimeout(() => {
+      io.emit('submission-created', {
+        challengeId: id,
+        count: Math.floor(Math.random() * 5) + 1,
+        timestamp: new Date()
+      });
+    }, 2000);
+    
+    // Simulate online users change
+    setTimeout(() => {
+      io.emit('online-users', {
+        count: Math.floor(Math.random() * 20) + 1
+      });
+    }, 4000);
+  }
+  
+  res.json({ success: true, message: 'Live stats simulation triggered' });
+});
+
 module.exports = router;
