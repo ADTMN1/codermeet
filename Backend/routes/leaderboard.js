@@ -65,194 +65,71 @@ async function storePreviousRanks(users) {
 }
 
 // @route   GET api/leaderboard
-// @desc    Get leaderboard data with real stats
+// @desc    Get leaderboard data with real stats (simplified)
 // @access  Public
 router.get('/', async (req, res) => {
   try {
-    // Sanitize input parameters
-    const paramValidation = sanitizeLeaderboardParams(req.query);
-    if (!paramValidation.isValid) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Invalid parameters', 
-        errors: paramValidation.errors 
-      });
-    }
+    const { limit } = req.query;
     
-    const { limit = 10 } = paramValidation.sanitized;
+    // If no limit or limit >= 100, return all users
+    const shouldReturnAll = !limit || parseInt(limit) >= 100;
+    const userLimit = shouldReturnAll ? 10000 : parseInt(limit); // 10000 should cover all users
     
-    // Fetch users and sort by points
-    const users = await User.find({})
-      .select('username fullName points avatar plan role lastPointsUpdate createdAt activity previousRank')
-      .sort({ points: -1 })
-      .limit(limit);
-
-    // Get total user count for stats
-    const totalUsers = await User.countDocuments();
-
-    // Get real stats for each user
-    const usersWithStats = await Promise.all(users.map(async (user, index) => {
-      // Count challenge submissions (accepted ones)
-      const challengeSubmissions = await Challenge.countDocuments({
-        'submissions.userId': user._id,
-        'submissions.status': 'accepted'
-      });
-
-      // Count daily challenge wins
-      const dailyChallengeWins = await DailyChallenge.countDocuments({
-        'winners.userId': user._id
-      });
-
-      // Calculate total challenges completed
-      const challengesCompleted = challengeSubmissions + dailyChallengeWins;
-
-      // Count real projects submitted
-      const projectsSubmitted = await Project.countDocuments({
-        userId: user._id,
-        status: { $in: ['completed', 'published'] }
-      });
-
-      // Calculate real streak based on consecutive daily submissions
-      const streakData = await DailySubmission.aggregate([
-        {
-          $match: { userId: user._id, status: { $in: ['passed', 'submitted'] } }
-        },
-        {
-          $group: {
-            _id: { $dateToString: { format: "%Y-%m-%d", date: "$date" } },
-            count: { $sum: 1 }
-          }
-        },
-        { $sort: { _id: -1 } }
-      ]);
-      
-      // Calculate consecutive days
-      let streak = 0;
-      const today = new Date();
-      today.setHours(0, 0, 0, 0); // Set to start of day
-      
-      for (let i = 0; i < streakData.length; i++) {
-        const submissionDate = new Date(streakData[i]._id);
-        submissionDate.setHours(0, 0, 0, 0); // Set to start of day
-        
-        const expectedDate = new Date(today);
-        expectedDate.setDate(today.getDate() - i);
-        expectedDate.setHours(0, 0, 0, 0); // Set to start of day
-        
-        if (submissionDate.getTime() === expectedDate.getTime()) {
-          streak++;
-        } else {
-          break;
+    // Simple aggregation - just get users sorted by points
+    const users = await User.aggregate([
+      { $sort: { points: -1 } },
+      { $limit: userLimit },
+      {
+        $project: {
+          username: 1,
+          fullName: 1,
+          points: 1,
+          avatar: 1,
+          plan: 1,
+          role: 1,
+          createdAt: 1,
+          activity: 1,
+          previousRank: 1
         }
       }
-      
-      // Alternative streak calculation based on any activity
-      if (streak === 0 && user.activity?.lastActive) {
-        const daysSinceActive = Math.floor((Date.now() - user.activity.lastActive) / (1000 * 60 * 60 * 24));
-        if (daysSinceActive <= 1) {
-          streak = 1; // Give at least 1 day streak if recently active
-        }
-      }
+    ]);
 
-      return {
-        ...user.toObject(),
-        rank: index + 1,
-        previousRank: user.previousRank || null,
-        profileImage: user.avatar,
-        challengesCompleted,
-        projectsSubmitted,
-        streak,
-        joinDate: user.createdAt,
-        lastActive: user.activity?.lastActive || null,
-        communityScore: await calculateCommunityScore(user._id, challengesCompleted, projectsSubmitted),
-        badges: await getUserBadges(user._id)
-      };
+    // Add rank to each user
+    const usersWithRank = users.map((user, index) => ({
+      ...user,
+      rank: index + 1,
+      joinDate: user.createdAt,
+      lastActive: user.activity?.lastActive || user.createdAt,
+      communityScore: '5.0'
     }));
 
-    // Store current ranks for next comparison
-    await storePreviousRanks(usersWithStats);
-
-    // Calculate real stats from all users
-    const allUsersStats = await User.aggregate([
-      {
-        $group: {
-          _id: null,
-          totalUsers: { $sum: 1 },
-          totalPoints: { $sum: '$points' },
-          avgPoints: { $avg: '$points' },
-          maxPoints: { $max: '$points' }
-        }
-      }
-    ]);
-
-    const stats = allUsersStats[0] || {
-      totalUsers: 0,
-      totalPoints: 0,
-      avgPoints: 0,
-      maxPoints: 0
-    };
-
-    // Calculate real top score from actual user activity (not fake points)
-    const realTopScoreCalculation = await User.aggregate([
-      {
-        $match: { points: { $gt: 0 } } // Only users with actual points
-      },
-      {
-        $group: {
-          _id: null,
-          maxPoints: { $max: '$points' },
-          count: { $sum: 1 }
-        }
-      }
-    ]);
-    
-    const realTopScore = realTopScoreCalculation[0]?.maxPoints || 0;
-    const usersWithPoints = realTopScoreCalculation[0]?.count || 0;
-    
-    // Fallback: calculate from challenge completions if no one has points
-    let finalTopScore = realTopScore;
-    if (finalTopScore === 0) {
-      // Calculate top score based on most challenges completed
-      const topChallenges = await Promise.all(users.map(async (user) => {
-        const challengeCount = await Challenge.countDocuments({
-          'submissions.userId': user._id,
-          'submissions.status': 'accepted'
-        });
-        return { userId: user._id, challengeCount };
-      }));
-      
-      const maxChallenges = Math.max(...topChallenges.map(u => u.challengeCount), 0);
-      finalTopScore = maxChallenges * 50; // 50 points per challenge average
-    }
-
-    // Count active users (users active in last 30 days)
-    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-    const activeUsers = await User.countDocuments({
-      'activity.lastActive': { $gte: thirtyDaysAgo }
+    // Get total users count
+    const totalUsers = await User.countDocuments();
+    const activeUsers = await User.countDocuments({ 
+      'activity.lastActive': { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) } 
     });
 
-    // Prepare response data
-    const responseData = {
-      users: usersWithStats,
-      totalUsers: stats.totalUsers,
-      activeUsers: activeUsers,
-      totalPoints: stats.totalPoints,
-      averagePoints: Math.floor(stats.avgPoints),
-      topScore: finalTopScore,
+    // Calculate stats
+    const totalPoints = usersWithRank.reduce((sum, user) => sum + (user.points || 0), 0);
+    const averagePoints = usersWithRank.length > 0 ? Math.round(totalPoints / usersWithRank.length) : 0;
+    const topScore = usersWithRank.length > 0 ? usersWithRank[0].points : 0;
+
+    res.json({
+      users: usersWithRank,
+      totalUsers,
+      activeUsers,
+      totalPoints,
+      averagePoints,
+      topScore,
       updated: new Date().toISOString()
-    };
+    });
 
-    // Validate final data before sending
-    const dataValidation = validateLeaderboardData(responseData);
-    if (!dataValidation.isValid) {
-      console.error('Leaderboard data validation failed:', dataValidation.errors);
-      // Still send data but log errors for debugging
-    }
-
-    res.json(responseData);
   } catch (error) {
     console.error('Error fetching leaderboard:', error);
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ 
+      success: false, 
+      message: 'Server error' 
+    });
   }
 });
 

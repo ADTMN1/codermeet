@@ -9,6 +9,7 @@ interface ApiResponse<T = any> {
   error?: { message: string; code?: string };
   success: boolean;
   message?: string;
+  token?: string; // Add token for login response
 }
 
 interface LoginResponse {
@@ -17,18 +18,18 @@ interface LoginResponse {
 }
 
 const API_ROUTES = {
-  login: '/api/auth/login',
-  register: '/api/auth/register',
-  logout: '/api/auth/logout',
-  me: '/api/users/me',
-  profile: '/api/users/profile',
-  profileAvatar: '/api/users/profile/avatar',
-  checkUser: '/api/users/check-user',
+  login: '/auth/login',
+  register: '/auth/register',
+  logout: '/auth/logout',
+  me: '/users/me',
+  profile: '/users/profile',
+  profileAvatar: '/users/profile/avatar',
+  checkUser: '/users/check-user',
 };
 
 // Axios instance
 const api = axios.create({
-  baseURL: 'http://localhost:5000',
+  baseURL: 'http://localhost:5000/api',
   withCredentials: true,
   headers: { 'Content-Type': 'application/json' },
   timeout: 10000,
@@ -81,10 +82,13 @@ function handleError(error: any): Error {
 // API service
 export const apiService = {
   login: async (email: string, password: string): Promise<LoginResponse> => {
-    const response = await api.post<ApiResponse<LoginResponse>>(API_ROUTES.login, { email, password });
-    const data = response.data.data!;
-    if (data.token && data.user) authService.login(data.token, data.user);
-    return data;
+    const response = await api.post<ApiResponse<User>>(API_ROUTES.login, { email, password });
+    const apiResponse = response.data;
+    const token = apiResponse.token!;
+    const user = apiResponse.data!; // Backend returns user data in 'data' field
+    
+    if (token && user) authService.login(token, user);
+    return { token, user };
   },
 
   register: async (userData: Omit<User, '_id' | 'points'> & { password: string }): Promise<User> => {

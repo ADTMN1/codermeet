@@ -234,21 +234,13 @@ const LoginForm: React.FC = () => {
 
     try {
 
-      const response = await axios.post(
-
-        `${import.meta.env.VITE_API_URL}/auth/login`,
-
-        { email, password },
-
-        { withCredentials: true }
-
-      );
+      const response = await apiService.login(email, password);
 
 
 
       // Save the token using authService
 
-    const token = response.data.token;
+    const token = response.token;
 
 
 
@@ -278,7 +270,7 @@ if (token && typeof token === 'string') {
 
     // response.data.data.token
 
-const userData = response.data.data; // <--- user info is here
+const userData = response.user; // <--- user info is here
 
 
 
@@ -294,9 +286,9 @@ const userData = response.data.data; // <--- user info is here
 
           email: userData.email || email,
 
-          avatar: userData.avatar || userData.profilePicture || userData.profileImage,
+          avatar: userData.avatar || userData.profilePicture,
 
-          profilePicture: userData.profilePicture || userData.avatar || userData.profileImage,
+          profilePicture: userData.profilePicture || userData.avatar,
 
           points: userData.points || 0,
 

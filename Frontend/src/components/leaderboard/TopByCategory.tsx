@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import apiClient from '../../utils/apiClient';
 import { FaCode, FaUsers, FaRocket, FaFire } from 'react-icons/fa';
 
 interface CategoryLeader {
@@ -33,18 +33,10 @@ const TopByCategory: React.FC = () => {
       
       // Fetch top users by different categories
       const [challengesRes, communityRes, projectsRes, streaksRes] = await Promise.all([
-        axios.get(`${API_URL}/leaderboard/top/challenges`, {
-          headers: { Authorization: `Bearer ${token}` }
-        }).catch(err => ({ data: { users: [] } })),
-        axios.get(`${API_URL}/leaderboard/top/community`, {
-          headers: { Authorization: `Bearer ${token}` }
-        }).catch(err => ({ data: { users: [] } })),
-        axios.get(`${API_URL}/leaderboard/top/projects`, {
-          headers: { Authorization: `Bearer ${token}` }
-        }).catch(err => ({ data: { users: [] } })),
-        axios.get(`${API_URL}/leaderboard/top/streaks`, {
-          headers: { Authorization: `Bearer ${token}` }
-        }).catch(err => ({ data: { users: [] } }))
+        apiClient.get('/leaderboard/top/challenges').catch(err => ({ data: { users: [] } })),
+        apiClient.get('/leaderboard/top/community').catch(err => ({ data: { users: [] } })),
+        apiClient.get('/leaderboard/top/projects').catch(err => ({ data: { users: [] } })),
+        apiClient.get('/leaderboard/top/streaks').catch(err => ({ data: { users: [] } }))
       ]);
 
       const newCategories: CategoryLeader[] = [

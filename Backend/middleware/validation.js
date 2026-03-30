@@ -135,8 +135,8 @@ function sanitizeLeaderboardParams(params) {
   
   if (params.limit) {
     const limit = parseInt(params.limit);
-    if (isNaN(limit) || limit < 1 || limit > 100) {
-      errors.push('Limit must be a number between 1 and 100');
+    if (isNaN(limit) || limit < 1 || limit > 1000) {
+      errors.push('Limit must be a number between 1 and 1000');
     } else {
       sanitized.limit = limit;
     }

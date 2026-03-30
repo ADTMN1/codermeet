@@ -124,6 +124,10 @@ const jobRoutes = require('./routes/job');
 
 
 
+const achievementsRoutes = require('./routes/achievements');
+
+
+
 
 
 
@@ -746,6 +750,8 @@ app.use("/api/weekly-challenges", weeklyChallengeRoutes);
 
 
 app.use("/api/jobs", jobRoutes); // Job routes
+
+app.use("/api/achievements", achievementsRoutes); // Achievements routes
 
 
 

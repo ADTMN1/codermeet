@@ -6,62 +6,32 @@ import React, { useState, useEffect } from 'react';
 
 
 
-import { Link, NavLink, useNavigate, useLocation } from 'react-router-dom';
+import {
+  Link,
+  NavLink,
+  useNavigate,
+  useLocation
+} from 'react-router-dom';
+
+
+
+import apiClient from '../../../utils/apiClient';
 
 
 
 import {
-
-
-
   FaHome,
-
-
-
   FaUsers,
-
-
-
   FaCode,
-
-
-
   FaProjectDiagram,
-
-
-
   FaComments,
-
-
-
   FaCog,
-
-
-
   FaSignOutAlt,
-
-
-
   FaUser,
-
-
-
   FaBars,
-
-
-
   FaBell,
-
-
-
   FaTrophy,
-
-
-
   FaChartLine
-
-
-
 } from 'react-icons/fa';
 
 
@@ -142,15 +112,7 @@ export default function Sidebar() {
 
 
 
-      const response = await axios.get(`${API_URL}/users/notifications/count`, {
-
-
-
-        headers: { Authorization: `Bearer ${token}` }
-
-
-
-      });
+      const response = await apiClient.get('/users/notifications/count');
 
 
 

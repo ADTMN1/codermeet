@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import apiClient from '../../utils/apiClient';
 import { FaTrophy, FaFire, FaStar, FaCode, FaRocket, FaGem } from 'react-icons/fa';
 
 interface Achievement {
@@ -36,7 +36,7 @@ const RecentAchievements: React.FC<RecentAchievementsProps> = ({ limit = 5 }) =>
       const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
       const token = localStorage.getItem('auth_token');
       
-      const response = await axios.get(`${API_URL}/achievements`, {
+      const response = await apiClient.get('/achievements', {
         params: { limit },
         headers: { Authorization: `Bearer ${token}` }
       });

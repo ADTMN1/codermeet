@@ -26,7 +26,7 @@ const Leaderboard: React.FC = () => {
       </div>
 
       {/* Main Leaderboard Component */}
-      <ImpressiveLeaderboard />
+      <ImpressiveLeaderboard showAllUsers={true} />
 
       {/* Additional Features Section */}
       <div className="mt-8 grid grid-cols-1 lg:grid-cols-2 gap-6">
