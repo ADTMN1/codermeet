@@ -99,6 +99,16 @@ const weeklyChallengeSchema = new mongoose.Schema({
       type: Date,
       default: Date.now
     },
+    registrationMode: {
+      type: String,
+      enum: ['solo', 'team'],
+      default: 'solo'
+    },
+    teamMembers: [{
+      name: String,
+      email: String,
+      role: String
+    }],
     lastSubmissionAt: Date
   }],
   submissions: [{

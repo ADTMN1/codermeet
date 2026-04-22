@@ -1,5 +1,7 @@
 const BusinessIdea = require('../models/businessIdea');
 const Competition = require('../models/competition');
+const Notification = require('../models/notification');
+const User = require('../models/user');
 const mongoose = require('mongoose');
 
 // Submit a new business idea
@@ -19,7 +21,7 @@ const submitBusinessIdea = async (req, res) => {
     } = req.body;
 
     const businessIdea = new BusinessIdea({
-      userId: req.user.id || req.user.userId,
+      userId: req.userProfile._id,
       userName: req.body.userName,
       title,
       description,
@@ -34,6 +36,66 @@ const submitBusinessIdea = async (req, res) => {
     });
 
     await businessIdea.save();
+
+    // Create notification for user who submitted business idea
+    const userNotification = await Notification.createNotification({
+      recipient: req.userProfile._id,
+      sender: req.userProfile._id,
+      title: 'Business Idea Submitted Successfully!',
+      message: `Your business idea "${title}" has been submitted for review. We'll notify you once it's been reviewed.`,
+      type: 'achievement',
+      metadata: {
+        businessIdeaId: businessIdea._id,
+        category: category
+      }
+    });
+
+    // Emit real-time notification to the user
+    const io = req.app.get('io');
+    if (io) {
+      const populatedNotification = await Notification.findById(userNotification._id)
+        .populate('sender', 'fullName username avatar')
+        .populate('recipient', 'fullName username avatar')
+        .exec();
+      
+      io.to(`user_${req.userProfile._id}`).emit('new-notification', populatedNotification.toJSON());
+    }
+
+    // Create notification for admins about new business idea submission
+    try {
+      const adminUsers = await User.find({ role: 'admin' }).select('_id');
+      
+      for (const admin of adminUsers) {
+        const adminNotification = await Notification.createNotification({
+          recipient: admin._id,
+          sender: req.userProfile._id,
+          title: 'New Business Idea Submission',
+          message: `A new business idea "${title}" has been submitted by ${req.body.userName}.`,
+          type: 'system',
+          metadata: {
+            businessIdeaId: businessIdea._id,
+            submittedBy: req.userProfile._id,
+            category: category
+          }
+        });
+
+        // Emit real-time notification to admin
+        const io = req.app.get('io');
+        if (io) {
+          const populatedAdminNotification = await Notification.findById(adminNotification._id)
+            .populate('sender', 'fullName username avatar')
+            .populate('recipient', 'fullName username avatar')
+            .exec();
+          
+          io.to(`user_${admin._id}`).emit('new-notification', populatedAdminNotification.toJSON());
+          console.log(`Real-time notification sent to admin ${admin._id} for business idea submission`);
+        }
+      }
+    } catch (adminError) {
+      console.error('Error creating admin notifications:', adminError);
+      // Don't fail the request if admin notifications fail
+    }
+
     res.status(201).json(businessIdea);
   } catch (error) {
     console.error('Error submitting business idea:', error);
@@ -92,7 +154,7 @@ const updateIdeaStatus = async (req, res) => {
       {
         status,
         adminNotes,
-        reviewedBy: req.user.id || req.user.userId,
+        reviewedBy: req.userProfile._id,
         reviewedAt: new Date()
       },
       { new: true }
@@ -175,11 +237,33 @@ const getActiveCompetition = async (req, res) => {
   }
 };
 
+// Delete business idea
+const deleteBusinessIdea = async (req, res) => {
+  try {
+    const ideaId = req.params.id;
+    const userId = req.userProfile._id;
+
+    const idea = await BusinessIdea.findOne({ _id: ideaId, userId: userId });
+    
+    if (!idea) {
+      return res.status(404).json({ message: 'Business idea not found or you do not have permission to delete it' });
+    }
+
+    await BusinessIdea.findByIdAndDelete(ideaId);
+    
+    res.json({ message: 'Business idea deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting business idea:', error);
+    res.status(500).json({ message: 'Failed to delete business idea' });
+  }
+};
+
 module.exports = {
   submitBusinessIdea,
   getUserBusinessIdeas,
   getAllBusinessIdeas,
   updateIdeaStatus,
   getIdeaStats,
-  getActiveCompetition
+  getActiveCompetition,
+  deleteBusinessIdea
 };

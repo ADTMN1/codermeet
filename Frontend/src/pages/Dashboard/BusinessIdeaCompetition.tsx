@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useUser } from '../../context/UserContext';
 import { toast } from 'sonner';
-import { FaLightbulb, FaArrowLeft, FaTrophy, FaCalendarAlt, FaUsers, FaCheckCircle } from 'react-icons/fa';
+import { FaLightbulb, FaArrowLeft, FaTrophy, FaCalendarAlt, FaUsers, FaCheckCircle, FaTrash } from 'react-icons/fa';
+import { API_CONFIG } from '../../config/api';
 
 interface BusinessIdea {
   _id?: string;
@@ -78,8 +79,7 @@ const BusinessIdeaCompetition: React.FC = () => {
 
   const fetchUserIdeas = async () => {
     try {
-      const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-      const response = await fetch(`${API_BASE_URL}/business-ideas/user/${user?._id}`, {
+      const response = await fetch(`${API_CONFIG.BASE_URL}/business-ideas/user/${user?._id}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
         }
@@ -136,8 +136,13 @@ const BusinessIdeaCompetition: React.FC = () => {
 
     setIsSubmitting(true);
     try {
-      const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-      const response = await fetch(`${API_BASE_URL}/api/business-ideas`, {
+      console.log('Submitting business idea with data:', {
+        ...formData,
+        userId: user?._id,
+        userName: user?.name || user?.username
+      });
+
+      const response = await fetch(`${API_CONFIG.BASE_URL}/business-ideas`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -149,6 +154,9 @@ const BusinessIdeaCompetition: React.FC = () => {
           userName: user?.name || user?.username
         })
       });
+
+      console.log('Response status:', response.status);
+      console.log('Response ok:', response.ok);
 
       if (response.ok) {
         toast.success('Business idea submitted successfully!');
@@ -167,14 +175,44 @@ const BusinessIdeaCompetition: React.FC = () => {
           additionalInfo: ''
         });
       } else {
-        const error = await response.json();
-        toast.error(error.message || 'Failed to submit idea');
+        const errorData = await response.json();
+        console.error('Error response:', errorData);
+        toast.error(errorData.message || 'Failed to submit business idea');
       }
     } catch (error) {
-      console.error('Error submitting idea:', error);
-      toast.error('Failed to submit idea. Please try again.');
+      console.error('Error submitting business idea:', error);
+      toast.error('Failed to submit business idea');
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleDeleteIdea = async (ideaId: string) => {
+    if (!confirm('Are you sure you want to delete this business idea?')) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`${API_CONFIG.BASE_URL}/business-ideas/${ideaId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+        }
+      });
+
+      if (response.ok) {
+        toast.success('Business idea deleted successfully!');
+        await fetchUserIdeas(); // Refresh the list
+        if (submittedIdeas.length <= 1) {
+          setShowForm(true); // Show form if this was the last idea
+        }
+      } else {
+        const errorData = await response.json();
+        toast.error(errorData.message || 'Failed to delete business idea');
+      }
+    } catch (error) {
+      console.error('Error deleting business idea:', error);
+      toast.error('Failed to delete business idea');
     }
   };
 
@@ -247,8 +285,19 @@ const BusinessIdeaCompetition: React.FC = () => {
               {submittedIdeas.map((idea) => (
                 <div key={idea._id} className="bg-gray-800 rounded-xl p-6 border border-gray-700">
                   <div className="flex justify-between items-start mb-3">
-                    <h3 className="text-xl font-semibold text-white">{idea.title}</h3>
-                    {getStatusBadge(idea.status)}
+                    <div className="flex-1">
+                      <h3 className="text-xl font-semibold text-white">{idea.title}</h3>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {getStatusBadge(idea.status)}
+                      <button
+                        onClick={() => handleDeleteIdea(idea._id!)}
+                        className="text-red-400 hover:text-red-300 transition-colors p-2 hover:bg-red-900/20 rounded"
+                        title="Delete idea"
+                      >
+                        <FaTrash className="text-sm" />
+                      </button>
+                    </div>
                   </div>
                   <p className="text-gray-400 mb-3 line-clamp-2">{idea.description}</p>
                   <div className="flex flex-wrap gap-2 mb-3">

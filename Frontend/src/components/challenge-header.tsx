@@ -11,7 +11,7 @@ interface ChallengeHeaderProps {
 }
 
 export function ChallengeHeader({ 
-  challengeTitle = "Build a Real-Time Chat App",
+  challengeTitle = "Build Real Project",
   challengeDifficulty = "Intermediate",
   challengePoints = 500,
   challengeType = 'weekly'

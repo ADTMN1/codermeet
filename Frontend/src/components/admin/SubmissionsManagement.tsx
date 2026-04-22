@@ -8,6 +8,7 @@ import { Textarea } from '../ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
 import { toast } from 'sonner';
 import { submissionService, Submission } from '../../services/submissionService';
+import { challengeService } from '../../services/challengeService';
 import { 
   CheckCircle, 
   XCircle, 
@@ -17,8 +18,22 @@ import {
   MessageSquare,
   Filter,
   Search,
-  Eye
+  Eye,
+  ChevronDown
 } from 'lucide-react';
+
+interface WeeklyChallenge {
+  _id: string;
+  title: string;
+  description: string;
+  category: string;
+  difficulty: string;
+  status: string;
+  weekNumber: number;
+  year: number;
+  startDate: string;
+  endDate: string;
+}
 
 interface SubmissionsManagementProps {
   challengeId?: string;
@@ -33,6 +48,9 @@ export function SubmissionsManagement({ challengeId }: SubmissionsManagementProp
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedChallenge, setSelectedChallenge] = useState<string>(challengeId || '');
+  const [weeklyChallenges, setWeeklyChallenges] = useState<WeeklyChallenge[]>([]);
+  const [challengesLoading, setChallengesLoading] = useState(false);
   const [reviewForm, setReviewForm] = useState({
     status: 'pending' as 'accepted' | 'rejected',
     score: 0,
@@ -40,22 +58,40 @@ export function SubmissionsManagement({ challengeId }: SubmissionsManagementProp
   });
 
   useEffect(() => {
-    if (challengeId) {
+    fetchWeeklyChallenges();
+  }, []);
+
+  useEffect(() => {
+    if (selectedChallenge) {
       fetchSubmissions();
     } else {
-      // If no challengeId provided, fetch all submissions across all challenges
+      // If no challenge selected, fetch all submissions across all challenges
       fetchAllSubmissions();
     }
-  }, [challengeId]);
+  }, [selectedChallenge]);
 
   useEffect(() => {
     filterSubmissions();
   }, [submissions, statusFilter, searchTerm]);
 
+  const fetchWeeklyChallenges = async () => {
+    try {
+      setChallengesLoading(true);
+      const result = await challengeService.getAllWeeklyChallenges({ limit: 100 });
+      setWeeklyChallenges(result.weeklyChallenges || []);
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to fetch weekly challenges');
+    } finally {
+      setChallengesLoading(false);
+    }
+  };
+
   const fetchSubmissions = async () => {
+    if (!selectedChallenge) return;
+    
     try {
       setLoading(true);
-      const result = await submissionService.getChallengeSubmissions(challengeId || '', statusFilter !== 'all' ? statusFilter : undefined);
+      const result = await submissionService.getChallengeSubmissions(selectedChallenge, statusFilter !== 'all' ? statusFilter : undefined);
       setSubmissions(result.data);
     } catch (error: any) {
       toast.error(error.message || 'Failed to fetch submissions');
@@ -67,7 +103,7 @@ export function SubmissionsManagement({ challengeId }: SubmissionsManagementProp
   const fetchAllSubmissions = async () => {
     try {
       setLoading(true);
-      const result = await submissionService.getAllSubmissions(statusFilter !== 'all' ? statusFilter : undefined);
+      const result = await submissionService.getAllSubmissions(statusFilter !== 'all' ? { status: statusFilter } : undefined);
       setSubmissions(result.data);
     } catch (error: any) {
       toast.error(error.message || 'Failed to fetch all submissions');
@@ -87,7 +123,7 @@ export function SubmissionsManagement({ challengeId }: SubmissionsManagementProp
       filtered = filtered.filter(sub => 
         sub.userId.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         sub.userId.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        sub.githubUrl.toLowerCase().includes(searchTerm.toLowerCase())
+        sub.githubUrl?.toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
 
@@ -105,11 +141,10 @@ export function SubmissionsManagement({ challengeId }: SubmissionsManagementProp
   };
 
   const handleSubmitReview = async () => {
-    if (!selectedSubmission || !challengeId) return;
+    if (!selectedSubmission || !selectedChallenge) return;
 
     try {
       const updatedSubmission = await submissionService.reviewSubmission(
-        challengeId,
         selectedSubmission._id,
         reviewForm
       );
@@ -167,7 +202,26 @@ export function SubmissionsManagement({ challengeId }: SubmissionsManagementProp
 
       {/* Filters */}
       <Card className="bg-slate-900/50 border-slate-700/50 p-4">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div>
+            <Label className="text-slate-300">Weekly Challenge</Label>
+            <div className="relative">
+              <select
+                value={selectedChallenge}
+                onChange={(e) => setSelectedChallenge(e.target.value)}
+                className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white appearance-none cursor-pointer"
+                disabled={challengesLoading}
+              >
+                <option value="">All Challenges</option>
+                {weeklyChallenges.map((challenge) => (
+                  <option key={challenge._id} value={challenge._id}>
+                    Week {challenge.weekNumber} - {challenge.title} ({challenge.category})
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
+            </div>
+          </div>
           <div>
             <Label className="text-slate-300">Search</Label>
             <div className="relative">
@@ -198,8 +252,8 @@ export function SubmissionsManagement({ challengeId }: SubmissionsManagementProp
           <div className="flex items-end">
             <Button
               onClick={fetchSubmissions}
-              variant="outline"
-              className="border-slate-600 text-slate-300 hover:bg-slate-800"
+              disabled={!selectedChallenge}
+              className="w-full"
             >
               <Filter className="w-4 h-4 mr-2" />
               Refresh

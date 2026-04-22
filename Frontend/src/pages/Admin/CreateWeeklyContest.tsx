@@ -415,8 +415,8 @@ const CreateWeeklyContest: React.FC = () => {
                 </label>
                 <input
                   type="number"
-                  value={formData.prizePool}
-                  onChange={(e) => handleInputChange('prizePool', parseInt(e.target.value) || 0)}
+                  value={formData.prizePool === 0 ? "" : formData.prizePool}
+                  onChange={(e) => handleInputChange('prizePool', e.target.value === '' ? 0 : parseInt(e.target.value) || 0)}
                   className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-red-500"
                   placeholder="0"
                   min="0"

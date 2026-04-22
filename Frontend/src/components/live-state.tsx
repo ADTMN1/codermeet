@@ -17,6 +17,7 @@ export function LiveStats({ challengeId, challengeType = 'weekly' }: { challenge
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
 
   console.log('🎯 LiveStats component initialized with:', { challengeId, challengeType });
+  console.log('🎯 Challenge ID type:', typeof challengeId, 'value:', challengeId);
 
   // Remove hardcoded demo data - start with zeros and fetch real data
   useEffect(() => {
@@ -83,6 +84,7 @@ export function LiveStats({ challengeId, challengeType = 'weekly' }: { challenge
         const endpoint = challengeType === 'weekly' ? 'weekly-challenges' : 'challenges';
         const url = `http://localhost:5000/api/${endpoint}/${challengeId}/stats`;
         console.log('🔍 Fetching stats from:', url);
+        console.log('🔍 Challenge ID being used:', challengeId, '(type:', typeof challengeId, ')');
         
         const response = await fetch(url);
         console.log('📡 Response status:', response.status, response.statusText);

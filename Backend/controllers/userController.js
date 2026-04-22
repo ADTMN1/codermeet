@@ -7,6 +7,9 @@ const Announcement = require("../models/announcement");
 const Comment = require("../models/comment");
 const Team = require("../models/team");
 const Notification = require("../models/notification");
+const { uploadToCloudinary } = require("../utils/cloudinary");
+const fs = require('fs');
+const path = require('path');
 
 // Get current logged-in user
 exports.me = async (req, res) => {
@@ -619,7 +622,15 @@ exports.updateProfilePicture = async (req, res) => {
       return res.status(400).json({ success: false, message: "No file uploaded" });
     }
 
-    const avatarUrl = `/uploads/avatars/${req.file.filename}`;
+    // Upload to Cloudinary using backend credentials
+    const avatarUrl = await uploadToCloudinary(req.file.path, userId);
+    
+    // Clean up the temporary file
+    try {
+      fs.unlinkSync(req.file.path);
+    } catch (cleanupError) {
+      console.warn("Warning: Could not clean up temp file:", cleanupError.message);
+    }
     
     const updatedUser = await User.findByIdAndUpdate(
       userId,
@@ -637,6 +648,15 @@ exports.updateProfilePicture = async (req, res) => {
       data: { avatar: avatarUrl, user: updatedUser }
     });
   } catch (error) {
+    // Clean up file on error
+    if (req.file && req.file.path) {
+      try {
+        fs.unlinkSync(req.file.path);
+      } catch (cleanupError) {
+        console.warn("Warning: Could not clean up temp file:", cleanupError.message);
+      }
+    }
+    
     res.status(500).json({ success: false, message: "Server error", error: error.message });
   }
 };

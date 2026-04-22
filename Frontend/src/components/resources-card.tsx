@@ -6,8 +6,25 @@ import { resourceService, Resource } from '../services/resourceService';
 import { useNavigate } from 'react-router-dom';
 import LoadingSpinner from './ui/loading-spinner';
 
-export function ResourcesCard() {
-  const [resources, setResources] = useState<Resource[]>([]);
+interface ResourcesCardProps {
+  challengeResources?: any[];
+}
+
+// Union type for both Resource and challenge resources
+type ResourceItem = Resource | { 
+  _id: string; 
+  title: string; 
+  url: string; 
+  type: string; 
+  link?: string;
+  icon?: string;
+  color?: string;
+  bgColor?: string;
+  description?: string;
+};
+
+export function ResourcesCard({ challengeResources }: ResourcesCardProps = {}) {
+  const [resources, setResources] = useState<ResourceItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
@@ -41,11 +58,19 @@ export function ResourcesCard() {
 
   // Initial fetch
   useEffect(() => {
-    fetchResources();
-  }, []);
+    if (challengeResources && challengeResources.length > 0) {
+      // Use challenge-specific resources
+      setResources(challengeResources);
+      setLoading(false);
+    } else {
+      // Fetch general resources
+      fetchResources();
+    }
+  }, [challengeResources]);
 
   // Handle resource click
-  const handleResourceClick = (link: string) => {
+  const handleResourceClick = (resource: ResourceItem) => {
+    const link = (resource as any).url || (resource as any).link;
     if (link && link !== '#') {
       window.open(link, '_blank', 'noopener,noreferrer');
     }
@@ -93,7 +118,7 @@ export function ResourcesCard() {
               return (
                 <button
                   key={resource._id}
-                  onClick={() => handleResourceClick(resource.link)}
+                  onClick={() => handleResourceClick(resource)}
                   className="w-full p-3 rounded-lg bg-slate-800/50 border border-slate-700/50 hover:border-cyan-500/50 hover:bg-slate-800 transition-all text-left group"
                 >
                   <div className="flex items-start gap-3">

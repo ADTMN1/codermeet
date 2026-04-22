@@ -45,22 +45,11 @@ export const useNotifications = () => {
 
     // Listen for new notifications
     socket.on('new-notification', (notification: Notification) => {
-      console.log('New real-time notification:', notification);
-      
       // Update notification count in sidebar
       const event = new CustomEvent('new-notification', {
         detail: notification
       });
       window.dispatchEvent(event);
-
-      // Show browser notification if permission granted
-      if (Notification.permission === 'granted') {
-        new Notification(notification.title, {
-          body: notification.message,
-          icon: '/favicon.ico',
-          tag: notification._id
-        });
-      }
     });
 
     // Handle connection errors with better logging

@@ -6,7 +6,8 @@ const {
   getAllBusinessIdeas,
   updateIdeaStatus,
   getIdeaStats,
-  getActiveCompetition
+  getActiveCompetition,
+  deleteBusinessIdea
 } = require('../controllers/businessIdeaController');
 const { authenticate, requireAdmin } = require('../middlewares/roleBasedAuth');
 
@@ -14,6 +15,7 @@ const { authenticate, requireAdmin } = require('../middlewares/roleBasedAuth');
 router.post('/', authenticate, submitBusinessIdea);
 router.get('/user/:userId', authenticate, getUserBusinessIdeas);
 router.get('/competition/active', getActiveCompetition);
+router.delete('/:id', authenticate, deleteBusinessIdea);
 
 // Admin routes
 router.get('/', authenticate, requireAdmin, getAllBusinessIdeas);

@@ -53,7 +53,18 @@ const AdminSettingsSimple: React.FC = () => {
     location: '',
     bio: '',
     joinedDate: '',
-    lastLogin: ''
+    lastLogin: '',
+    avatar: '',
+    profilePicture: '',
+    plan: '',
+    isProfessional: false,
+    primaryLanguage: '',
+    skills: [],
+    github: '',
+    linkedin: '',
+    website: '',
+    createdAt: '',
+    updatedAt: ''
   });
 
   // Load admin profile data
@@ -70,7 +81,18 @@ const AdminSettingsSimple: React.FC = () => {
           location: profile.location || '',
           bio: profile.bio || '',
           joinedDate: new Date(profile.createdAt).toLocaleDateString(),
-          lastLogin: profile.adminProfile?.lastLoginIP ? 'Just now' : 'Unknown'
+          lastLogin: profile.adminProfile?.lastLoginIP ? 'Just now' : 'Unknown',
+          avatar: profile.avatar || '',
+          profilePicture: profile.avatar || '',
+          plan: profile.plan || '',
+          isProfessional: profile.isProfessional || false,
+          primaryLanguage: profile.primaryLanguage || '',
+          skills: profile.skills || [],
+          github: profile.github || '',
+          linkedin: profile.linkedin || '',
+          website: profile.website || '',
+          createdAt: profile.createdAt || '',
+          updatedAt: profile.updatedAt || ''
         });
       } catch (error) {
         console.error('Failed to load profile:', error);
@@ -343,8 +365,16 @@ const AdminSettingsSimple: React.FC = () => {
               
               <div className="space-y-6">
                 <div className="flex items-center gap-6">
-                  <div className="w-24 h-24 bg-gradient-to-r from-red-500 to-red-700 rounded-full flex items-center justify-center shadow-lg">
-                    <User className="w-12 h-12 text-white" />
+                  <div className="w-24 h-24 bg-gradient-to-r from-red-500 to-red-700 rounded-full overflow-hidden">
+                    {(profileSettings.avatar || profileSettings.profilePicture) ? (
+                      <img 
+                        src={profileSettings.avatar || profileSettings.profilePicture} 
+                        alt={profileSettings.fullName} 
+                        className="w-full h-full object-cover" 
+                      />
+                    ) : (
+                      <User className="w-12 h-12 text-white" />
+                    )}
                   </div>
                   <div>
                     <h4 className="text-xl font-bold text-white">{profileSettings.fullName}</h4>

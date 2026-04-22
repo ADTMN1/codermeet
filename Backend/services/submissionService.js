@@ -168,7 +168,8 @@ class SubmissionService {
       
       const weeklyChallenges = await WeeklyChallenge.find({})
         .populate('submissions.user', 'fullName username avatar email')
-        .populate('submissions.reviewedBy', 'fullName username');
+        .populate('submissions.reviewedBy', 'fullName username')
+        .populate('participants.user', 'fullName username avatar email');
       
       let allSubmissions = [];
       
@@ -176,9 +177,15 @@ class SubmissionService {
         if (challenge.submissions && challenge.submissions.length > 0) {
           const challengeSubmissions = challenge.submissions.map(submission => {
             const submissionObj = submission.toObject();
+            
+            // Find the corresponding participant user for this submission
+            const participantUser = challenge.participants.find(p => 
+              p.user && p.user._id.toString() === submissionObj.user?.toString()
+            );
+            
             return {
               _id: submissionObj._id,
-              userId: submissionObj.user,
+              userId: participantUser?.user || submissionObj.user, // Use participant user as fallback
               challengeId: challenge._id,
               challengeTitle: challenge.title,
               challengeType: 'weekly',
@@ -187,6 +194,7 @@ class SubmissionService {
               status: submissionObj.status,
               submittedAt: submissionObj.submittedAt,
               githubUrl: submissionObj.githubUrl,
+              liveUrl: submissionObj.liveUrl,
               description: submissionObj.description,
               score: submissionObj.score,
               feedback: submissionObj.reviewComments,
@@ -196,6 +204,10 @@ class SubmissionService {
             };
           });
           
+          // Debug: Check if user data is populated
+          console.log('Weekly submission user data:', challengeSubmissions[0]?.userId);
+          console.log('Weekly submission structure:', JSON.stringify(challengeSubmissions[0], null, 2));
+          
           // Filter by status if provided
           const filteredSubmissions = status 
             ? challengeSubmissions.filter(sub => sub.status === status)
@@ -203,7 +215,7 @@ class SubmissionService {
           
           // Filter by userId if provided
           const userFilteredSubmissions = userId
-            ? filteredSubmissions.filter(sub => sub.userId._id.toString() === userId)
+            ? filteredSubmissions.filter(sub => sub.userId && sub.userId._id.toString() === userId)
             : filteredSubmissions;
           
           allSubmissions.push(...userFilteredSubmissions);
@@ -297,18 +309,176 @@ class SubmissionService {
    */
   async reviewSubmission(submissionId, reviewData, reviewerId) {
     try {
-      const submission = await this.Submission.findById(submissionId);
+      console.log('=== COMPREHENSIVE SUBMISSION REVIEW DEBUGGING ===');
+      console.log('1. Method called with:', { 
+        submissionId, 
+        reviewData: JSON.stringify(reviewData, null, 2), 
+        reviewerId 
+      });
+      console.log('2. Submission ID type:', typeof submissionId);
+      console.log('3. Submission ID length:', submissionId?.length);
+      console.log('4. ReviewerId type:', typeof reviewerId);
+      console.log('5. ReviewerId length:', reviewerId?.length);
+      
+      // First try to find in main Submission collection
+      console.log('6. Searching in main Submission collection...');
+      let submission = await this.Submission.findById(submissionId);
+      console.log('7. Found in main collection:', !!submission);
+      
+      // If not found in main collection, try weekly challenge submissions
+      if (!submission) {
+        console.log('8. Not found in main collection, checking weekly challenges...');
+        console.log('9. Query: { "submissions._id": "' + submissionId + '" }');
+        
+        const weeklyChallenges = await WeeklyChallenge.find({
+          'submissions._id': submissionId
+        }).populate('submissions.user', 'fullName username avatar email')
+          .populate('submissions.reviewedBy', 'fullName username');
+        
+        console.log('10. Found weekly challenges:', weeklyChallenges.length);
+        console.log('11. Weekly challenges details:', weeklyChallenges.map(c => ({
+          id: c._id.toString(),
+          title: c.title,
+          submissionCount: c.submissions?.length || 0,
+          hasSubmissions: !!c.submissions,
+          submissionsArray: c.submissions ? Array.isArray(c.submissions) : false
+        })));
+        
+        if (weeklyChallenges.length > 0) {
+          console.log('12. All submission IDs in weekly challenges:');
+          weeklyChallenges.forEach((challenge, index) => {
+            if (challenge.submissions && Array.isArray(challenge.submissions)) {
+              console.log(`   Challenge ${index + 1} (${challenge.title}):`);
+              challenge.submissions.forEach((sub, subIndex) => {
+                console.log(`     ${subIndex + 1}. ${sub._id.toString()} (${sub.status || 'no status'})`);
+              });
+            }
+          });
+        }
+        
+        for (const challenge of weeklyChallenges) {
+          console.log('13. Checking challenge:', challenge._id.toString(), 'with', challenge.submissions?.length, 'submissions');
+          
+          // Add null check for submissions array
+          if (!challenge.submissions || !Array.isArray(challenge.submissions)) {
+            console.log('13a. Challenge has no submissions array or it\'s not an array, skipping...');
+            console.log('13b. Type of submissions:', typeof challenge.submissions);
+            console.log('13c. Submissions value:', challenge.submissions);
+            continue;
+          }
+          
+          const submissionInChallenge = challenge.submissions.find(
+            sub => sub._id.toString() === submissionId
+          );
+          
+          console.log('14. Looking for submission ID:', submissionId);
+          console.log('15. Found submission in challenge:', !!submissionInChallenge);
+          
+          if (submissionInChallenge) {
+            console.log('16. Found submission in weekly challenge!');
+            console.log('17. Submission details:', {
+              id: submissionInChallenge._id.toString(),
+              status: submissionInChallenge.status,
+              score: submissionInChallenge.score,
+              user: submissionInChallenge.user?.fullName,
+              hasUser: !!submissionInChallenge.user,
+              hasReviewedBy: !!submissionInChallenge.reviewedBy
+            });
+            
+            // Update weekly challenge submission
+            const submissionIndex = challenge.submissions.findIndex(
+              sub => sub._id.toString() === submissionId
+            );
+            
+            console.log('18. Submission index in array:', submissionIndex);
+            console.log('19. Total submissions in challenge:', challenge.submissions.length);
+            
+            if (submissionIndex !== -1) {
+              console.log('20. About to update submission at index:', submissionIndex);
+              console.log('21. Current submission data:', {
+                status: challenge.submissions[submissionIndex].status,
+                score: challenge.submissions[submissionIndex].score,
+                feedback: challenge.submissions[submissionIndex].reviewComments
+              });
+              
+              // Update the submission in the weekly challenge
+              challenge.submissions[submissionIndex] = {
+                ...challenge.submissions[submissionIndex],
+                status: reviewData.status,
+                score: reviewData.score || 0,
+                reviewComments: reviewData.feedback,
+                reviewedBy: reviewerId,
+                reviewedAt: new Date(),
+                rankingCriteria: reviewData.rankingCriteria,
+                rank: reviewData.rank
+              };
+              
+              console.log('22. Updated submission data:', {
+                status: challenge.submissions[submissionIndex].status,
+                score: challenge.submissions[submissionIndex].score,
+                feedback: challenge.submissions[submissionIndex].reviewComments,
+                rankingCriteria: challenge.submissions[submissionIndex].rankingCriteria,
+                rank: challenge.submissions[submissionIndex].rank
+              });
+              
+              console.log('23. About to save weekly challenge...');
+              await challenge.save();
+              console.log('24. Successfully saved weekly challenge');
+              
+              // Format the submission to match expected structure
+              const updatedSubmission = {
+                ...challenge.submissions[submissionIndex].toObject(),
+                userId: challenge.submissions[submissionIndex].user,
+                reviewedBy: challenge.submissions[submissionIndex].reviewedBy,
+                challengeId: challenge._id,
+                challengeTitle: challenge.title,
+                challengeCategory: challenge.category,
+                challengeDifficulty: challenge.difficulty,
+                challengeType: 'weekly'
+              };
+              
+              console.log('25. Formatted submission for response:', {
+                id: updatedSubmission._id?.toString(),
+                status: updatedSubmission.status,
+                score: updatedSubmission.score,
+                hasUserId: !!updatedSubmission.userId,
+                hasChallengeId: !!updatedSubmission.challengeId
+              });
+              
+              // Send notification to user
+              console.log('26. About to send notification to user:', updatedSubmission.userId);
+              await this._sendReviewNotification(updatedSubmission.userId, reviewData);
+              console.log('27. Notification sent successfully');
+              
+              console.log('=== SUBMISSION REVIEW SUCCESS ===');
+              return {
+                success: true,
+                data: updatedSubmission,
+                message: 'Submission reviewed successfully'
+              };
+            } else {
+              console.log('28. ERROR: Submission index not found in array');
+            }
+          } else {
+            console.log('29. Submission not found in this challenge');
+          }
+        }
+        
+        console.log('30. Submission not found in any weekly challenge');
+      } else {
+        console.log('31. Found submission in main collection, proceeding with main collection update');
+      }
+      
+      console.log('32. Final submission check - submission exists:', !!submission);
+      console.log('33. Final submission ID:', submission?._id?.toString());
       
       if (!submission) {
+        console.log('34. THROWING ERROR: Submission not found anywhere');
         throw new Error('Submission not found');
       }
 
-      // Allow re-reviewing submissions (commenting out the restriction)
-      // if (submission.status === 'approved' || submission.status === 'rejected') {
-      //   throw new Error('Submission has already been reviewed');
-      // }
-
-      // Add review to history and update submission directly
+      // Update main submission collection
+      console.log('35. Updating main submission collection...');
       const updatedSubmission = await this.Submission.findByIdAndUpdate(
         submissionId,
         {
@@ -328,32 +498,51 @@ class SubmissionService {
             score: reviewData.score || 0,
             reviewedBy: reviewerId,
             reviewedAt: new Date(),
-            lastUpdated: new Date()
+            lastUpdated: new Date(),
+            rankingCriteria: reviewData.rankingCriteria,
+            rank: reviewData.rank
           }
         },
         { new: true }
       );
+      
+      console.log('36. Main submission updated successfully');
 
       // Update user points if approved
       if (reviewData.status === 'approved') {
+        console.log('37. Updating user points...');
         await this._updateUserPoints(submission.userId, reviewData.score || 0);
+        console.log('38. User points updated');
       }
 
       // Send notification to user
+      console.log('39. Sending notification to user...');
       await this._sendReviewNotification(submission.userId, reviewData);
+      console.log('40. Notification sent');
 
       const finalSubmission = await this.Submission.findById(submissionId)
         .populate('userId', 'fullName username avatar email')
         .populate('challengeId', 'title category difficulty')
         .populate('reviewedBy', 'fullName username');
 
+      console.log('41. Final submission retrieved:', {
+        id: finalSubmission._id?.toString(),
+        status: finalSubmission.status,
+        score: finalSubmission.score
+      });
+
+      console.log('=== SUBMISSION REVIEW SUCCESS (MAIN COLLECTION) ===');
       return {
         success: true,
         data: finalSubmission,
         message: 'Submission reviewed successfully'
       };
     } catch (error) {
-      console.error('Error reviewing submission:', error);
+      console.error('=== SUBMISSION REVIEW ERROR ===');
+      console.error('Error type:', error.constructor.name);
+      console.error('Error message:', error.message);
+      console.error('Error stack:', error.stack);
+      console.error('=== END ERROR DEBUGGING ===');
       throw new Error(error.message || 'Failed to review submission');
     }
   }

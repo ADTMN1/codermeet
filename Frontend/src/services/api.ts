@@ -110,7 +110,9 @@ export const apiService = {
 
   updateProfile: async (data: Partial<User> | FormData): Promise<User> => {
     const config: AxiosRequestConfig = { headers: {} };
-    if (data instanceof FormData) config.headers['Content-Type'] = 'multipart/form-data';
+    if (data instanceof FormData && config.headers) {
+      config.headers['Content-Type'] = 'multipart/form-data';
+    }
 
     const response = await api.put<ApiResponse<{ user: User }>>(API_ROUTES.profile, data, config);
     const userData = response.data.data?.user;
@@ -130,6 +132,7 @@ export const apiService = {
       throw new Error('Image size must be less than 5MB');
     }
 
+    // Upload file directly to backend (backend will handle Cloudinary)
     const formData = new FormData();
     formData.append('avatar', file);
 

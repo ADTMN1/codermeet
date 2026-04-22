@@ -1,5 +1,6 @@
 const WeeklyChallenge = require('../models/weeklyChallenge');
 const mongoose = require('mongoose');
+const { validateChallengeDates } = require('../middleware/challengeDateValidation');
 
 // Lazy load User to avoid circular dependency
 const getUser = () => require('../models/user');
@@ -203,7 +204,9 @@ exports.getWeeklyChallengeById = async (req, res) => {
 };
 
 // Create weekly challenge
-exports.createWeeklyChallenge = async (req, res) => {
+exports.createWeeklyChallenge = [
+  validateChallengeDates,
+  async (req, res) => {
   try {
     console.log('🔍 Debug - createWeeklyChallenge called');
     console.log('🔍 Debug - req.userProfile:', req.userProfile);
@@ -303,7 +306,8 @@ exports.createWeeklyChallenge = async (req, res) => {
       error: error.message
     });
   }
-};
+  }
+];
 
 // Update weekly challenge
 exports.updateWeeklyChallenge = async (req, res) => {
@@ -396,6 +400,7 @@ exports.joinWeeklyChallenge = async (req, res) => {
   try {
     const { id } = req.params;
     const userId = req.userProfile._id;
+    const { registrationMode = 'solo', teamMembers = [] } = req.body;
 
     const weeklyChallenge = await WeeklyChallenge.findById(id);
 
@@ -435,11 +440,19 @@ exports.joinWeeklyChallenge = async (req, res) => {
       });
     }
 
-    // Add participant
-    weeklyChallenge.participants.push({
+    // Add participant with registration mode and team members
+    const participantData = {
       user: userId,
-      joinedAt: new Date()
-    });
+      joinedAt: new Date(),
+      registrationMode: registrationMode
+    };
+
+    // Add team members if registering as a team
+    if (registrationMode === 'team' && teamMembers.length > 0) {
+      participantData.teamMembers = teamMembers;
+    }
+
+    weeklyChallenge.participants.push(participantData);
     weeklyChallenge.currentParticipants += 1;
 
     await weeklyChallenge.save();
@@ -450,14 +463,20 @@ exports.joinWeeklyChallenge = async (req, res) => {
       io.emit('participant-joined', {
         challengeId: weeklyChallenge._id,
         count: weeklyChallenge.participants.length,
+        teams: weeklyChallenge.participants.filter(p => p.registrationMode === 'team').length,
         timestamp: new Date()
       });
-      console.log('📡 Live stats update emitted for participant join:', weeklyChallenge.participants.length);
+      console.log('📡 Live stats update emitted for participant join:', {
+        participants: weeklyChallenge.participants.length,
+        teams: weeklyChallenge.participants.filter(p => p.registrationMode === 'team').length
+      });
     }
 
     res.status(200).json({
       success: true,
-      message: 'Successfully joined the weekly challenge',
+      message: registrationMode === 'team' 
+        ? `Successfully registered your team of ${teamMembers.length} members for the weekly challenge`
+        : 'Successfully joined weekly challenge',
       data: weeklyChallenge
     });
   } catch (error) {
@@ -968,10 +987,11 @@ exports.getWeeklyChallengeByIdStats = async (req, res) => {
 
     const stats = {
       participants: challenge.participants?.length || 0,
-      teams: 0, // Weekly challenges don't have teams, always return 0
+      teams: challenge.participants?.filter(p => p.registrationMode === 'team').length || 0,
       submissions: challenge.submissions?.length || 0,
       title: challenge.title,
-      status: challenge.status
+      status: challenge.status,
+      lastUpdated: new Date()
     };
 
     res.status(200).json({

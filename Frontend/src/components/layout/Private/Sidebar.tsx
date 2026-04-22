@@ -177,17 +177,8 @@ export default function Sidebar() {
 
 
       const handleNewNotification = () => {
-
-
-
         setUnreadCount(prev => prev + 1);
-
-
-
         fetchUnreadCount(); // Refresh count from server
-
-
-
       };
 
 
@@ -249,6 +240,16 @@ export default function Sidebar() {
 
 
   }, [user?._id]);
+
+  // Add test function to verify real-time notifications
+  (window as any).testRealTimeNotifications = () => {
+    console.log('=== TESTING REAL-TIME NOTIFICATIONS ===');
+    console.log('Current unreadCount:', unreadCount);
+    console.log('Triggering new-notification event...');
+    window.dispatchEvent(new CustomEvent('new-notification'));
+    console.log('Event dispatched. Badge should update in real-time!');
+    console.log('=== TEST COMPLETE ===');
+  };
 
 
 

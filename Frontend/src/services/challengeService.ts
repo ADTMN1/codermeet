@@ -288,7 +288,7 @@ export const challengeService = {
     difficulty?: string;
     year?: number;
     search?: string;
-  }): Promise<{ data: any[]; pagination: any }> => {
+  }): Promise<{ weeklyChallenges: any[]; pagination: any }> => {
     const response = await axios.get(`${API_URL}/weekly-challenges`, {
       params,
       headers: getAuthHeaders(),

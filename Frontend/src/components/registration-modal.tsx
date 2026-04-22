@@ -89,13 +89,27 @@ export function RegistrationModal({
     }
 
     try {
+      // Prepare registration data
+      const registrationData: {
+        registrationMode: 'solo' | 'team';
+        teamMembers?: TeamMember[];
+      } = {
+        registrationMode: mode
+      };
+
+      // Add team members if registering as a team
+      if (mode === 'team') {
+        registrationData.teamMembers = teamMembers;
+      }
+
       // Call the registration API
       const response = await fetch(`${API_CONFIG.BASE_URL}/weekly-challenges/${challengeId}/join`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': localStorage.getItem('auth_token') ? `Bearer ${localStorage.getItem('auth_token')}` : ''
-        }
+        },
+        body: JSON.stringify(registrationData)
       });
 
       const data = await response.json();

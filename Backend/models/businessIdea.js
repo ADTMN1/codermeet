@@ -48,7 +48,8 @@ const businessIdeaSchema = new mongoose.Schema({
   },
   teamSize: {
     type: String,
-    enum: ['Just Me', '2-3 People', '4-5 People', '6-10 People', '11+ People']
+    enum: ['Just Me', '2-3 People', '4-5 People', '6-10 People', '11+ People', ''],
+    default: ''
   },
   currentStage: {
     type: String,
@@ -98,6 +99,6 @@ const businessIdeaSchema = new mongoose.Schema({
 businessIdeaSchema.index({ userId: 1 });
 businessIdeaSchema.index({ status: 1 });
 businessIdeaSchema.index({ category: 1 });
-businessIdeaSchema.index({ submittedAt: -1 });
+businessIdeaSchema.index({ createdAt: -1 });
 
 module.exports = mongoose.model('BusinessIdea', businessIdeaSchema);

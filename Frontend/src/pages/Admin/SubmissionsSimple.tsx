@@ -28,9 +28,17 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../componen
 const SubmissionsSimple: React.FC = () => {
   const navigate = useNavigate();
   const [challenges, setChallenges] = useState<Challenge[]>([]);
+  const [weeklyChallenges, setWeeklyChallenges] = useState<any[]>([]);
   const [selectedChallengeForSubmissions, setSelectedChallengeForSubmissions] = useState<string | null>(null);
+  const [selectedChallengeType, setSelectedChallengeType] = useState<string>('all');
   const [loading, setLoading] = useState(true);
   const [submissions, setSubmissions] = useState<any[]>([]);
+  const [stats, setStats] = useState({
+    totalSubmissions: 0,
+    pendingSubmissions: 0,
+    acceptedSubmissions: 0,
+    rejectedSubmissions: 0
+  });
   const [selectedSubmission, setSelectedSubmission] = useState<any | null>(null);
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [rankingForm, setRankingForm] = useState({
@@ -55,14 +63,132 @@ const SubmissionsSimple: React.FC = () => {
     return getValue(criteria.codeQuality) + getValue(criteria.functionality) + getValue(criteria.creativity) + getValue(criteria.documentation);
   };
 
-  // Update score whenever ranking criteria changes
+  // Auto-calculate rank based on score (simplified - will be overridden by relative ranking)
+  const calculateRank = (score: number) => {
+    if (score >= 95) return '1st';
+    if (score >= 85) return '2nd';
+    if (score >= 75) return '3rd';
+    if (score >= 65) return '4th';
+    if (score >= 55) return '5th';
+    if (score >= 45) return '6th';
+    if (score >= 35) return '7th';
+    if (score >= 25) return '8th';
+    if (score >= 15) return '9th';
+    if (score >= 5) return '10th';
+    return 'Honorable Mention';
+  };
+
+  // Calculate relative ranking for all submissions of the same challenge
+  const calculateRelativeRanks = (allSubmissions: any[], currentSubmissionId: string) => {
+    // Get all submissions for the same challenge with scores
+    const scoredSubmissions = allSubmissions.filter(sub => 
+      sub.challengeId === selectedSubmission?.challengeId && 
+      (sub.score > 0 || sub._id === currentSubmissionId)
+    );
+
+    // Sort by score (descending)
+    const sortedSubmissions = [...scoredSubmissions].sort((a, b) => b.score - a.score);
+
+    // Assign ranks
+    const rankedSubmissions = sortedSubmissions.map((sub, index) => {
+      let rank;
+      if (index === 0) rank = '1st';
+      else if (index === 1) rank = '2nd';
+      else if (index === 2) rank = '3rd';
+      else if (index === 3) rank = '4th';
+      else if (index === 4) rank = '5th';
+      else if (index === 5) rank = '6th';
+      else if (index === 6) rank = '7th';
+      else if (index === 7) rank = '8th';
+      else if (index === 8) rank = '9th';
+      else if (index === 9) rank = '10th';
+      else rank = 'Honorable Mention';
+
+      return { ...sub, rank };
+    });
+
+    return rankedSubmissions;
+  };
+
+  // Update all submission ranks in the UI after scoring
+  const updateAllSubmissionRanks = async (updatedSubmission: any) => {
+    try {
+      console.log('Updating ranks for submission:', updatedSubmission);
+      
+      // Get all submissions for the same challenge
+      const challengeSubmissions = submissions.filter(sub => 
+        sub.challengeId === selectedSubmission?.challengeId
+      );
+
+      console.log('Challenge submissions before update:', challengeSubmissions);
+
+      // Calculate new relative ranks
+      const rankedSubmissions = calculateRelativeRanks(challengeSubmissions, updatedSubmission._id);
+
+      console.log('Ranked submissions after calculation:', rankedSubmissions);
+
+      // Update the submissions state with new ranks, preserving all other data
+      setSubmissions(prevSubmissions => 
+        prevSubmissions.map(sub => {
+          const rankedSub = rankedSubmissions.find(r => r._id === sub._id);
+          if (rankedSub) {
+            // Preserve all existing data, only update rank
+            return { 
+              ...sub, 
+              rank: rankedSub.rank,
+              // Ensure user data is preserved
+              userId: sub.userId,
+              user: sub.user,
+              challenge: sub.challenge
+            };
+          }
+          return sub;
+        })
+      );
+
+      console.log('Updated ranks for challenge submissions:', rankedSubmissions);
+    } catch (error) {
+      console.error('Error updating ranks:', error);
+    }
+  };
+
+  // Refresh submissions data to fix user information
+  const refreshSubmissionsData = async () => {
+    try {
+      console.log('Refreshing submissions data...');
+      await fetchSubmissions(selectedChallengeForSubmissions || undefined, selectedChallengeType);
+      console.log('Submissions data refreshed');
+    } catch (error) {
+      console.error('Error refreshing submissions:', error);
+    }
+  };
+
+  // Add refresh button to the stats section
+  const addRefreshButton = () => {
+    return (
+      <Button
+        onClick={refreshSubmissionsData}
+        variant="outline"
+        className="border-gray-600 text-gray-300 hover:bg-gray-800"
+        title="Refresh submissions data"
+      >
+        <Clock className="w-4 h-4 mr-2" />
+        Refresh Data
+      </Button>
+    );
+  };
   useEffect(() => {
     const newScore = calculateScore(rankingForm.rankingCriteria);
-    setRankingForm(prev => ({ ...prev, score: newScore }));
+    const newRank = calculateRank(newScore);
+    setRankingForm(prev => ({ 
+      ...prev, 
+      score: newScore,
+      rank: newRank
+    }));
   }, [rankingForm.rankingCriteria]);
 
   useEffect(() => {
-    fetchChallenges();
+    fetchAllChallenges();
   }, []);
 
   const handleSubmitRanking = async () => {
@@ -134,6 +260,9 @@ const SubmissionsSimple: React.FC = () => {
       );
 
       console.log('Ranking submitted successfully:', updatedSubmission);
+
+      // Update relative rankings for all submissions of this challenge
+      await updateAllSubmissionRanks(updatedSubmission);
 
       // Show success message
       const message = rankingForm.status === 'accepted' 
@@ -216,6 +345,9 @@ const SubmissionsSimple: React.FC = () => {
   };
 
   const handleViewSubmission = (submission: any) => {
+    console.log('Opening submission with data:', submission);
+    console.log('All submission keys:', Object.keys(submission));
+    console.log('Submission structure:', JSON.stringify(submission, null, 2));
     setSelectedSubmission(submission);
     setRankingForm({
       status: submission.status === 'pending' ? 'accepted' : submission.status as 'accepted' | 'rejected',
@@ -232,11 +364,20 @@ const SubmissionsSimple: React.FC = () => {
     setViewDialogOpen(true);
   };
 
-  const fetchChallenges = async () => {
+  const fetchAllChallenges = async () => {
     try {
       setLoading(true);
+      
+      // Fetch regular challenges
       const challengesData = await challengeService.getAllChallenges({ limit: 100 });
-      setChallenges(challengesData?.data?.challenges || []);
+      const regularChallenges = challengesData?.data?.challenges || [];
+      
+      // Fetch weekly challenges
+      const weeklyData = await challengeService.getAllWeeklyChallenges({ limit: 100 });
+      const weeklyChallengesList = weeklyData?.weeklyChallenges || [];
+      
+      setChallenges(regularChallenges);
+      setWeeklyChallenges(weeklyChallengesList);
     } catch (error) {
       console.error('Failed to fetch challenges:', error);
     } finally {
@@ -244,44 +385,74 @@ const SubmissionsSimple: React.FC = () => {
     }
   };
 
-  const fetchSubmissions = async (challengeId?: string) => {
+  const fetchSubmissions = async (challengeId?: string, challengeType?: string) => {
     try {
+      let allSubmissions: any[] = [];
+      
       if (challengeId) {
         // Fetch submissions for a specific challenge
         const submissionsData = await submissionService.getChallengeSubmissions(challengeId);
-        const challengeDetails = challenges.find(c => c._id === challengeId);
+        const challengeDetails = [...challenges, ...weeklyChallenges].find(c => c._id === challengeId);
+        
+        console.log('Raw submissions data:', submissionsData);
         
         // Merge challenge details into submissions
-        const submissionsWithChallenge = (submissionsData?.data || []).map(submission => ({
+        allSubmissions = (submissionsData?.data || []).map(submission => ({
           ...submission,
           challenge: challengeDetails
         }));
+      } else if (challengeType && challengeType !== 'all') {
+        // Fetch submissions by challenge type
+        const allSubmissionsData = await submissionService.getAllSubmissions({ challengeType });
+        allSubmissions = allSubmissionsData?.data || [];
         
-        setSubmissions(submissionsWithChallenge);
-      } else {
-        // Fetch all submissions across all challenges using the proper submission service
-        const allSubmissionsData = await submissionService.getAllSubmissions();
-        const allSubmissions = allSubmissionsData?.data || [];
+        console.log('Raw submissions data by type:', allSubmissionsData);
         
-        // Merge challenge details into submissions
-        const submissionsWithChallenge = allSubmissions.map(submission => {
-          const challengeDetails = challenges.find(c => c._id === submission.challengeId);
+        // Merge challenge details
+        allSubmissions = allSubmissions.map(submission => {
+          const challengeDetails = [...challenges, ...weeklyChallenges].find(c => c._id === submission.challengeId);
           return {
             ...submission,
             challenge: challengeDetails
           };
         });
+      } else {
+        // Fetch all submissions across all challenges
+        const allSubmissionsData = await submissionService.getAllSubmissions();
+        allSubmissions = allSubmissionsData?.data || [];
         
-        setSubmissions(submissionsWithChallenge);
+        console.log('All raw submissions data:', allSubmissionsData);
+        
+        // Merge challenge details
+        allSubmissions = allSubmissions.map(submission => {
+          const challengeDetails = [...challenges, ...weeklyChallenges].find(c => c._id === submission.challengeId);
+          return {
+            ...submission,
+            challenge: challengeDetails
+          };
+        });
       }
+      
+      console.log('Final processed submissions:', allSubmissions);
+      setSubmissions(allSubmissions);
+      
+      // Update stats
+      const newStats = {
+        totalSubmissions: allSubmissions.length,
+        pendingSubmissions: allSubmissions.filter(s => s.status === 'pending').length,
+        acceptedSubmissions: allSubmissions.filter(s => s.status === 'accepted').length,
+        rejectedSubmissions: allSubmissions.filter(s => s.status === 'rejected').length
+      };
+      setStats(newStats);
+      
     } catch (error) {
       console.error('Failed to fetch submissions:', error);
     }
   };
 
   useEffect(() => {
-    fetchSubmissions(selectedChallengeForSubmissions || undefined);
-  }, [selectedChallengeForSubmissions, challenges]);
+    fetchSubmissions(selectedChallengeForSubmissions || undefined, selectedChallengeType);
+  }, [selectedChallengeForSubmissions, selectedChallengeType, challenges, weeklyChallenges]);
 
   if (loading) {
     return (
@@ -291,10 +462,7 @@ const SubmissionsSimple: React.FC = () => {
     );
   }
 
-  const totalSubmissions = submissions.length;
-  const pendingSubmissions = submissions.filter(s => s.status === 'pending' || s.status === 'under_review').length;
-  const approvedSubmissions = submissions.filter(s => s.status === 'approved' || s.status === 'reviewed').length;
-  const rejectedSubmissions = submissions.filter(s => s.status === 'rejected').length;
+  // Remove duplicate stats calculation since we now use the stats state
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -327,9 +495,20 @@ const SubmissionsSimple: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Page Header */}
-      <div>
-        <h2 className="text-2xl font-bold text-white mb-2">Code Review</h2>
-        <p className="text-gray-400">Review and manage challenge submissions</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold text-white mb-2">Code Review</h2>
+          <p className="text-gray-400">Review and manage challenge submissions</p>
+        </div>
+        <Button
+          onClick={refreshSubmissionsData}
+          variant="outline"
+          className="border-gray-600 text-gray-300 hover:bg-gray-800"
+          title="Refresh submissions data to fix user information"
+        >
+          <Clock className="w-4 h-4 mr-2" />
+          Refresh Data
+        </Button>
       </div>
 
       {/* Stats Overview */}
@@ -343,7 +522,7 @@ const SubmissionsSimple: React.FC = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-blue-200 text-sm font-medium">Total Submissions</p>
-              <p className="text-2xl font-bold text-white">{totalSubmissions}</p>
+              <p className="text-2xl font-bold text-white">{stats.totalSubmissions}</p>
             </div>
             <FileText className="w-8 h-8 text-blue-300" />
           </div>
@@ -358,7 +537,7 @@ const SubmissionsSimple: React.FC = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-green-200 text-sm font-medium">Pending Review</p>
-              <p className="text-2xl font-bold text-white">{pendingSubmissions}</p>
+              <p className="text-2xl font-bold text-white">{stats.pendingSubmissions}</p>
             </div>
             <Clock className="w-8 h-8 text-green-300" />
           </div>
@@ -373,7 +552,7 @@ const SubmissionsSimple: React.FC = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-purple-200 text-sm font-medium">Approved</p>
-              <p className="text-2xl font-bold text-white">{approvedSubmissions}</p>
+              <p className="text-2xl font-bold text-white">{stats.acceptedSubmissions}</p>
             </div>
             <CheckCircle className="w-8 h-8 text-purple-300" />
           </div>
@@ -388,7 +567,7 @@ const SubmissionsSimple: React.FC = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-red-200 text-sm font-medium">Rejected</p>
-              <p className="text-2xl font-bold text-white">{rejectedSubmissions}</p>
+              <p className="text-2xl font-bold text-white">{stats.rejectedSubmissions}</p>
             </div>
             <XCircle className="w-8 h-8 text-red-300" />
           </div>
@@ -397,29 +576,91 @@ const SubmissionsSimple: React.FC = () => {
 
       {/* Challenge Selector */}
       <Card className="bg-gray-900 border-gray-800 p-6">
-        <div className="flex items-center gap-4">
-          <div className="flex-1">
-             <select
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <Label className="text-gray-300 text-sm font-medium mb-2 block">Challenge Type</Label>
+            <select
+              value={selectedChallengeType}
+              onChange={(e) => {
+                setSelectedChallengeType(e.target.value);
+                setSelectedChallengeForSubmissions(null); // Reset specific challenge when type changes
+              }}
+              className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-red-500"
+            >
+              <option value="all">All Challenge Types</option>
+              <option value="regular">Regular Challenges</option>
+              <option value="weekly">Weekly Challenges</option>
+              <option value="daily">Daily Challenges</option>
+              <option value="business">Business Ideas</option>
+              <option value="mentorship">Mentorship</option>
+              <option value="hackathon">Hackathon</option>
+              <option value="competition">Competition</option>
+            </select>
+          </div>
+          <div>
+            <Label className="text-gray-300 text-sm font-medium mb-2 block">Specific Challenge</Label>
+            <select
               value={selectedChallengeForSubmissions || ''}
               onChange={(e) => setSelectedChallengeForSubmissions(e.target.value || null)}
               className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-red-500"
+              disabled={selectedChallengeType !== 'all' && selectedChallengeType !== 'regular' && selectedChallengeType !== 'weekly'}
             >
               <option value="">All Challenges</option>
-              {challenges.map((challenge) => (
-                <option key={challenge._id} value={challenge._id}>
-                  {challenge.title} ({challenge.status})
-                </option>
-              ))}
+              {selectedChallengeType === 'all' || selectedChallengeType === 'regular' ? (
+                <>
+                  <optgroup label="Regular Challenges">
+                    {challenges.map((challenge) => (
+                      <option key={challenge._id} value={challenge._id}>
+                        {challenge.title} ({challenge.status})
+                      </option>
+                    ))}
+                  </optgroup>
+                </>
+              ) : null}
+              {selectedChallengeType === 'all' || selectedChallengeType === 'weekly' ? (
+                <>
+                  <optgroup label="Weekly Challenges">
+                    {weeklyChallenges.map((challenge) => (
+                      <option key={challenge._id} value={challenge._id}>
+                        Week {challenge.weekNumber} - {challenge.title} ({challenge.category})
+                      </option>
+                    ))}
+                  </optgroup>
+                </>
+              ) : null}
             </select>
           </div>
           <div className="flex items-end">
             <Button
-              onClick={() => setSelectedChallengeForSubmissions(null)}
+              onClick={() => {
+                setSelectedChallengeForSubmissions(null);
+                setSelectedChallengeType('all');
+              }}
               variant="outline"
-              className="border-gray-600 text-gray-300 hover:bg-gray-800"
+              className="border-gray-600 text-gray-300 hover:bg-gray-800 w-full"
             >
-              Clear Filter
+              Clear All Filters
             </Button>
+          </div>
+        </div>
+        <div className="mt-4 flex items-center justify-between">
+          <div className="text-sm text-gray-400">
+            Showing: <span className="text-white font-medium">
+              {selectedChallengeType === 'all' ? 'All Challenge Types' : 
+               selectedChallengeType === 'regular' ? 'Regular Challenges' :
+               selectedChallengeType === 'weekly' ? 'Weekly Challenges' :
+               selectedChallengeType.charAt(0).toUpperCase() + selectedChallengeType.slice(1) + ' Challenges'}
+            </span>
+            {selectedChallengeForSubmissions && (
+              <span className="ml-2">
+                → <span className="text-white font-medium">
+                  {[...challenges, ...weeklyChallenges].find(c => c._id === selectedChallengeForSubmissions)?.title || 'Selected Challenge'}
+                </span>
+              </span>
+            )}
+          </div>
+          <div className="text-sm text-gray-400">
+            Total: <span className="text-white font-medium">{stats.totalSubmissions} submissions</span>
           </div>
         </div>
       </Card>
@@ -432,11 +673,67 @@ const SubmissionsSimple: React.FC = () => {
             {submissions.map((submission) => (
               <div key={submission._id} className="flex items-center justify-between p-4 bg-gray-800 rounded-lg border border-gray-700">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
-                    <User className="w-5 h-5 text-white" />
+                  <div className="w-10 h-10 rounded-full bg-gray-700 overflow-hidden flex items-center justify-center">
+                    {(() => {
+                      const avatar = submission.userId?.avatar || 
+                                   submission.user?.avatar ||
+                                   // Extract from challenge participants for weekly challenges
+                                   (submission.challenge?.participants?.find((p: any) => 
+                                     p.user && (
+                                       submission.challenge?.submissions?.find((s: any) => 
+                                         s._id === submission._id && s.user === p.user._id
+                                       )
+                                     )
+                                   )?.user?.avatar) ||
+                                   // Fallback to first participant
+                                   submission.challenge?.participants?.[0]?.user?.avatar;
+                      return avatar ? (
+                        <img 
+                          src={avatar} 
+                          alt={(() => {
+                            const userName = submission.userId?.fullName || 
+                                           submission.user?.fullName || 
+                                           submission.challenge?.participants?.[0]?.user?.fullName ||
+                                           'User';
+                            return userName;
+                          })()} 
+                          className="w-full h-full object-cover" 
+                        />
+                      ) : (
+                        <User className="w-5 h-5 text-white" />
+                      );
+                    })()}
                   </div>
                   <div>
-                    <p className="text-white font-medium">{submission.userId?.fullName || submission.user?.fullName || 'Unknown User'}</p>
+                    <p className="text-white font-medium">
+                      {(() => {
+                        // Try multiple possible user data locations
+                        const userName = submission.userId?.fullName || 
+                                       submission.user?.fullName || 
+                                       submission.participant?.fullName ||
+                                       submission.submittedBy?.fullName ||
+                                       // Extract from challenge participants for weekly challenges
+                                       (submission.challenge?.participants?.find((p: any) => 
+                                         p.user && (
+                                           submission.challenge?.submissions?.find((s: any) => 
+                                             s._id === submission._id && s.user === p.user._id
+                                           )
+                                         )
+                                       )?.user?.fullName) ||
+                                       // Fallback to first participant if submission user match not found
+                                       submission.challenge?.participants?.[0]?.user?.fullName ||
+                                       'Unknown User';
+                        console.log('User name options:', {
+                          'userId.fullName': submission.userId?.fullName,
+                          'user.fullName': submission.user?.fullName,
+                          'participant.fullName': submission.participant?.fullName,
+                          'submittedBy.fullName': submission.submittedBy?.fullName,
+                          'challenge.participants[0].user.fullName': submission.challenge?.participants?.[0]?.user?.fullName,
+                          'final': userName
+                        });
+                        return userName;
+                      })()}
+                    </p>
                     <p className="text-gray-400 text-sm">
                       {submission.challenge?.title || 
                        `${submission.challengeType?.charAt(0).toUpperCase() + submission.challengeType?.slice(1) || 'Unknown'} Challenge` ||
@@ -449,6 +746,14 @@ const SubmissionsSimple: React.FC = () => {
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
+                  {/* Rank Badge */}
+                  {submission.rank && (
+                    <Badge className="bg-purple-500/20 text-purple-300 border-purple-500/30">
+                      <Trophy className="w-3 h-3 mr-1" />
+                      {submission.rank}
+                    </Badge>
+                  )}
+                  
                   <span className={`px-3 py-1 rounded-full text-xs font-medium ${
                     submission.status === 'approved' ? 'bg-green-500/20 text-green-300 border border-green-500/30' :
                     submission.status === 'rejected' ? 'bg-red-500/20 text-red-300 border border-red-500/30' :
@@ -520,59 +825,65 @@ const SubmissionsSimple: React.FC = () => {
               <div className="p-4 bg-gray-800/50 rounded-lg">
                 <h3 className="text-lg font-semibold text-white mb-3">Submission Information</h3>
                 <div className="space-y-3">
+                  {/* GitHub URL */}
                   <div>
                     <p className="text-sm text-gray-400">GitHub Repository</p>
-                    <a
-                      href={selectedSubmission.content?.githubUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-blue-400 hover:text-blue-300 underline flex items-center gap-2"
-                    >
-                      <ExternalLink className="w-4 h-4" />
-                      {selectedSubmission.content?.githubUrl}
-                    </a>
-                  </div>
-
-                  {/* Live URL for weekly challenges */}
-                  {selectedSubmission.content?.liveUrl && (
-                    <div>
-                      <p className="text-sm text-gray-400">Live Demo URL</p>
+                    {selectedSubmission?.githubUrl ? (
                       <a
-                        href={selectedSubmission.content.liveUrl}
+                        href={selectedSubmission.githubUrl}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-blue-400 hover:text-blue-300 underline flex items-center gap-2"
                       >
                         <ExternalLink className="w-4 h-4" />
-                        {selectedSubmission.content.liveUrl}
+                        {selectedSubmission.githubUrl}
                       </a>
-                    </div>
-                  )}
+                    ) : (
+                      <p className="text-gray-500">No GitHub URL provided</p>
+                    )}
+                  </div>
 
-                  {/* File Upload Information */}
-                  {selectedSubmission.content?.files && selectedSubmission.content.files.length > 0 && (
-                    <div>
-                      <p className="text-sm text-gray-400">Uploaded Files</p>
-                      <div className="space-y-2">
-                        {selectedSubmission.content.files.map((file: any, index: number) => (
-                          <div key={index} className="flex items-center gap-2 p-2 bg-gray-700/50 rounded-lg">
-                            <FileText className="w-4 h-4 text-gray-400" />
-                            <span className="text-white text-sm">{file.filename}</span>
-                            {file.size && (
-                              <span className="text-gray-500 text-xs ml-auto">
-                                {(file.size / 1024 / 1024).toFixed(2)} MB
-                              </span>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  
-                  {selectedSubmission.content?.description && (
+                  {/* Live URL - show if it exists */}
+                  <div>
+                    <p className="text-sm text-gray-400">Live Demo</p>
+                    {selectedSubmission?.liveUrl ? (
+                      <a
+                        href={selectedSubmission.liveUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-400 hover:text-blue-300 underline flex items-center gap-2"
+                      >
+                        <ExternalLink className="w-4 h-4" />
+                        {selectedSubmission.liveUrl}
+                      </a>
+                    ) : selectedSubmission?.githubUrl ? (
+                      <a
+                        href={selectedSubmission.githubUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-400 hover:text-blue-300 underline flex items-center gap-2"
+                      >
+                        <ExternalLink className="w-4 h-4" />
+                        {selectedSubmission.githubUrl}
+                      </a>
+                    ) : (
+                      <p className="text-gray-500">No live demo URL provided</p>
+                    )}
+                    {selectedSubmission?.liveUrl && selectedSubmission.liveUrl === selectedSubmission.githubUrl && (
+                      <p className="text-xs text-gray-500 mt-1 italic">Note: Live demo URL is same as GitHub repository</p>
+                    )}
+                  </div>
+
+                  {/* Description */}
+                  {selectedSubmission?.description && selectedSubmission.description.trim() !== '' ? (
                     <div>
                       <p className="text-sm text-gray-400">Description</p>
-                      <p className="text-white">{selectedSubmission.content.description}</p>
+                      <p className="text-white">{selectedSubmission.description}</p>
+                    </div>
+                  ) : (
+                    <div>
+                      <p className="text-sm text-gray-400">Description</p>
+                      <p className="text-gray-500 italic">No description provided</p>
                     </div>
                   )}
 
@@ -636,14 +947,14 @@ const SubmissionsSimple: React.FC = () => {
 
                   {/* Rank */}
                   <div>
-                    <Label className="text-sm text-gray-400">Rank Position</Label>
+                    <Label className="text-sm text-gray-400">Rank Position (Auto-calculated)</Label>
                     <input
                       type="text"
                       value={rankingForm.rank}
-                      onChange={(e) => setRankingForm(prev => ({ ...prev, rank: e.target.value }))}
-                      placeholder="e.g., 1st, 2nd, 3rd, Honorable Mention"
-                      className="w-full mt-1 px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
+                      readOnly
+                      className="w-full mt-1 px-3 py-2 bg-gray-600 border border-gray-500 rounded-lg text-white cursor-not-allowed"
                     />
+                    <p className="text-xs text-gray-500 mt-1">Automatically calculated based on total score</p>
                   </div>
 
                   {/* Ranking Criteria */}

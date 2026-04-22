@@ -27,7 +27,7 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({ onClose, onSu
     startDate: '',
     endDate: '',
     maxParticipants: '',
-    prizes: [{ position: 1, prize: '', value: 0, currency: 'USD' }] as Array<{ position: number; prize: string; value: number; currency: string }>,
+    prizes: [{ position: 1, prize: '', value: 0, currency: 'Birr' }] as Array<{ position: number; prize: string; value: number; currency: string }>,
     evaluationCriteria: [{ criterion: '', weight: 1, description: '' }] as Array<{ criterion: string; weight: number; description: string }>
   });
   const [loading, setLoading] = useState(false);
@@ -51,7 +51,7 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({ onClose, onSu
         startDate: challenge.startDate ? new Date(challenge.startDate).toISOString().slice(0, 16) : '',
         endDate: challenge.endDate ? new Date(challenge.endDate).toISOString().slice(0, 16) : '',
         maxParticipants: challenge.maxParticipants?.toString() || '',
-        prizes: challenge.prizes || [{ position: 1, prize: '', value: 0, currency: 'USD' }],
+        prizes: challenge.prizes || [{ position: 1, prize: '', value: 0, currency: 'Birr' }],
         evaluationCriteria: challenge.evaluationCriteria || [{ criterion: '', weight: 1, description: '' }]
       });
     }

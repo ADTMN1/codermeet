@@ -109,12 +109,39 @@ class SubmissionController {
    */
   static async reviewSubmission(req, res) {
     try {
+      console.log('=== CONTROLLER SUBMISSION REVIEW DEBUGGING ===');
+      console.log('1. reviewSubmission controller called');
+      console.log('2. Request params:', req.params);
+      console.log('3. Request body:', req.body);
+      console.log('4. User profile from middleware:', req.userProfile);
+      console.log('5. User ID:', req.user?.id);
+      console.log('6. User role:', req.userProfile?.role);
+      
       const { submissionId } = req.params;
       const reviewData = req.body;
       const reviewerId = req.user.id;
       
+      console.log('7. Extracted data:', {
+        submissionId,
+        submissionIdType: typeof submissionId,
+        reviewData: JSON.stringify(reviewData, null, 2),
+        reviewerId,
+        reviewerIdType: typeof reviewerId
+      });
+      
       // Validate review data
-      if (!reviewData.status || !['approved', 'accepted', 'rejected', 'reviewed'].includes(reviewData.status)) {
+      if (!reviewData.status || !reviewData.score) {
+        console.log('8. ERROR: Missing required fields');
+        return res.status(400).json({
+          success: false,
+          message: 'Status and score are required'
+        });
+      }
+      
+      // Validate status
+      const validStatuses = ['approved', 'accepted', 'rejected', 'reviewed'];
+      if (!validStatuses.includes(reviewData.status)) {
+        console.log('9. ERROR: Invalid status:', reviewData.status);
         return res.status(400).json({
           success: false,
           message: 'Invalid review status'
@@ -122,15 +149,40 @@ class SubmissionController {
       }
       
       // Normalize status to backend format
+      const originalStatus = reviewData.status;
       if (reviewData.status === 'accepted') {
         reviewData.status = 'approved';
+        console.log('10. Normalized status from "accepted" to "approved"');
       }
+      
+      console.log('11. About to call submissionService.reviewSubmission...');
+      console.log('12. Final review data:', JSON.stringify(reviewData, null, 2));
       
       const result = await submissionService.reviewSubmission(submissionId, reviewData, reviewerId);
       
+      console.log('13. Service returned result:', {
+        success: result.success,
+        hasData: !!result.data,
+        message: result.message
+      });
+      
+      if (result.data) {
+        console.log('14. Result data summary:', {
+          id: result.data._id,
+          status: result.data.status,
+          score: result.data.score
+        });
+      }
+      
+      console.log('=== CONTROLLER SUBMISSION REVIEW SUCCESS ===');
       res.status(200).json(result);
     } catch (error) {
-      console.error('Error reviewing submission:', error);
+      console.error('=== CONTROLLER SUBMISSION REVIEW ERROR ===');
+      console.error('Error type:', error.constructor.name);
+      console.error('Error message:', error.message);
+      console.error('Error stack:', error.stack);
+      console.error('=== END CONTROLLER ERROR DEBUGGING ===');
+      
       res.status(400).json({
         success: false,
         message: error.message || 'Failed to review submission'

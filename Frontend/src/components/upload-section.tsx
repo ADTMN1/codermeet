@@ -20,9 +20,10 @@ interface UploadSectionProps {
   challengeId?: string;
   userId?: string;
   challengeType?: 'regular' | 'weekly';
+  onSubmissionSuccess?: () => void;
 }
 
-export function UploadSection({ registrationMode, challengeId, userId, challengeType }: UploadSectionProps) {
+export function UploadSection({ registrationMode, challengeId, userId, challengeType, onSubmissionSuccess }: UploadSectionProps) {
   const [githubUrl, setGithubUrl] = useState('');
   const [liveUrl, setLiveUrl] = useState('');
   const [description, setDescription] = useState('');
@@ -39,17 +40,23 @@ export function UploadSection({ registrationMode, challengeId, userId, challenge
       try {
         const userSubmission = await submissionService.getUserSubmission(challengeId, challengeType);
         if (userSubmission) {
+          console.log('📋 Found existing submission:', userSubmission);
           setSubmission(userSubmission);
           setSubmitted(true);
           setGithubUrl(userSubmission.githubUrl || '');
+          setLiveUrl(userSubmission.liveUrl || '');
+          setDescription(userSubmission.description || '');
         }
-      } catch (error) {
+      } catch (error: any) {
         // Expected error when no submission exists - silently handle
+        if (error.response?.status !== 404) {
+          console.error('Unexpected error checking submission:', error);
+        }
       }
     };
 
     checkSubmission();
-  }, [challengeId]);
+  }, [challengeId, challengeType]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -90,7 +97,21 @@ export function UploadSection({ registrationMode, challengeId, userId, challenge
       const result = await submissionService.submitProject(challengeId, submissionData, challengeType);
       
       setSubmitted(true);
-      setSubmission(result.data);
+      
+      // Extract the user's submission from the challenge response
+      if ((result.data as any).submissions && Array.isArray((result.data as any).submissions)) {
+        const userSubmission = (result.data as any).submissions.find((sub: any) => 
+          sub.user === userId || (sub.user && sub.user._id === userId)
+        );
+        setSubmission(userSubmission);
+      } else {
+        setSubmission(result.data);
+      }
+      
+      // Call the success callback to update parent component
+      if (onSubmissionSuccess) {
+        onSubmissionSuccess();
+      }
       
       toast.success('🚀 Project submitted successfully!', {
         description: 'Your project has been submitted and will be reviewed by our team.',

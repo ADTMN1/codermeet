@@ -767,14 +767,15 @@ const Dashboard: React.FC = () => {
               onClick={handleJoin}
 
               className={`text-heading font-medium leading-5 rounded-full text-sm px-6 py-3 focus:outline-none cursor-pointer transition shadow-md min-w-[100px] min-h-[44px] ${
-                user?.plan?.toLowerCase() === 'trial' || activeWeeklyChallenges.length === 0
+                user?.plan?.toLowerCase() === 'trial'
                   ? 'bg-gray-600 text-gray-400 cursor-not-allowed hover:bg-gray-600'
                   : 'bg-neutral-primary box-border border border-transparent hover:bg-neutral-secondary-medium focus:ring-4 focus:ring-neutral-tertiary-soft hover:shadow-[0_0_15px_#C27AFF] shadow-md transition'
               }`}
 
-              disabled={user?.plan?.toLowerCase() === 'trial' || activeWeeklyChallenges.length === 0}
+              disabled={user?.plan?.toLowerCase() === 'trial'}
             >
-              {user?.plan?.toLowerCase() === 'trial' ? 'Upgrade Required' : activeWeeklyChallenges.length === 0 ? 'No Challenge' : 'Join'}
+              {user?.plan?.toLowerCase() === 'trial' ? 'Upgrade Required' : 
+               activeWeeklyChallenges.length === 0 ? 'View Challenges' : 'Join'}
 
             </button>
 
