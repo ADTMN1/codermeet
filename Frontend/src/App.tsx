@@ -28,6 +28,7 @@ import MentorshipDashboard from './pages/MentorshipDashboard/MentorshipDashboard
 import Pricing from './pages/Pricing';
 import PricingInfo from './pages/PricingInfo';
 import PaymentSuccess from './pages/PaymentSuccess';
+import SmsForwardingPayment from './components/Payment/SmsForwardingPayment';
 import Features from './components/sections/Features';
 import ViewProjects from './pages/Projects/ViewProjects';
 import AdminLayout from './components/layout/Admin/AdminLayout';
@@ -196,6 +197,18 @@ function AppContent() {
               <>
                 <Navbar />
                 <PricingInfo />
+                <Footer />
+              </>
+            }
+          />
+
+          {/* SMS Forwarding Payment Page */}
+          <Route
+            path="/sms-payment"
+            element={
+              <>
+                <Navbar />
+                <SmsForwardingPayment />
                 <Footer />
               </>
             }

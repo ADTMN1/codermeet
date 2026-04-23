@@ -244,18 +244,8 @@ const pointsRoutes = require('./routes/points');
 
 
 
-
-
-
-
-
 const paymentRoutes = require('./routes/payment');
-// const smsForwardingRoutes = require('./routes/smsForwarding'); // Temporarily disabled
-
-
-
-
-
+const smsForwardingRoutes = require('./routes/smsForwarding');
 
 
 
@@ -2825,6 +2815,9 @@ app.use("/api/points", pointsRoutes); // Points awarding system
 
 
 app.use("/api/payment", paymentLimiter, paymentRoutes);
+app.use("/api/sms-forwarding", smsForwardingRoutes); // Temporarily enabled
+
+
 // app.use("/api/sms-forwarding", smsForwardingRoutes); // Temporarily disabled
 
 
