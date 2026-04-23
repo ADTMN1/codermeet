@@ -209,7 +209,7 @@ const SubmissionsSimple: React.FC = () => {
       
       // Create a clean copy of ranking criteria to avoid any corruption
       const cleanRankingCriteria = {
-        codeQuality: (!rankingForm.rankingCriteria.codeQuality && rankingForm.rankingCriteria.codeQuality !== 0) ? rankingForm.rankingCriteria.codeQuality : '',
+        codeQuality: Number(rankingForm.rankingCriteria.codeQuality) || 0,
         functionality: Number(rankingForm.rankingCriteria.functionality) || 0,
         creativity: Number(rankingForm.rankingCriteria.creativity) || 0,
         documentation: Number(rankingForm.rankingCriteria.documentation) || 0
@@ -348,18 +348,31 @@ const SubmissionsSimple: React.FC = () => {
     console.log('Opening submission with data:', submission);
     console.log('All submission keys:', Object.keys(submission));
     console.log('Submission structure:', JSON.stringify(submission, null, 2));
+    
     setSelectedSubmission(submission);
+    
+    // Safely extract ranking criteria with fallbacks
+    const getRankingCriteria = () => {
+      if (submission.rankingCriteria && typeof submission.rankingCriteria === 'object') {
+        return {
+          codeQuality: Number(submission.rankingCriteria.codeQuality) || 0,
+          functionality: Number(submission.rankingCriteria.functionality) || 0,
+          creativity: Number(submission.rankingCriteria.creativity) || 0,
+          documentation: Number(submission.rankingCriteria.documentation) || 0
+        };
+      }
+      return { codeQuality: 0, functionality: 0, creativity: 0, documentation: 0 };
+    };
+    
+    const rankingCriteria = getRankingCriteria();
+    const calculatedScore = rankingCriteria.codeQuality + rankingCriteria.functionality + rankingCriteria.creativity + rankingCriteria.documentation;
+    
     setRankingForm({
-      status: submission.status === 'pending' ? 'accepted' : submission.status as 'accepted' | 'rejected',
-      score: submission.score || 0,
+      status: submission.status === 'pending' ? 'accepted' : (submission.status === 'approved' ? 'accepted' : submission.status) as 'accepted' | 'rejected',
+      score: submission.score || calculatedScore,
       rank: submission.rank || '',
-      rankingCriteria: {
-        codeQuality: submission.rankingCriteria?.codeQuality || 0,
-        functionality: submission.rankingCriteria?.functionality || 0,
-        creativity: submission.rankingCriteria?.creativity || 0,
-        documentation: submission.rankingCriteria?.documentation || 0
-      },
-      feedback: submission.feedback || ''
+      rankingCriteria,
+      feedback: submission.feedback || submission.reviewComments || ''
     });
     setViewDialogOpen(true);
   };
@@ -1253,7 +1266,7 @@ const SubmissionsSimple: React.FC = () => {
                   onClick={handleSubmitRanking}
                   className="bg-blue-600 hover:bg-blue-700"
                 >
-                  Save Ranking
+                  {selectedSubmission.score > 0 || selectedSubmission.status === 'approved' || selectedSubmission.status === 'accepted' ? 'Update Ranking' : 'Save Ranking'}
                 </Button>
               </div>
             </div>

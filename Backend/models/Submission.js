@@ -160,6 +160,38 @@ const submissionSchema = new mongoose.Schema({
     default: ''
   },
   
+  // Ranking and evaluation criteria
+  rankingCriteria: {
+    codeQuality: {
+      type: Number,
+      min: 0,
+      max: 25,
+      default: 0
+    },
+    functionality: {
+      type: Number,
+      min: 0,
+      max: 25,
+      default: 0
+    },
+    creativity: {
+      type: Number,
+      min: 0,
+      max: 25,
+      default: 0
+    },
+    documentation: {
+      type: Number,
+      min: 0,
+      max: 25,
+      default: 0
+    }
+  },
+  rank: {
+    type: String,
+    default: ''
+  },
+  
   // Review tracking
   reviewedBy: {
     type: mongoose.Schema.Types.ObjectId,

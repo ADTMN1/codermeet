@@ -501,6 +501,16 @@ exports.submitWeeklyChallenge = async (req, res) => {
     const { id } = req.params;
     const userId = req.userProfile._id;
     const { githubUrl, liveUrl, description, screenshots } = req.body;
+    
+    console.log('🔍 Debug - Extracted submission data:', {
+      githubUrl: githubUrl,
+      liveUrl: liveUrl, 
+      description: description,
+      screenshots: screenshots,
+      githubUrlType: typeof githubUrl,
+      liveUrlType: typeof liveUrl,
+      descriptionType: typeof description
+    });
 
     const weeklyChallenge = await WeeklyChallenge.findById(id);
 

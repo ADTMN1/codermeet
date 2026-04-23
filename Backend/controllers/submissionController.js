@@ -130,7 +130,7 @@ class SubmissionController {
       });
       
       // Validate review data
-      if (!reviewData.status || !reviewData.score) {
+      if (!reviewData.status || reviewData.score === undefined || reviewData.score === null) {
         console.log('8. ERROR: Missing required fields');
         return res.status(400).json({
           success: false,

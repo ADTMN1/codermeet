@@ -178,14 +178,14 @@ class SubmissionService {
           const challengeSubmissions = challenge.submissions.map(submission => {
             const submissionObj = submission.toObject();
             
-            // Find the corresponding participant user for this submission
-            const participantUser = challenge.participants.find(p => 
-              p.user && p.user._id.toString() === submissionObj.user?.toString()
-            );
+            // For weekly challenges, use the first participant's user data
+            // since submissions are tied to participants
+            const participantUser = challenge.participants[0]; // Get first participant
             
             return {
               _id: submissionObj._id,
               userId: participantUser?.user || submissionObj.user, // Use participant user as fallback
+              user: participantUser?.user, // Add populated user object
               challengeId: challenge._id,
               challengeTitle: challenge.title,
               challengeType: 'weekly',
@@ -200,7 +200,15 @@ class SubmissionService {
               feedback: submissionObj.reviewComments,
               reviewedBy: submissionObj.reviewedBy,
               reviewedAt: submissionObj.reviewedAt,
-              content: submissionObj.content
+              content: submissionObj.content,
+              // Include ranking data
+              rankingCriteria: submissionObj.rankingCriteria || {
+                codeQuality: 0,
+                functionality: 0,
+                creativity: 0,
+                documentation: 0
+              },
+              rank: submissionObj.rank || ''
             };
           });
           
@@ -401,9 +409,10 @@ class SubmissionService {
                 feedback: challenge.submissions[submissionIndex].reviewComments
               });
               
-              // Update the submission in the weekly challenge
+              // Update the submission in the weekly challenge - preserve all original fields
+              const originalSubmissionData = challenge.submissions[submissionIndex].toObject();
               challenge.submissions[submissionIndex] = {
-                ...challenge.submissions[submissionIndex],
+                ...originalSubmissionData, // Preserve ALL original fields
                 status: reviewData.status,
                 score: reviewData.score || 0,
                 reviewComments: reviewData.feedback,
@@ -425,16 +434,37 @@ class SubmissionService {
               await challenge.save();
               console.log('24. Successfully saved weekly challenge');
               
+              // Get the participant user data for the response
+              const participantUser = challenge.participants[0]; // First participant
+              
+              // Get the original submission data before update
+              const originalSubmission = challenge.submissions[submissionIndex].toObject();
+              
               // Format the submission to match expected structure
               const updatedSubmission = {
-                ...challenge.submissions[submissionIndex].toObject(),
-                userId: challenge.submissions[submissionIndex].user,
-                reviewedBy: challenge.submissions[submissionIndex].reviewedBy,
+                ...originalSubmission, // Preserve ALL original fields
+                userId: participantUser?.user || originalSubmission.user,
+                user: participantUser?.user, // Add user field for frontend compatibility
+                reviewedBy: originalSubmission.reviewedBy,
                 challengeId: challenge._id,
                 challengeTitle: challenge.title,
                 challengeCategory: challenge.category,
                 challengeDifficulty: challenge.difficulty,
-                challengeType: 'weekly'
+                challengeType: 'weekly',
+                // Explicitly preserve submission fields that might be overwritten
+                githubUrl: originalSubmission.githubUrl || '',
+                liveUrl: originalSubmission.liveUrl || '',
+                description: originalSubmission.description || '',
+                submittedAt: originalSubmission.submittedAt, // Preserve original submission time
+                // Map backend field names to frontend expectations
+                feedback: originalSubmission.reviewComments || '',
+                rankingCriteria: originalSubmission.rankingCriteria || {
+                  codeQuality: 0,
+                  functionality: 0,
+                  creativity: 0,
+                  documentation: 0
+                },
+                rank: originalSubmission.rank || ''
               };
               
               console.log('25. Formatted submission for response:', {
@@ -442,7 +472,12 @@ class SubmissionService {
                 status: updatedSubmission.status,
                 score: updatedSubmission.score,
                 hasUserId: !!updatedSubmission.userId,
-                hasChallengeId: !!updatedSubmission.challengeId
+                hasUser: !!updatedSubmission.user,
+                hasGithubUrl: !!updatedSubmission.githubUrl,
+                hasLiveUrl: !!updatedSubmission.liveUrl,
+                hasDescription: !!updatedSubmission.description,
+                hasChallengeId: !!updatedSubmission.challengeId,
+                fullSubmission: JSON.stringify(updatedSubmission, null, 2)
               });
               
               // Send notification to user

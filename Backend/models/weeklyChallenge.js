@@ -138,7 +138,39 @@ const weeklyChallengeSchema = new mongoose.Schema({
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User'
     },
-    reviewedAt: Date
+    reviewedAt: Date,
+    
+    // Ranking and evaluation criteria
+    rankingCriteria: {
+      codeQuality: {
+        type: Number,
+        min: 0,
+        max: 25,
+        default: 0
+      },
+      functionality: {
+        type: Number,
+        min: 0,
+        max: 25,
+        default: 0
+      },
+      creativity: {
+        type: Number,
+        min: 0,
+        max: 25,
+        default: 0
+      },
+      documentation: {
+        type: Number,
+        min: 0,
+        max: 25,
+        default: 0
+      }
+    },
+    rank: {
+      type: String,
+      default: ''
+    }
   }],
   
   // Winners and results
