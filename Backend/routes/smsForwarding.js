@@ -13,4 +13,18 @@ router.post('/receive-sms', smsForwardingController.receiveSms);
 router.get('/pending', smsForwardingController.getPendingPayments);
 router.post('/verify-manual', smsForwardingController.verifyManualPayment);
 
+// Debug endpoint to check recent activity
+router.get('/debug/activity', (req, res) => {
+  res.json({
+    success: true,
+    message: 'SMS Forwarding Debug Info',
+    data: {
+      timestamp: new Date().toISOString(),
+      pendingPayments: Array.from(smsForwardingController.getPendingPayments().data || []),
+      serverStatus: 'running',
+      lastActivity: 'Check server logs for recent SMS activity'
+    }
+  });
+});
+
 module.exports = router;

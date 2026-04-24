@@ -124,40 +124,56 @@ exports.generatePaymentReference = async (req, res) => {
 // SMS forwarding receiver endpoint
 exports.receiveSms = async (req, res) => {
   try {
+    const startTime = Date.now();
+    console.log('='.repeat(50));
+    console.log('🔔 NEW SMS RECEIVED AT:', new Date().toISOString());
+    console.log('='.repeat(50));
+    
     const { message, sender, time } = req.body;
 
-    console.log('Received SMS:', { message, sender, time });
+    console.log('📱 SMS Details:');
+    console.log('  - Message:', message);
+    console.log('  - Sender:', sender);
+    console.log('  - Time:', time);
+    console.log('  - Request IP:', req.ip);
+    console.log('  - User-Agent:', req.get('User-Agent'));
 
     // Parse the SMS to extract payment information
     const paymentInfo = parseBankSMS(message);
     
     if (!paymentInfo) {
-      console.log('SMS does not contain payment information');
+      console.log('❌ SMS does not contain payment information');
+      console.log('📤 Response sent: No payment detected');
       return res.status(200).json({ 
         success: false, 
         message: 'No payment information detected' 
       });
     }
 
-    console.log('Payment detected:', paymentInfo);
+    console.log('✅ Payment detected:', paymentInfo);
 
     // Try to match with pending payment
+    console.log('🔍 Looking for matching pending payment...');
     const matchedPayment = await matchPaymentWithUser(paymentInfo);
     
     if (matchedPayment) {
+      console.log('🎉 MATCH FOUND! Processing payment...');
+      console.log('📊 Match Details:', {
+        userId: matchedPayment.userId,
+        plan: matchedPayment.plan,
+        paymentRef: matchedPayment.paymentRef,
+        amount: paymentInfo.amount
+      });
+
       // Update user plan
+      console.log('⬆️  Updating user plan...');
       await updateUserPlan(matchedPayment.userId, matchedPayment.plan);
       
       // Remove from pending payments
       pendingPayments.delete(matchedPayment.paymentRef);
+      console.log('🗑️  Removed from pending payments');
 
-      console.log('Payment processed successfully:', {
-        userId: matchedPayment.userId,
-        plan: matchedPayment.plan,
-        amount: paymentInfo.amount
-      });
-
-      return res.status(200).json({
+      const responseData = {
         success: true,
         message: 'Payment processed and user upgraded',
         data: {
@@ -166,26 +182,47 @@ exports.receiveSms = async (req, res) => {
           amount: paymentInfo.amount,
           bank: paymentInfo.bank
         }
-      });
+      };
+
+      console.log('📤 SUCCESS RESPONSE:', responseData);
+      console.log('⏱️  Processing time:', Date.now() - startTime, 'ms');
+      console.log('='.repeat(50));
+
+      return res.status(200).json(responseData);
     } else {
-      console.log('No matching pending payment found');
+      console.log('❌ NO MATCHING PENDING PAYMENT FOUND');
+      console.log('💾 Storing unmatched payment for manual review...');
       
       // Store unmatched payment for manual review
       await storeUnmatchedPayment(paymentInfo, message, sender);
       
-      return res.status(200).json({
+      const responseData = {
         success: false,
         message: 'Payment detected but no matching user found',
         data: paymentInfo
-      });
+      };
+
+      console.log('📤 NO MATCH RESPONSE:', responseData);
+      console.log('⏱️  Processing time:', Date.now() - startTime, 'ms');
+      console.log('='.repeat(50));
+
+      return res.status(200).json(responseData);
     }
 
   } catch (error) {
-    console.error('SMS processing error:', error);
-    res.status(500).json({
+    console.error('💥 SMS PROCESSING ERROR:', error);
+    console.error('Stack trace:', error.stack);
+    
+    const errorResponse = {
       success: false,
       message: 'Failed to process SMS'
-    });
+    };
+
+    console.log('📤 ERROR RESPONSE:', errorResponse);
+    console.log('⏱️  Processing time:', Date.now() - startTime, 'ms');
+    console.log('='.repeat(50));
+
+    res.status(500).json(errorResponse);
   }
 };
 
