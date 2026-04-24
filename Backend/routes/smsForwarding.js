@@ -27,4 +27,26 @@ router.get('/debug/activity', (req, res) => {
   });
 });
 
+// Simple test endpoint to verify connection
+router.post('/test-connection', (req, res) => {
+  console.log('='.repeat(50));
+  console.log('🔔 TEST CONNECTION RECEIVED AT:', new Date().toISOString());
+  console.log('📱 Request Body:', req.body);
+  console.log('📱 Request IP:', req.ip);
+  console.log('📱 User-Agent:', req.get('User-Agent'));
+  console.log('📱 Headers:', req.headers);
+  console.log('='.repeat(50));
+  
+  res.json({
+    success: true,
+    message: 'Test connection successful!',
+    data: {
+      timestamp: new Date().toISOString(),
+      receivedBody: req.body,
+      receivedIP: req.ip,
+      userAgent: req.get('User-Agent')
+    }
+  });
+});
+
 module.exports = router;
