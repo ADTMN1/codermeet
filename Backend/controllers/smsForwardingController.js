@@ -127,6 +127,7 @@ exports.receiveSms = async (req, res) => {
     const startTime = Date.now();
     console.log('='.repeat(50));
     console.log('🔔 NEW SMS RECEIVED AT:', new Date().toISOString());
+    console.log('📱 DEPLOYED WITH DEBUG LOGS - v2.0');
     console.log('='.repeat(50));
     
     const { message, sender, time } = req.body;
