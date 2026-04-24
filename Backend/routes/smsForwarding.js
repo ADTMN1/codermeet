@@ -49,4 +49,14 @@ router.post('/test-connection', (req, res) => {
   });
 });
 
+// Ultra-simple endpoint that's impossible to miss
+router.post('/ping', (req, res) => {
+  console.log('🔥🔥🔥 PING RECEIVED AT:', new Date().toISOString());
+  console.log('🔥 BODY:', JSON.stringify(req.body));
+  console.log('🔥 IP:', req.ip);
+  console.log('🔥🔥🔥');
+  
+  res.send('PONG SUCCESS');
+});
+
 module.exports = router;
