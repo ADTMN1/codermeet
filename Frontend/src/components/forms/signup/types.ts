@@ -15,4 +15,9 @@ export type FormData = {
   notifications: boolean;
   challenges: boolean;
   paymentScreenshot?: string;
+  screenshotFileName?: string;
+  paymentMethod?: string;
+  accountHolderName?: string;
+  accountNumber?: string;
+  transactionId?: string;
 };

@@ -240,7 +240,7 @@ const PaymentSuccess: React.FC = () => {
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600">Payment Method:</span>
-                    <span>Chapa Secure Payment</span>
+                    <span>Bank Transfer / Mobile Money</span>
                   </div>
                 </div>
               </div>
@@ -270,7 +270,7 @@ const PaymentSuccess: React.FC = () => {
               {/* Security Note */}
               <div className="mt-6 text-center">
                 <p className="text-xs text-gray-500">
-                  🔒 Secured by Chapa | Payment processed successfully
+                  🔒 Secure Payment Processing | Payment verified successfully
                 </p>
               </div>
             </div>

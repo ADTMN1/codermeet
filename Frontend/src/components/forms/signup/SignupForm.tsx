@@ -10,6 +10,7 @@ import LoadingSpinner from '../../ui/loading-spinner';
 import { FormData } from './types';
 import {
   validateStep,
+  validateFinalSubmission,
   sanitizeInput,
   validatePasswordStrength,
   validateEmail,
@@ -20,6 +21,7 @@ import { uploadToCloudinary } from './cloudinary';
 import Step1Account from './Step1Account';
 import Step2Profile from './Step2Profile';
 import Step3Plan from './Step3Plan';
+import Step4Payment from './Step4Payment';
 
 const SignupForm: React.FC = () => {
   const [step, setStep] = useState<number>(1);
@@ -196,7 +198,7 @@ const SignupForm: React.FC = () => {
     
     // Clear all errors and proceed to next step
     setErrors({});
-    if (step < 3) { // Only 3 steps now
+    if (step < 4) { // Now 4 steps
       setStep(step + 1);
     }
   };
@@ -214,11 +216,8 @@ const SignupForm: React.FC = () => {
     // Validate all steps before final submission
     let allErrors: { [key: string]: string } = {};
     
-    // Validate each step
-    for (let stepNum = 1; stepNum <= 3; stepNum++) { 
-      const stepErrors = validateStep(formData, stepNum);
-      allErrors = { ...allErrors, ...stepErrors };
-    }
+    // Use strict final validation for submission
+    allErrors = validateFinalSubmission(formData);
     
     if (Object.keys(allErrors).length > 0) {
       setErrors(allErrors);
@@ -226,7 +225,7 @@ const SignupForm: React.FC = () => {
       setIsSubmitting(false);
       
       // Find which step has errors and go back to it
-      const errorSteps = [1, 2, 3].filter(stepNum => { // Only 3 steps now
+      const errorSteps = [1, 2, 3, 4].filter(stepNum => { // Now 4 steps
         const stepErrors = validateStep(formData, stepNum);
         return Object.keys(stepErrors).length > 0;
       });
@@ -242,76 +241,27 @@ const SignupForm: React.FC = () => {
       const API_BASE_URL =
         import.meta.env.VITE_API_URL || 'http://localhost:5000';
       
-      // For paid plans, initialize payment first
-      if (formData.plan !== 'trial') {
-        try {
-          // Initialize payment with Chapa
-          const paymentPayload = {
-            plan: formData.plan,
-            userId: 'temp', // Will be updated after registration
-            email: formData.email,
-            fullName: formData.fullName
-          };
+      // Check if payment verification was completed
+    const paymentVerified = localStorage.getItem('payment_verified');
+    const paymentData = paymentVerified ? JSON.parse(paymentVerified) : null;
 
-          const paymentRes = await axios.post(
-            `${API_BASE_URL}/api/payment/initialize`,
-            paymentPayload,
-            {
-              timeout: 10000,
-              headers: { 'Content-Type': 'application/json' },
-            }
-          );
-
-          if (paymentRes.data.success) {
-            // Payment initialization successful
-            window.location.href = paymentRes.data.data.checkout_url;
-            
-            const checkoutUrl = paymentRes.data.data.checkout_url;
-            
-            // Validate checkout URL
-            if (!checkoutUrl || !checkoutUrl.startsWith('https://checkout.chapa.co')) {
-              showToast('Invalid payment URL. Please try again.', 'error');
-              setIsLoading(false);
-              return;
-            }
-            
-            // Store form data temporarily for after payment
-            localStorage.setItem('pending_registration', JSON.stringify({
-              formData,
-              paymentTxRef: paymentRes.data.data.tx_ref
-            }));
-
-            // Redirect to Chapa payment page
-            window.location.href = checkoutUrl;
-            return;
-          } else {
-            showToast('Failed to initialize payment. Please try again.', 'error');
-            setIsLoading(false);
-            return;
-          }
-        } catch (error: any) {
-          showToast('Payment initialization failed. Please try again.', 'error');
-          setIsLoading(false);
-          return;
-        }
-      }
-
-      // For trial plan, proceed with normal registration
-      const payload = {
-        fullName: formData.fullName,
-        username: formData.username,
-        email: formData.email,
-        password: formData.password,
-        confirmPassword: formData.confirmPassword,
-        primaryLanguage: formData.primaryLanguage,
-        skills: formData.skills,
-        githubUrl: formData.github,
-        bio: formData.bio,
-        plan: 'Trial', // Always Trial for direct registration
-      };
+    const payload = {
+      fullName: formData.fullName,
+      username: formData.username,
+      email: formData.email,
+      password: formData.password,
+      confirmPassword: formData.confirmPassword,
+      primaryLanguage: formData.primaryLanguage,
+      skills: formData.skills,
+      githubUrl: formData.github,
+      bio: formData.bio,
+      plan: paymentData ? paymentData.plan.charAt(0).toUpperCase() + paymentData.plan.slice(1) : formData.plan.charAt(0).toUpperCase() + formData.plan.slice(1),
+      verifiedTransactionId: paymentData?.transactionId,
+      paymentVerifiedAt: paymentData?.verifiedAt
+    };
 
       const res = await axios.post(
-        `${API_BASE_URL}/api/auth/register`,
+        `${API_BASE_URL}/auth/register`,
         payload,
         {
           timeout: 10000,
@@ -343,6 +293,9 @@ const SignupForm: React.FC = () => {
       }
 
       showToast(res.data.message, 'success');
+
+      // Clear payment verification data
+      localStorage.removeItem('payment_verified');
 
       // Redirect to dashboard
       navigate('/dashboard');
@@ -394,7 +347,7 @@ const SignupForm: React.FC = () => {
         {/* Enhanced Progress Indicator */}
         <div className="mb-8">
           <div className="flex items-center justify-between mb-3">
-            {[1, 2, 3].map((s) => (
+            {[1, 2, 3, 4].map((s) => (
               <div key={s} className="flex flex-col items-center">
                 <div
                   className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold transition-all duration-300 ${
@@ -408,14 +361,14 @@ const SignupForm: React.FC = () => {
                 <span className={`text-xs mt-2 transition-colors duration-300 ${
                   step >= s ? 'text-purple-400' : 'text-gray-500'
                 }`}>
-                  {s === 1 ? 'Account' : s === 2 ? 'Profile' : 'Plan'}
+                  {s === 1 ? 'Account' : s === 2 ? 'Profile' : s === 3 ? 'Plan' : 'Payment'}
                 </span>
               </div>
             ))}
           </div>
           <div className="relative">
             <div className="flex justify-between">
-              {[1, 2].map((s) => (
+              {[1, 2, 3].map((s) => (
                 <div
                   key={s}
                   className={`flex-1 h-1 mx-1 transition-all duration-500 ${
@@ -456,6 +409,17 @@ const SignupForm: React.FC = () => {
           />
         )}
 
+        {step === 4 && (
+          <Step4Payment
+            formData={formData}
+            setFormData={setFormData}
+            errors={errors}
+            setErrors={setErrors}
+            onClearPaymentError={() => setErrors(prev => ({ ...prev, paymentScreenshot: '' }))}
+          />
+        )}
+
+        
         {/* Enhanced Navigation Buttons */}
         <div className="flex justify-between items-center mt-8">
           {step > 1 && (
@@ -470,7 +434,7 @@ const SignupForm: React.FC = () => {
             </button>
           )}
           <div className="flex-1"></div>
-          {step < 3 ? (
+          {step < 4 ? (
             <button
               type="button"
               onClick={handleNext}
@@ -484,7 +448,7 @@ const SignupForm: React.FC = () => {
                 </>
               ) : (
                 <>
-                  Next
+                  {step === 3 ? 'Next' : 'Next'}
                   <FaArrowRight />
                 </>
               )}

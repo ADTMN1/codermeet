@@ -109,12 +109,6 @@ const Dashboard: React.FC = () => {
 
     
 
-    // Check if user just came from Chapa payment (look for recent payment in session)
-
-    const sessionPayment = sessionStorage.getItem('recent_chapa_payment');
-
-    
-
     // Handle token from URL (after payment)
 
     if (token && !user) {
@@ -168,22 +162,6 @@ const Dashboard: React.FC = () => {
       const newUrl = window.location.pathname;
 
       window.history.replaceState({}, '', newUrl);
-
-      
-
-      // Clear the payment flag
-
-      sessionStorage.removeItem('recent_chapa_payment');
-
-    } else if (sessionPayment) {
-
-      // Show success notification if user was just redirected from Chapa
-
-      setShowPaymentSuccess(true);
-
-      setPaymentTxRef(sessionPayment);
-
-      sessionStorage.removeItem('recent_chapa_payment');
 
     }
 

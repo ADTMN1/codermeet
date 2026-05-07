@@ -103,9 +103,33 @@ export const validateStep = (
   }
 
   if (step === 4) {
-    if (formData.plan !== 'trial' && !paymentProof) {
-      errors.paymentProof = 'Payment screenshot is required for paid plans';
+    // For navigation, only validate screenshot if it's uploaded
+    if (formData.paymentScreenshot) {
+      // Screenshot is provided, it's valid for navigation
     }
+  }
+
+  return errors;
+};
+
+/**
+ * validateFinalSubmission - Strict validation for final form submission
+ */
+export const validateFinalSubmission = (formData: FormData) => {
+  const errors: { [key: string]: string } = {};
+
+  // Validate all previous steps
+  const step1Errors = validateStep(formData, 1);
+  const step2Errors = validateStep(formData, 2);
+  const step3Errors = validateStep(formData, 3);
+  
+  Object.assign(errors, step1Errors, step2Errors, step3Errors);
+
+  // Simplified Step 4 validation for final submission
+  // Only require payment screenshot for paid plans
+  // Check if screenshot is uploaded or being processed
+  if (formData.plan !== 'trial' && !formData.paymentScreenshot && !formData.screenshotFileName) {
+    errors.paymentScreenshot = 'Payment screenshot is required for paid plans';
   }
 
   return errors;

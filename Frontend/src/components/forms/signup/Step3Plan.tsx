@@ -34,8 +34,8 @@ const Step3Plan: React.FC<Props> = ({ formData, setFormData, errors, onPlanSelec
     },
     {
       key: 'basic',
-      title: 'Basic – 100 Birr',
-      price: '100 Birr/month',
+      title: 'Basic – 1 Birr',
+      price: '1 Birr/month',
       features: [
         'Access to all core services.',
         'Standard support is included.',
@@ -48,8 +48,8 @@ const Step3Plan: React.FC<Props> = ({ formData, setFormData, errors, onPlanSelec
     },
     {
       key: 'premium',
-      title: 'Premium – 400 Birr',
-      price: '400 Birr/month',
+      title: 'Premium – 599 Birr',
+      price: '599 Birr/month',
       features: [
         'All Basic features are included.',
         'Advanced analytics and reports are available.',

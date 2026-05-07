@@ -14,6 +14,7 @@ import {
   Eye,
   Star,
   Trophy,
+  Award,
   ExternalLink,
   MessageSquare
 } from 'lucide-react';
@@ -41,6 +42,7 @@ const SubmissionsSimple: React.FC = () => {
   });
   const [selectedSubmission, setSelectedSubmission] = useState<any | null>(null);
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
+  const [showRankings, setShowRankings] = useState(false);
   const [rankingForm, setRankingForm] = useState({
     status: 'accepted' as 'accepted' | 'rejected',
     score: 0,
@@ -795,6 +797,167 @@ const SubmissionsSimple: React.FC = () => {
           </div>
         )}
       </Card>
+
+      {/* Rankings Toggle Button */}
+      <div className="flex justify-center mt-6">
+        <Button
+          onClick={() => setShowRankings(!showRankings)}
+          variant="outline"
+          className="border-gray-600 text-gray-300 hover:bg-gray-800 px-6 py-3"
+        >
+          <Trophy className="w-4 h-4 mr-2" />
+          {showRankings ? 'Hide Rankings' : 'Show Rankings'}
+          <Trophy className="w-4 h-4 ml-2" />
+        </Button>
+      </div>
+
+      {/* Winner/Rank List - Collapsible */}
+      {showRankings && (
+        <motion.div
+          initial={{ opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: 'auto' }}
+          exit={{ opacity: 0, height: 0 }}
+          transition={{ duration: 0.3 }}
+          className="mt-6"
+        >
+          <Card className="bg-gray-900 border-gray-800 p-6">
+            <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+              <Trophy className="w-5 h-5 text-yellow-400" />
+              Winners & Rankings
+            </h3>
+            
+            {/* Group by challenge */}
+            {(() => {
+              // Group submissions by challenge
+              const submissionsByChallenge = submissions.reduce((acc: Record<string, {challengeTitle: string; submissions: any[]}>, submission: any) => {
+                const challengeId = submission.challengeId || 'unknown';
+                if (!acc[challengeId]) {
+                  acc[challengeId] = {
+                    challengeTitle: submission.challengeTitle || submission.challenge?.title || 'Unknown Challenge',
+                    submissions: []
+                  };
+                }
+                acc[challengeId].submissions.push(submission);
+                return acc;
+              }, {});
+
+              return Object.entries(submissionsByChallenge).map(([challengeId, challengeData]: [string, {challengeTitle: string; submissions: any[]}]) => {
+                // Filter only submissions with scores and sort by score (descending)
+                const scoredSubmissions = challengeData.submissions
+                  .filter((sub: any) => sub.score > 0)
+                  .sort((a: any, b: any) => b.score - a.score);
+
+                if (scoredSubmissions.length === 0) return null;
+
+                return (
+                  <div key={challengeId} className="mb-6 last:mb-0">
+                    <h4 className="text-md font-medium text-white mb-3 flex items-center gap-2">
+                      <Award className="w-4 h-4 text-blue-400" />
+                      {challengeData.challengeTitle}
+                    </h4>
+                    
+                    <div className="space-y-2">
+                      {scoredSubmissions.map((submission: any, index: number) => {
+                        const rank = index + 1;
+                        const rankDisplay = rank === 1 ? '1st' : 
+                                          rank === 2 ? '2nd' : 
+                                          rank === 3 ? '3rd' : 
+                                          `${rank}th`;
+                        
+                        // Rank colors
+                        const rankColors = rank === 1 ? 'bg-yellow-500/20 text-yellow-300 border-yellow-500/30' :
+                                           rank === 2 ? 'bg-gray-400/20 text-gray-300 border-gray-400/30' :
+                                           rank === 3 ? 'bg-orange-600/20 text-orange-300 border-orange-600/30' :
+                                           'bg-blue-500/20 text-blue-300 border-blue-500/30';
+
+                        return (
+                          <div key={submission._id} className="flex items-center justify-between p-3 bg-gray-800 rounded-lg border border-gray-700">
+                            <div className="flex items-center gap-3">
+                              {/* Rank Badge */}
+                              <div className={`px-3 py-1 rounded-full text-sm font-medium border ${rankColors}`}>
+                                {rankDisplay}
+                              </div>
+                              
+                              {/* User Info */}
+                              <div className="flex items-center gap-2">
+                                <div className="w-8 h-8 rounded-full bg-gray-700 overflow-hidden flex items-center justify-center">
+                                  {submission.userId?.avatar || submission.user?.avatar ? (
+                                    <img 
+                                      src={submission.userId?.avatar || submission.user?.avatar} 
+                                      alt={submission.userId?.fullName || submission.user?.fullName || 'User'}
+                                      className="w-full h-full object-cover" 
+                                    />
+                                  ) : (
+                                    <User className="w-4 h-4 text-white" />
+                                  )}
+                                </div>
+                                <div>
+                                  <p className="text-white font-medium text-sm">
+                                    {submission.userId?.fullName || submission.user?.fullName || 'Unknown User'}
+                                  </p>
+                                  <p className="text-xs text-gray-400">
+                                    @{submission.userId?.username || submission.user?.username || 'unknown'}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                            
+                            <div className="flex items-center gap-4">
+                              {/* Score */}
+                              <div className="text-right">
+                                <p className="text-white font-bold">{submission.score}/100</p>
+                                <p className="text-xs text-gray-400">Score</p>
+                              </div>
+                              
+                              {/* Rank */}
+                              {submission.rank && (
+                                <Badge className="bg-purple-500/20 text-purple-300 border-purple-500/30">
+                                  <Trophy className="w-3 h-3 mr-1" />
+                                  {submission.rank}
+                                </Badge>
+                              )}
+                              
+                              {/* View Button */}
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleViewSubmission(submission)}
+                                className="border-gray-600 text-gray-300 hover:bg-gray-800"
+                              >
+                                <Eye className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    
+                    {/* Challenge Stats */}
+                    <div className="mt-3 pt-3 border-t border-gray-700">
+                      <div className="flex items-center gap-4 text-sm text-gray-400">
+                        <span>Total Participants: {challengeData.submissions.length}</span>
+                        <span>•</span>
+                        <span>Scored: {scoredSubmissions.length}</span>
+                        <span>•</span>
+                        <span>Avg Score: {Math.round(scoredSubmissions.reduce((sum: number, sub: any) => sum + sub.score, 0) / scoredSubmissions.length)}</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              });
+            })()}
+            
+            {/* No ranked submissions */}
+            {submissions.filter(sub => sub.score > 0).length === 0 && (
+              <div className="text-center py-8">
+                <Trophy className="w-16 h-16 text-gray-600 mx-auto mb-4" />
+                <p className="text-gray-400">No ranked submissions found</p>
+                <p className="text-sm text-gray-500 mt-2">Submissions will appear here once they are scored</p>
+              </div>
+            )}
+          </Card>
+        </motion.div>
+      )}
 
       {/* View Submission Detail Modal */}
       <Dialog open={viewDialogOpen} onOpenChange={setViewDialogOpen}>

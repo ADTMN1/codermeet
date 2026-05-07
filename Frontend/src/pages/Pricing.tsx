@@ -22,40 +22,19 @@ const Pricing: React.FC = () => {
     }
 
     try {
-      // Initialize payment with Chapa
-      const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-      const paymentPayload = {
-        plan: plan,
+      // Store upgrade info for SMS payment
+      localStorage.setItem('pending_upgrade', JSON.stringify({
         userId: user._id || user.id,
+        plan: plan,
         email: user.email,
         fullName: user.name || user.fullName
-      };
+      }));
 
-      const paymentRes = await axios.post(
-        `${API_BASE_URL}/api/payment/initialize`,
-        paymentPayload,
-        {
-          timeout: 10000,
-          headers: { 'Content-Type': 'application/json' },
-        }
-      );
-
-      if (paymentRes.data.success) {
-        // Store upgrade info for after payment
-        localStorage.setItem('pending_upgrade', JSON.stringify({
-          userId: user._id || user.id,
-          plan: plan,
-          paymentTxRef: paymentRes.data.data.tx_ref
-        }));
-
-        // Redirect to Chapa payment page
-        window.location.href = paymentRes.data.data.checkout_url;
-      } else {
-        alert('Failed to initialize payment. Please try again.');
-      }
+      // Redirect to SMS payment page
+      window.location.href = '/payment/sms';
     } catch (error) {
-      console.error('Payment initialization error:', error);
-      alert('Payment initialization failed. Please try again.');
+      console.error('Payment redirect error:', error);
+      alert('Failed to redirect to payment page. Please try again.');
     }
   };
 
@@ -101,7 +80,7 @@ const Pricing: React.FC = () => {
         <div className="text-center mb-8">
           <div className="inline-flex items-center gap-4 bg-gray-800 rounded-lg px-6 py-3">
             <span className="text-gray-300">Pricing in Ethiopian Birr (ETB)</span>
-            <span className="text-purple-400">Basic: 299 ETB/month</span>
+            <span className="text-purple-400">Basic: 1 ETB/month</span>
             <span className="text-yellow-400">Premium: 599 ETB/month</span>
           </div>
         </div>

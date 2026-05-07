@@ -1,0 +1,639 @@
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import axios from 'axios';
+import type { FormData } from './types';
+
+interface Props {
+  formData: FormData;
+  errors: { [key: string]: string };
+}
+
+const Step4Payment: React.FC<Props> = ({ formData }) => {
+  const navigate = useNavigate();
+  const [paymentInfo, setPaymentInfo] = useState<any>(null);
+  const [screenshotFile, setScreenshotFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [paymentSubmitted, setPaymentSubmitted] = useState(false);
+  const [waitingForSMS, setWaitingForSMS] = useState(false);
+  const [waitingTime, setWaitingTime] = useState(0);
+  const [pollingStatus, setPollingStatus] = useState('');
+  const [useSMSVerification, setUseSMSVerification] = useState(true); // Default to SMS verification
+    const [countdown, setCountdown] = useState<number>(0);
+  const [verificationStarted, setVerificationStarted] = useState(false);
+  
+  // Separate payer information
+  const [payerInfo, setPayerInfo] = useState({
+    fullName: '',
+    email: '',
+    phone: ''
+  });
+
+  useEffect(() => {
+    fetchPaymentInfo();
+  }, []);
+
+  const fetchPaymentInfo = async () => {
+    try {
+      const response = await fetch('/api/sms-forwarding/info');
+      const data = await response.json();
+      if (data.success) {
+        setPaymentInfo(data.data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch payment info:', error);
+    }
+  };
+
+  const completeRegistration = async () => {
+    try {
+      const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      
+      const payload = {
+        fullName: formData.fullName,
+        username: formData.username,
+        email: formData.email,
+        password: formData.password,
+        confirmPassword: formData.confirmPassword,
+        primaryLanguage: formData.primaryLanguage,
+        skills: formData.skills,
+        githubUrl: formData.github,
+        bio: formData.bio,
+        plan: formData.plan.charAt(0).toUpperCase() + formData.plan.slice(1),
+      };
+
+      const res = await axios.post(
+        `${API_BASE_URL}/auth/register`,
+        payload,
+        {
+          timeout: 10000,
+          headers: { 'Content-Type': 'application/json' },
+        }
+      );
+
+      // Set authentication token
+      if (res.data.token) {
+        localStorage.setItem('auth_token', res.data.token);
+      }
+
+      // Show success message and redirect
+      alert('🎉 Payment verified! Your account has been created successfully. Redirecting to dashboard...');
+      
+      setTimeout(() => {
+        navigate('/dashboard');
+      }, 2000);
+
+    } catch (error: any) {
+      console.error('Registration completion error:', error);
+      alert('❌ Error completing registration. Please contact support.');
+    }
+  };
+
+  const startSMSVerification = async () => {
+    // Validate payer information
+    if (!payerInfo.fullName.trim() || !payerInfo.email.trim()) {
+      alert('Please fill in payer information (Full Name and Email) before starting verification.');
+      return;
+    }
+
+    // Create pending payment with payer info (without reference)
+    try {
+      const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      
+      const response = await fetch(`${API_BASE_URL}/sms-forwarding/generate-reference`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          plan: formData.plan,
+          userId: 'pending-' + Date.now(),
+          email: payerInfo.email,
+          fullName: payerInfo.fullName,
+          phone: payerInfo.phone,
+          // Also include user account info for reference
+          userAccount: {
+            email: formData.email,
+            username: formData.username
+          }
+        })
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        console.log('✅ Pending payment created for:', payerInfo.fullName);
+      }
+    } catch (error) {
+      console.error('Failed to create pending payment:', error);
+      return;
+    }
+
+    // Start 1-minute countdown
+    setVerificationStarted(true);
+    setCountdown(60);
+    
+    const countdownInterval = setInterval(() => {
+      setCountdown(prev => {
+        if (prev <= 1) {
+          clearInterval(countdownInterval);
+          setVerificationStarted(false);
+          setPollingStatus('⏰ Time\'s up! Checking for payment confirmation...');
+          
+          // Start SMS verification after countdown
+          setTimeout(() => {
+            startSMSPolling();
+          }, 1000);
+          
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  };
+
+  const startSMSPolling = () => {
+    setWaitingForSMS(true);
+    setPaymentSubmitted(true);
+    setPollingStatus('Checking for SMS confirmation...');
+    setWaitingTime(0);
+    
+    const waitingInterval = setInterval(() => {
+      setWaitingTime(prev => {
+        const newTime = prev + 1;
+        
+        if (newTime <= 10) {
+          setPollingStatus('Looking for your payment SMS...');
+        } else if (newTime <= 30) {
+          setPollingStatus('Verifying payment details...');
+        } else if (newTime <= 60) {
+          setPollingStatus('Almost done, final verification...');
+        } else {
+          setPollingStatus('Taking longer than expected, still checking...');
+        }
+        
+        return newTime;
+      });
+    }, 1000);
+
+    // Poll for SMS verification with payer info matching
+    const checkSMSVerification = async () => {
+      try {
+        const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+        const response = await fetch(`${API_BASE_URL}/sms-forwarding/pending`);
+        
+        // Handle rate limiting
+        if (response.status === 429) {
+          console.log('⚠️ Rate limited, backing off...');
+          setPollingStatus('Rate limited - checking less frequently...');
+          return;
+        }
+        
+        const data = await response.json();
+        
+        if (data.success && data.data.length === 0) {
+          // No pending payments means payment was processed
+          clearInterval(waitingInterval);
+          clearInterval(smsCheckInterval);
+          setPollingStatus('🎉 Payment confirmed! Creating your account...');
+          
+          setTimeout(() => {
+            completeRegistration();
+          }, 2000);
+        } else if (data.success && data.data.length > 0) {
+          // Still pending payments - payment not received yet
+          setPollingStatus(`⏳ Still waiting for payment... Found ${data.data.length} pending payment(s)`);
+        } else if (waitingTime >= 120) { // 2 minute timeout
+          clearInterval(waitingInterval);
+          clearInterval(smsCheckInterval);
+          setWaitingForSMS(false);
+          setPollingStatus('❌ Payment not received! Please check:');
+          setPollingStatus(prev => prev + '\n• Did you use the correct payer name?');
+          setPollingStatus(prev => prev + '\n• Did you pay the correct amount?');
+          setPollingStatus(prev => prev + '\n• Did you use the right payment reference?');
+          setPollingStatus(prev => prev + '\n\nPlease try again or contact support.');
+        }
+      } catch (error) {
+        console.error('Error checking SMS verification:', error);
+      }
+    };
+
+    // Start with 5 second interval, implement exponential backoff for rate limiting
+    let pollingInterval = 5000;
+    let retryCount = 0;
+    
+    const smsCheckInterval = setInterval(() => {
+      checkSMSVerification().then(() => {
+        retryCount = 0; // Reset retry count on success
+      }).catch(() => {
+        retryCount++;
+        // Exponential backoff: 5s, 10s, 20s, 30s max
+        pollingInterval = Math.min(5000 * Math.pow(2, retryCount), 30000);
+        console.log(`🔄 Adjusting polling interval to ${pollingInterval}ms due to retries`);
+      });
+    }, pollingInterval);
+    
+    // Cleanup after 3 minutes max
+    setTimeout(() => {
+      clearInterval(waitingInterval);
+      clearInterval(smsCheckInterval);
+      setWaitingForSMS(false);
+    }, 180000);
+  };
+
+  const handlePayerInfoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setPayerInfo(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.type.startsWith('image/')) {
+        setScreenshotFile(file);
+      } else {
+        alert('Please upload an image file (PNG, JPG, etc.)');
+      }
+    }
+  };
+
+  const uploadScreenshot = async () => {
+    if (!screenshotFile) {
+      alert('Please select a screenshot file first');
+      return;
+    }
+
+    setUploading(true);
+    setPollingStatus('Uploading screenshot...');
+
+    try {
+      const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      
+      const formData = new FormData();
+      formData.append('screenshot', screenshotFile);
+      formData.append('plan', formData.plan);
+      formData.append('amount', paymentInfo?.prices?.[formData.plan as keyof typeof paymentInfo.prices] || '1');
+      formData.append('email', formData.email);
+      formData.append('fullName', formData.fullName);
+      formData.append('pendingRegistration', 'true');
+
+      const response = await fetch(`${API_BASE_URL}/enhanced-screenshots/upload-and-verify`, {
+        method: 'POST',
+        body: formData
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        setPaymentSubmitted(true);
+        
+        // Handle different verification statuses with detailed user feedback
+        switch (data.data.status) {
+          case 'auto_verified':
+            alert('🎉 Payment verified automatically! Your account is now active.');
+            completeRegistration();
+            break;
+            
+          case 'insufficient_amount':
+            alert(`💸 Insufficient payment detected!\n\nReceived: ${data.data.screenshotAmount} ETB\nRequired: ${data.data.expectedAmount} ETB\nShortfall: ${data.data.errorDetails.shortfall} ETB\n\nPlease pay the additional amount and upload a new screenshot.`);
+            break;
+            
+          case 'overpayment':
+            alert(`💰 Overpayment detected!\n\nReceived: ${data.data.screenshotAmount} ETB\nRequired: ${data.data.expectedAmount} ETB\nExcess: ${data.data.errorDetails.excess} ETB\n\nPlease contact support for a refund of the excess amount.`);
+            break;
+            
+          case 'no_amount':
+            alert('💳 No payment amount found!\n\nPlease ensure your screenshot clearly shows:\n• The payment amount\n• Transaction details\n\nTake a new screenshot and try again.');
+            break;
+            
+          case 'invalid_amount':
+            alert('❌ Invalid payment amount!\n\nThe screenshot contains an invalid amount format. Please ensure:\n• Clear payment amount is visible\n• Amount is properly formatted (e.g., "1.00 ETB")\n\nTake a new screenshot and try again.');
+            break;
+            
+          case 'pending_manual_review':
+            alert('📸 Screenshot uploaded successfully!\n\nYour payment is being reviewed by our team. You will receive an email confirmation once verified.\n\nTransaction ID: ' + (data.data.verificationResult?.transactionIds?.[0] || 'N/A'));
+            // For manual review, we'll still complete registration but user will need to wait for admin approval
+            completeRegistration();
+            break;
+            
+          case 'verification_error':
+            alert('⚠️ System error during verification!\n\nPlease try uploading the screenshot again. If the problem persists, contact support with your transaction details.');
+            break;
+            
+          default:
+            alert('📸 Screenshot uploaded!\n\nManual review required for verification. You will receive an email confirmation once processed.');
+        }
+      } else {
+        alert('❌ Upload failed: ' + (data.message || 'Unknown error'));
+      }
+    } catch (error) {
+      console.error('Upload error:', error);
+      alert('❌ Upload failed. Please try again.');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  if (!paymentInfo) {
+    return (
+      <div className="min-h-screen text-gray-200 flex items-center justify-center p-6">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500"></div>
+          <p className="mt-4">Loading payment information...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen text-gray-200 flex items-center justify-center p-6">
+      <div className="w-full max-w-4xl bg-gray-900 rounded-2xl p-10 shadow-2xl animate-fadeIn">
+        <h2 className="text-3xl font-bold text-center mb-8 text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400">
+          Payment Information
+        </h2>
+
+        {/* Account Details */}
+        <div className="bg-gray-800/50 p-6 rounded-lg mb-6">
+          <h3 className="text-lg font-semibold mb-3">Account Information</h3>
+          <div className="space-y-2 text-sm">
+            <p><strong>Account Name:</strong> CoderMeet Technologies</p>
+            <p><strong>Account Number:</strong> 1000516323381</p>
+            <p><strong>Bank:</strong> Commercial Bank of Ethiopia</p>
+            <p><strong>Branch:</strong> Bole Branch</p>
+            <p><strong>TeleBirr:</strong> +251986006897</p>
+          </div>
+        </div>
+
+        {/* Payer Information Form */}
+        <div className="bg-blue-900/30 border border-blue-500/30 p-6 rounded-lg mb-6">
+          <h3 className="text-lg font-semibold mb-3 text-blue-300">Payer Information</h3>
+          <p className="text-sm text-gray-400 mb-4">
+            Enter details of person who will make the payment (may be different from account holder)
+          </p>
+          <div className="bg-gray-800/50 p-4 rounded border space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Payer Full Name *
+                </label>
+                <input
+                  type="text"
+                  name="fullName"
+                  value={payerInfo.fullName}
+                  onChange={handlePayerInfoChange}
+                  placeholder="Enter full name of person making payment"
+                  className="w-full p-2 border border-gray-600 rounded-lg bg-gray-700/50 text-gray-200"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Payer Email *
+                </label>
+                <input
+                  type="email"
+                  name="email"
+                  value={payerInfo.email}
+                  onChange={handlePayerInfoChange}
+                  placeholder="payer@example.com"
+                  className="w-full p-2 border border-gray-600 rounded-lg bg-gray-700/50 text-gray-200"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Payer Phone (Optional)
+                </label>
+                <input
+                  type="tel"
+                  name="phone"
+                  value={payerInfo.phone}
+                  onChange={handlePayerInfoChange}
+                  placeholder="+2519xxxxxxxx"
+                  className="w-full p-2 border border-gray-600 rounded-lg bg-gray-700/50 text-gray-200"
+                />
+              </div>
+                          </div>
+            
+            {/* Account Information (for reference) */}
+            <div className="border-t border-gray-600 pt-4 mt-4">
+              <h4 className="text-sm font-semibold text-gray-400 mb-2">Account Holder Information:</h4>
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <p className="text-gray-400">Account Email:</p>
+                  <p className="text-white">{formData.email}</p>
+                </div>
+                <div>
+                  <p className="text-gray-400">Username:</p>
+                  <p className="text-white">{formData.username}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Plan Summary */}
+        <div className="bg-gray-800/50 p-6 rounded-lg mb-6">
+          <h3 className="text-lg font-semibold mb-3">Selected Plan</h3>
+          <div className="bg-gray-700/50 p-4 rounded border">
+            <div className="flex justify-between items-center">
+              <div>
+                <p className="font-semibold capitalize">{formData.plan} Plan</p>
+                <p className="text-sm text-gray-400">
+                  {formData.plan === 'basic' ? 'Basic dashboard access' : 'Full premium features'}
+                </p>
+              </div>
+              <p className="text-2xl font-bold text-purple-400">
+                {paymentInfo?.prices?.[formData.plan as keyof typeof paymentInfo.prices]} ETB
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Verification Method Selection */}
+        <div className="bg-purple-900/30 border border-purple-500/30 p-6 rounded-lg mb-6">
+          <h3 className="text-lg font-semibold mb-3 text-purple-300">Verification Method</h3>
+          <div className="space-y-3">
+            <label className="flex items-center space-x-3 cursor-pointer">
+              <input
+                type="radio"
+                name="verificationMethod"
+                checked={useSMSVerification}
+                onChange={() => setUseSMSVerification(true)}
+                className="w-4 h-4 text-purple-500"
+              />
+              <div>
+                <span className="font-medium text-white">📱 SMS Auto-Verification (Recommended)</span>
+                <p className="text-sm text-gray-400">Instant verification via bank SMS - no screenshot needed</p>
+              </div>
+            </label>
+            <label className="flex items-center space-x-3 cursor-pointer">
+              <input
+                type="radio"
+                name="verificationMethod"
+                checked={!useSMSVerification}
+                onChange={() => setUseSMSVerification(false)}
+                className="w-4 h-4 text-purple-500"
+              />
+              <div>
+                <span className="font-medium text-white">📸 Screenshot Verification</span>
+                <p className="text-sm text-gray-400">Manual verification by uploading payment screenshot</p>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        {/* Payment Instructions */}
+        <div className="bg-yellow-900/30 border border-yellow-500/30 p-6 rounded-lg mb-6">
+          <h3 className="text-lg font-semibold mb-3 text-yellow-300">Payment Instructions</h3>
+          <ol className="list-decimal list-inside space-y-2 text-sm">
+            <li>Pay {paymentInfo?.prices?.[formData.plan as keyof typeof paymentInfo.prices]} ETB using the account details above</li>
+            <li>Use your name "{payerInfo.fullName || '[Enter Payer Name]'}" as payment reference</li>
+            {useSMSVerification ? (
+              <>
+                <li>System will automatically detect your payment via SMS</li>
+                <li>Your account will be upgraded instantly after payment</li>
+              </>
+            ) : (
+              <>
+                <li>Take a screenshot of your payment confirmation</li>
+                <li>Upload the screenshot below for verification</li>
+              </>
+            )}
+          </ol>
+        </div>
+
+        {/* Payment Verification */}
+        {!paymentSubmitted ? (
+          <div className="bg-green-900/30 border border-green-500/30 p-6 rounded-lg">
+            <h3 className="text-lg font-semibold mb-4 text-green-300">
+              {useSMSVerification ? '📱 SMS Payment Verification' : '📸 Upload Payment Screenshot'}
+            </h3>
+            
+            {useSMSVerification ? (
+              <div className="space-y-4">
+                {!verificationStarted && !paymentSubmitted && (
+                  <div className="bg-blue-900/30 border border-blue-500/30 p-4 rounded-lg">
+                    <h4 className="font-semibold text-blue-300 mb-2">How SMS Verification Works:</h4>
+                    <ul className="text-sm text-gray-300 space-y-1">
+                      <li>✅ Click "Pay Now" to generate payment reference</li>
+                      <li>✅ You have 1 minute to go to the bank and make payment</li>
+                      <li>✅ Use payer name "{payerInfo.fullName || '[Enter Payer Name]'}" as payment reference</li>
+                      <li>✅ Bank sends SMS confirmation to our system</li>
+                      <li>✅ System matches payer info with SMS and upgrades account</li>
+                      <li>✅ No screenshot needed - instant access!</li>
+                    </ul>
+                  </div>
+                )}
+                
+                {verificationStarted && (
+                  <div className="bg-orange-900/30 border border-orange-500/30 p-4 rounded-lg">
+                    <h4 className="font-semibold text-orange-300 mb-2">⏰ Payment Countdown Active!</h4>
+                    <div className="text-center">
+                      <div className="text-4xl font-bold text-orange-400 mb-2">
+                        {Math.floor(countdown / 60)}:{(countdown % 60).toString().padStart(2, '0')}
+                      </div>
+                      <p className="text-sm text-gray-300">
+                        Go to the bank now and pay {paymentInfo?.prices?.[formData.plan as keyof typeof paymentInfo.prices]} ETB
+                      </p>
+                      <p className="text-xs text-gray-400 mt-2">
+                        Use payer name "{payerInfo.fullName}" as payment reference
+                      </p>
+                                          </div>
+                  </div>
+                )}
+                
+                {!verificationStarted && !paymentSubmitted && (
+                  <button
+                    type="button"
+                    onClick={startSMSVerification}
+                    disabled={uploading}
+                    className="w-full bg-blue-600 text-white py-3 px-6 rounded-lg font-semibold hover:bg-blue-700 transition-colors disabled:bg-gray-600 disabled:cursor-not-allowed"
+                  >
+                    {uploading ? 'Starting Verification...' : '💳 Pay Now'}
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Payment Screenshot (PNG, JPG, etc.)
+                  </label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleFileUpload}
+                    className="w-full p-2 border border-gray-600 rounded-lg bg-gray-800/50 text-gray-200"
+                  />
+                </div>
+                
+                {screenshotFile && (
+                  <div className="bg-gray-800/50 p-4 rounded border">
+                    <p className="text-sm text-gray-400 mb-2">Selected file:</p>
+                    <p className="font-medium">{screenshotFile.name}</p>
+                    <p className="text-sm text-gray-500">
+                      Size: {(screenshotFile.size / 1024 / 1024).toFixed(2)} MB
+                    </p>
+                  </div>
+                )}
+                
+                <button
+                  type="button"
+                  onClick={uploadScreenshot}
+                  disabled={uploading || !screenshotFile}
+                  className="w-full bg-green-600 text-white py-3 px-6 rounded-lg font-semibold hover:bg-green-700 transition-colors disabled:bg-gray-600 disabled:cursor-not-allowed"
+                >
+                  {uploading ? (waitingForSMS ? 'Verifying Payment...' : 'Uploading...') : 'Submit Payment Screenshot'}
+                </button>
+              </div>
+            )}
+              
+            {waitingForSMS && (
+              <div className="bg-blue-900/30 border border-blue-500/30 p-4 rounded-lg">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-blue-300 text-sm font-medium">{pollingStatus}</span>
+                  <span className="text-blue-400 text-sm">{waitingTime}s</span>
+                </div>
+                <div className="w-full bg-gray-700 rounded-full h-2">
+                  <div 
+                    className="bg-blue-500 h-2 rounded-full transition-all duration-1000"
+                    style={{ width: `${Math.min((waitingTime / 30) * 100, 100)}%` }}
+                  />
+                </div>
+                <p className="text-blue-400 text-xs mt-2">
+                  {useSMSVerification ? 'Waiting for SMS confirmation...' : 'Verifying payment (usually takes 10-30 seconds)...'}
+                </p>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="bg-green-900/30 border border-green-500/30 p-6 rounded-lg text-center">
+            <div>
+              <p className="text-green-300 font-semibold text-lg">
+                {useSMSVerification ? '📱 SMS Verification Started!' : '📸 Screenshot Submitted Successfully!'}
+              </p>
+              <p className="text-green-400 text-sm mt-2">
+                {useSMSVerification 
+                  ? 'Make your payment now. We\'ll detect it automatically via SMS and upgrade your account instantly.'
+                  : 'We\'re verifying your payment. You\'ll receive dashboard access shortly.'
+                }
+              </p>
+              <p className="text-green-500 text-xs mt-1">
+                {useSMSVerification ? 'No screenshot needed - instant verification!' : 'Check your email for confirmation.'}
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Support Info */}
+        <div className="bg-gray-700/50 p-4 rounded-lg text-center">
+          <p className="text-sm text-gray-400">
+            Need help? Contact us at support@codermeet.com
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default Step4Payment;

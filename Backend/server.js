@@ -1,3205 +1,371 @@
 // server.js
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 require("dotenv").config();
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 const express = require("express");
 
-
-
-
-
-
-
-
-
-
-
-
-
-
+const crypto = require("crypto");
 
 const http = require('http');
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 const socketIo = require('socket.io');
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 const helmet = require("helmet");
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 const cors = require("cors");
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 const morgan = require("morgan");
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 const rateLimit = require("express-rate-limit");
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 const connectDB = require("./config/db");
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 const authRoutes = require('./routes/auth');
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 const userRoutes = require('./routes/user');
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 const adminRoutes = require('./routes/admin');
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 const challengeRoutes = require('./routes/challenges');
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 const leaderboardRoutes = require('./routes/leaderboard');
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 const pointsRoutes = require('./routes/points');
 
 
 
-
-
-const paymentRoutes = require('./routes/payment');
-const smsForwardingRoutes = require('./routes/smsForwarding');
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 const resourceRoutes = require('./routes/resources');
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 const businessIdeaRoutes = require('./routes/businessIdeas');
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 const mentorshipRoutes = require('./routes/mentorship');
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 const messageRoutes = require('./routes/messages');
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 const chatRoutes = require('./routes/chat');
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 const dailyChallengeRoutes = require('./routes/dailyChallenge');
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 const userNotificationRoutes = require('./routes/userNotifications');
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 const submissionsRoutes = require('./routes/submissions');
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 const adminChallengeRoutes = require('./routes/adminChallenges');
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 const weeklyChallengeRoutes = require('./routes/weeklyChallenge');
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 const twoFactorRoutes = require('./routes/twoFactor');
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 const sessionRoutes = require('./routes/sessions');
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 const jobRoutes = require('./routes/job');
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 const achievementsRoutes = require('./routes/achievements');
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+const screenshotsRoutes = require('./routes/screenshots');
 
 // Import models
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 const User = require('./models/user');
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 const Submission = require('./models/Submission');
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 const DailySubmission = require('./models/dailySubmission');
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 const BusinessIdea = require('./models/businessIdea');
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 const Announcement = require('./models/announcement');
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 const Comment = require('./models/comment');
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 const Team = require('./models/team');
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 const { errorHandler } = require("./middlewares/errorHandler");
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 const socketHandler = require('./socket/socketHandler');
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 const notificationCleanupService = require('./services/notificationCleanupService');
 
-
-
 const DailyChallengeScheduler = require('./services/dailyChallengeScheduler');
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 const uploadSecurity = require('./middleware/uploadSecurity');
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 const logger = require('./utils/logger');
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 const fs = require('fs');
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 const path = require('path');
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 const app = express();
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 const server = http.createServer(app);
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 const io = socketIo(server, {
 
+cors: {
 
+origin: process.env.FRONTEND_URL?.split(',') || ["http://localhost:3000", "http://localhost:5173"],
 
+methods: ["GET", "POST"],
 
-
-
-
-
-
-
-
-
-
-
-
-  cors: {
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    origin: process.env.FRONTEND_URL?.split(',') || ["http://localhost:3000", "http://localhost:5173"],
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    methods: ["GET", "POST"],
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    credentials: true
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-  }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-});
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-const PORT = process.env.PORT || 5000;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-// Connect DB
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-connectDB();
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-// CORS Configuration
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-const allowedOrigins = (process.env.FRONTEND_URL || "http://localhost:3000,http://localhost:5173").split(",");
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-// Ensure uploads directory exists
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-const uploadsDir = path.join(__dirname, 'uploads');
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-if (!fs.existsSync(uploadsDir)) {
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-  fs.mkdirSync(uploadsDir, { recursive: true });
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+credentials: true
 
 }
 
+});
 
+const PORT = process.env.PORT || 5000;
 
+// Connect DB
 
+connectDB();
 
+// CORS Configuration
 
+const allowedOrigins = (process.env.FRONTEND_URL || "http://localhost:3000,http://localhost:5173").split(",");
 
+// Ensure uploads directory exists
 
+const uploadsDir = path.join(__dirname, 'uploads');
 
+if (!fs.existsSync(uploadsDir)) {
 
+fs.mkdirSync(uploadsDir, { recursive: true });
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+}
 
 // Apply CORS middleware first
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 app.use(cors({
 
+origin: function (origin, callback) {
 
+// Allow requests with no origin (like mobile apps or curl requests)
 
+if (!origin) return callback(null, true);
 
+if (allowedOrigins.includes(origin)) {
 
+callback(null, true);
 
+} else {
 
+callback(new Error('Not allowed by CORS'));
 
+}
 
+},
 
+credentials: true,
 
+methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
 
+allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
 
-
-
-  origin: function (origin, callback) {
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    // Allow requests with no origin (like mobile apps or curl requests)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    if (!origin) return callback(null, true);
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    if (allowedOrigins.includes(origin)) {
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-      callback(null, true);
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    } else {
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-      callback(new Error('Not allowed by CORS'));
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-  },
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-  credentials: true,
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-  preflightContinue: false,
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-  optionsSuccessStatus: 204
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+preflightContinue: false,
 
 }));
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
 // Middlewares
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 app.use(helmet({
 
+contentSecurityPolicy: {
 
+directives: {
 
+defaultSrc: ["'self'"],
 
+styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
 
+fontSrc: ["'self'", "https://fonts.gstatic.com"],
 
+imgSrc: ["'self'", "data:", "https:"],
 
+scriptSrc: ["'self'"],
 
+connectSrc: ["'self'"],
 
+},
 
+},
 
-
-
-
-
-  contentSecurityPolicy: {
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    directives: {
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-      defaultSrc: ["'self'"],
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-      fontSrc: ["'self'", "https://fonts.gstatic.com"],
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-      imgSrc: ["'self'", "data:", "https:"],
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-      scriptSrc: ["'self'"],
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-      connectSrc: ["'self'", "https://api.chapa.co"],
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    },
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-  },
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-  crossOriginEmbedderPolicy: false,
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+crossOriginEmbedderPolicy: false,
 
 }));
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 // Logging (dev only)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 if (process.env.NODE_ENV !== "production") {
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-  app.use(morgan("dev"));
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+app.use(morgan("dev"));
 
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 // Body parser with reasonable limits for security
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 app.use(express.json({ limit: '5mb' }));
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 app.use(express.urlencoded({ extended: true, limit: '5mb' }));
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 // Request logging middleware
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 app.use((req, res, next) => {
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-  next();
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+next();
 
 });
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 // Global rate limiter - Professional settings for production
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 const globalLimiter = rateLimit({
 
+windowMs: 15 * 60 * 1000, // 15 minutes
 
+max: 1000, // 1000 requests per 15 minutes (reasonable for production)
 
+message: {
 
+error: "Too many requests, please try again later",
 
+retryAfter: "15 minutes"
 
+},
 
+standardHeaders: true,
 
+legacyHeaders: false,
 
+// Skip successful requests from rate limiting
 
+skipSuccessfulRequests: false,
 
+// Skip failed requests from rate limiting
 
+skipFailedRequests: false,
 
+// Add custom handler for rate limit exceeded
 
+handler: (req, res) => {
 
-  windowMs: 15 * 60 * 1000, // 15 minutes
+res.status(429).json({
 
+error: "Too many requests",
 
+message: "Rate limit exceeded. Please try again later.",
 
-
-
-
-
-
-
-
-
-
-
-
-
-  max: 1000, // 1000 requests per 15 minutes (reasonable for production)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-  message: {
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    error: "Too many requests, please try again later",
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    retryAfter: "15 minutes"
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-  },
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-  standardHeaders: true,
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-  legacyHeaders: false,
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-  // Skip successful requests from rate limiting
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-  skipSuccessfulRequests: false,
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-  // Skip failed requests from rate limiting  
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-  skipFailedRequests: false,
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-  // Add custom handler for rate limit exceeded
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-  handler: (req, res) => {
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    res.status(429).json({
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-      error: "Too many requests",
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-      message: "Rate limit exceeded. Please try again later.",
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-      retryAfter: Math.ceil(15 * 60) // 15 minutes in seconds
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    });
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-  }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+retryAfter: Math.ceil(15 * 60) // 15 minutes in seconds
 
 });
 
+}
 
-
-
-
-
-
-
-
-
-
-
-
-
+});
 
 app.use(globalLimiter);
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 // Stricter rate limiting for auth endpoints
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 const authLimiter = rateLimit({
 
+windowMs: 15 * 60 * 1000, // 15 minutes
 
+max: 10, // 10 attempts per 15 minutes
 
+message: "Too many authentication attempts, please try again later",
 
+standardHeaders: true,
 
-
-
-
-
-
-
-
-
-
-
-  windowMs: 15 * 60 * 1000, // 15 minutes
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-  max: 10, // 10 attempts per 15 minutes
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-  message: "Too many authentication attempts, please try again later",
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-  standardHeaders: true,
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-  legacyHeaders: false,
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+legacyHeaders: false,
 
 });
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-// Stricter rate limiting for payment endpoints
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-const paymentLimiter = rateLimit({
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-  windowMs: 15 * 60 * 1000, // 15 minutes
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-  max: 5, // 5 payment attempts per 15 minutes
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-  message: "Too many payment attempts, please try again later",
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-  standardHeaders: true,
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-  legacyHeaders: false,
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-});
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 // Serve static files from uploads directory
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 // Routes
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 app.use("/api/auth", authLimiter, authRoutes);
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 app.use("/api/users", userRoutes);
 
-
-
-
-
-
-
-
-
-
-
 app.use("/api/user-notifications", userNotificationRoutes);
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 app.use("/api/admin", adminRoutes);
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 app.use("/api/admin/challenges", adminChallengeRoutes); // AI Challenge Generation
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 app.use("/api/submissions", submissionsRoutes); // Professional submission management
 
+app.use("/api/achievements", achievementsRoutes);
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-app.use("/api/challenges", challengeRoutes); // Public challenge routes
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+app.use("/api/screenshots", screenshotsRoutes); // Public challenge routes
 
 app.use("/api/leaderboard", leaderboardRoutes);
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 app.use("/api/points", pointsRoutes); // Points awarding system
 
 
 
-
-
-
-
-
-
-
-app.use("/api/payment", paymentLimiter, paymentRoutes);
-app.use("/api/sms-forwarding", smsForwardingRoutes); // Temporarily enabled
-
-
-// app.use("/api/sms-forwarding", smsForwardingRoutes); // Temporarily disabled
-
-
-
-
-
-
-
-
-
-
 app.use("/api/resources", resourceRoutes);
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 app.use("/api/daily-challenge", dailyChallengeRoutes);
 
-
-
 app.use("/api/debug", require('./routes/debug')); // Debug endpoint
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 app.use("/api/2fa", twoFactorRoutes); // 2FA routes
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 app.use("/api/sessions", sessionRoutes); // Session management routes
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 app.use("/api/business-ideas", businessIdeaRoutes);
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 app.use("/api/mentorship", mentorshipRoutes);
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 app.use("/api/messages", messageRoutes); // Message routes (mounted at /api to handle /api/challenges/:id/messages)
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 app.use("/api/chat", chatRoutes); // Chat routes
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 app.use("/api/weekly-challenges", weeklyChallengeRoutes);
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 app.use("/api/jobs", jobRoutes); // Job routes
 
 
 
 
-
-
-
-app.use("/api/achievements", achievementsRoutes); // Achievements routes
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 // Error handler
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 app.use(errorHandler);
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-// Health check route
-app.get("/", (req, res) => {
-    res.send("🚀 CoderMeet Backend is running");
-});
-
-// Start server
-
-
-
-// Make Socket.IO available to controllers BEFORE server starts
-app.set('io', io);
-console.log('Socket.IO instance attached to Express app');
-
 server.listen(PORT, () => {
 
+logger.info(`Server running on port ${PORT}`);
 
+logger.info(`Socket.IO server initialized`);
 
+// Initialize socket handler
 
+socketHandler(io);
 
+// Initialize notification cleanup service
 
+notificationCleanupService.start();
 
+// Initialize daily challenge scheduler
 
+const dailyChallengeScheduler = new DailyChallengeScheduler();
 
+dailyChallengeScheduler.initialize();
 
+// Initialize professional automatic status updates
 
-  logger.info(`Server running on port ${PORT}`);
+const challengeStatusService = require('./services/challengeStatusService');
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-  logger.info(`Socket.IO server initialized`);
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-  // Initialize socket handler
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-  socketHandler(io);
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-  // Initialize notification cleanup service
-
-
-
-  notificationCleanupService.start();
-
-
-
-
-
-
-
-  // Initialize daily challenge scheduler
-
-
-
-  const dailyChallengeScheduler = new DailyChallengeScheduler();
-
-
-
-  dailyChallengeScheduler.initialize();
-
-
-
-  // Initialize professional automatic status updates
-
-  const challengeStatusService = require('./services/challengeStatusService');
-
-  challengeStatusService.startAutomaticUpdates();
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+challengeStatusService.startAutomaticUpdates();
 
 });
+
+
+

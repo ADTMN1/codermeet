@@ -642,6 +642,29 @@ const userSchema = new mongoose.Schema(
 
 
 
+    // Payment verification fields
+    paymentStatus: {
+      type: String,
+      enum: ['pending', 'verified', 'failed'],
+      default: 'pending'
+    },
+    paymentVerifiedAt: {
+      type: Date
+    },
+    verifiedTransactionId: {
+      type: String
+    },
+    paymentScreenshot: {
+      type: String
+    },
+    paymentAttempts: {
+      type: Number,
+      default: 0
+    },
+    lastPaymentAttempt: {
+      type: Date
+    }
+
   }, 
 
 
